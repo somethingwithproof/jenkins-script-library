@@ -7,9 +7,9 @@ This repository contains a collection of scripts for Jenkins. The scripts are wr
 
 The scripts are organized into the following directories:
 
-**jobs**: Contains scripts for starting and stopping Jenkins jobs
-**build**: Contains scripts for building and deploying applications
-**resources**: Contains scripts for managing Jenkins resources
+* **jobs**: Contains scripts for starting and stopping Jenkins jobs
+* **build**: Contains scripts for building and deploying applications
+* **resources**: Contains scripts for managing Jenkins resources
 
 To use the scripts, you will need to install Groovy and the Jenkins CLI. Once you have installed the necessary software, you can run the scripts by using the groovy command.
 
