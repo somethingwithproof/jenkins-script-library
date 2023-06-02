@@ -1,5 +1,5 @@
 # Jenkins scripts
-This repository contains a collection of scripts for Jenkins. The scripts are written in Groovy and can be used to automate tasks such as:
+This repository contains a collection of scripts for Jenkins. Most were written several years ago and I haven't tested them in a while. I plan to write unit tests and test them soon. THIS IS A WIP. The scripts are written in Groovy and can be used to automate tasks such as:
 
 * Starting and stopping Jenkins jobs
 * Building and deploying applications
