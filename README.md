@@ -30,6 +30,7 @@ To run these scripts, you will need Groovy installed on your machine and the Jen
 
 ```bash
 groovy <script-name.groovy> [parameters]
+```
 
 Please ensure you have the appropriate permissions within your Jenkins environment to execute the operations performed by the scripts.
 
