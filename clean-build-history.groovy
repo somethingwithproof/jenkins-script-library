@@ -9,7 +9,7 @@ import java.util.logging.Logger
  * This utility class allows for targeted clean-up operations within a Jenkins instance,
  * affecting only specified jobs or folders.
  * 
- * @author Author
+ * @author thomasvincent
  */
 class JobCleaner {
     private static final Logger LOGGER = Logger.getLogger(JobCleaner.class.name)
