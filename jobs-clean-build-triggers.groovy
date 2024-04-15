@@ -1,54 +1,49 @@
-/**
- * Removes all build triggers from all jobs in the Jenkins instance.
- *
- * @author thomasvincent
- */
-
-import hudson.model.Hudson
-import hudson.model.AbstractProject
-import hudson.triggers.Trigger
+import jenkins.model.Jenkins
+import hudson.model.Job
+import hudson.security.Permission
+import java.util.logging.Logger
 
 /**
- * Removes all build triggers of a specific type from all jobs in the Jenkins instance.
+ * This script disables all buildable jobs in a Jenkins instance.
+ * It checks user permissions before performing any operations and logs all significant actions and errors.
+ * This ensures that only authorized users can perform disable operations and provides a traceable log of actions performed.
  *
- * @author thomasvincent
+ * @author Thomas Vincent
  */
-class RemoveBuildTriggers {
+public class JenkinsJobDisabler {
 
-  /**
-   * The type of build trigger to remove.
-   */
-  private static final Class<Trigger> BUILD_TRIGGER_TYPE = Trigger.class
+    private static final Logger LOGGER = Logger.getLogger("JenkinsJobDisabler");
 
-  /**
-   * Removes all build triggers from the specified job.
-   *
-   * @param job The job to remove build triggers from.
-   */
-  private static void removeBuildTriggers(AbstractProject job) {
-    job.getTriggers().findAll { it.getClass() == BUILD_TRIGGER_TYPE }.each { trigger ->
-      job.removeTrigger(trigger.getDescriptor())
+    /**
+     * The main method that runs the job disable process.
+     * It first checks for administrative permissions and then processes each job, disabling it if it is currently buildable.
+     *
+     * @param args Command-line arguments (not used).
+     */
+    public static void main(String[] args) {
+        LOGGER.info("Starting cleanup operation");
+        Jenkins jenkins = Jenkins.getInstance();
+        def user = jenkins.getMe();
+
+        // Check for administrative permissions before proceeding
+        if (!user.hasPermission(Jenkins.ADMINISTER)) {
+            throw new SecurityException("User does not have necessary permissions to perform cleanup");
+        }
+
+        // Process all items, specifically looking for jobs
+        jenkins.allItems.findAll { it instanceof Job }.each { job ->
+            try {
+                // Disable the job if it is buildable
+                if (job.isBuildable()) {
+                    job.setBuildable(false);
+                    job.save();
+                    LOGGER.info("Disabled job: ${job.name}");
+                }
+            } catch (Exception e) {
+                LOGGER.severe("Failed to disable job ${job.name}: ${e.message}");
+            }
+        }
+
+        LOGGER.info("Completed cleanup operation");
     }
-    job.save()
-  }
-
-  /**
-   * Iterates over all items in Jenkins, including those in folders, and removes the specified build triggers.
-   */
-  static void processAllItems() {
-    Hudson.instance.allItems.each { item ->
-      if (item instanceof AbstractProject) {
-        removeBuildTriggers(item)
-      }
-    }
-  }
-
-  /**
-   * The main method.
-   *
-   * @param args The command-line arguments.
-   */
-  static void main(String[] args) {
-    processAllItems()
-  }
 }
