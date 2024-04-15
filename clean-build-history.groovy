@@ -4,6 +4,9 @@ import jenkins.model.Item
 import org.kohsuke.stapler.DataBoundConstructor
 import java.util.logging.Logger
 
+/**
+ * Class to clean up Jenkins jobs and optionally reset their build numbers.
+ */
 class JobCleaner {
     private static final Logger LOGGER = Logger.getLogger(JobCleaner.class.name)
     private static final int DEFAULT_CLEANED_JOBS_LIMIT = 25
@@ -17,8 +20,8 @@ class JobCleaner {
 
     @DataBoundConstructor
     JobCleaner(Jenkins jenkins, String jobName, boolean resetBuildNumber, int cleanedJobsLimit = DEFAULT_CLEANED_JOBS_LIMIT, int buildTotal = DEFAULT_BUILD_TOTAL) {
-        this.jenkins = jenkins
-        this.jobName = jobName
+        this.jenkins = jenkins ?: throw new IllegalArgumentException("Jenkins instance cannot be null")
+        this.jobName = jobName?.trim() ?: throw new IllegalArgumentException("Job name cannot be null or blank")
         this.resetBuildNumber = resetBuildNumber
         this.cleanedJobsLimit = cleanedJobsLimit
         this.buildTotal = buildTotal
@@ -51,10 +54,7 @@ class JobCleaner {
                 LOGGER.severe("Failed to delete build ${build.id} for job ${job.name}: ${e.message}")
             }
         }
-        if (buildsDeleted) {
-            LOGGER.info("Job ${job.name} cleaned successfully.")
-        }
-        if (resetBuildNumber) {
+        if (buildsDeleted && resetBuildNumber) {
             job.nextBuildNumber = 1
             try {
                 job.save()
