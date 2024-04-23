@@ -1,4 +1,4 @@
-package com.github.thomasvincent.jenkinsscripts/
+package com.github.thomasvincent.jenkinsscripts
 
 import hudson.model.Node
 import hudson.model.TaskListener
