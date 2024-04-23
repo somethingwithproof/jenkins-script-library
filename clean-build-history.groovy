@@ -1,93 +1,98 @@
-import jenkins.model.Jenkins
-import jenkins.model.AbstractItem
-import jenkins.model.Item
-import org.kohsuke.stapler.DataBoundConstructor
-import java.util.logging.Logger
+import jenkins.model.Jenkins;
+import hudson.model.AbstractProject;
+import hudson.model.Job;
+import hudson.model.TopLevelItem;
+import org.kohsuke.stapler.DataBoundConstructor;
+import java.io.IOException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
- * Cleans Jenkins jobs either by removing old builds or by resetting their build numbers.
- * This utility class allows for targeted clean-up operations within a Jenkins instance,
- * affecting only specified jobs or folders.
- * 
- * @author thomasvincent
+ * Utility class to clean Jenkins jobs by either removing old builds or resetting their build numbers.
  */
-class JobCleaner {
-    private static final Logger LOGGER = Logger.getLogger(JobCleaner.class.name)
-    private static final int DEFAULT_CLEANED_JOBS_LIMIT = 25
-    private static final int DEFAULT_BUILD_TOTAL = 100
+public class JobCleaner {
+    private static final Logger LOGGER = Logger.getLogger(JobCleaner.class.getName());
+    private static final int DEFAULT_CLEANED_JOBS_LIMIT = 25;
+    private static final int DEFAULT_BUILD_TOTAL = 100;
 
-    private final Jenkins jenkins
-    private final String jobName
-    private final boolean resetBuildNumber
-    private final int cleanedJobsLimit
-    private final int buildTotal
+    private final Jenkins jenkins;
+    private final String jobName;
+    private final boolean resetBuildNumber;
+    private final int cleanedJobsLimit;
+    private final int buildTotal;
 
     /**
-     * Data-bound constructor to create a JobCleaner object.
-     * 
-     * @param jenkins the Jenkins instance this cleaner will operate on
-     * @param jobName the name of the job to clean
-     * @param resetBuildNumber if true, resets the build number to 1
-     * @param cleanedJobsLimit the maximum number of jobs to clean within a folder
-     * @param buildTotal the maximum number of builds to delete from a job
+     * Constructs a JobCleaner object with specified parameters.
+     *
+     * @param jenkins           The Jenkins instance.
+     * @param jobName           Name of the job to clean.
+     * @param resetBuildNumber  If true, resets the build number to 1.
+     * @param cleanedJobsLimit  Max number of jobs to clean within a folder.
+     * @param buildTotal        Max number of builds to delete from a job.
      */
     @DataBoundConstructor
-    JobCleaner(Jenkins jenkins, String jobName, boolean resetBuildNumber, int cleanedJobsLimit = DEFAULT_CLEANED_JOBS_LIMIT, int buildTotal = DEFAULT_BUILD_TOTAL) {
-        this.jenkins = jenkins ?: throw new IllegalArgumentException("Jenkins instance cannot be null")
-        this.jobName = jobName?.trim() ?: throw new IllegalArgumentException("Job name cannot be null or blank")
-        this.resetBuildNumber = resetBuildNumber
-        this.cleanedJobsLimit = cleanedJobsLimit
-        this.buildTotal = buildTotal
+    public JobCleaner(Jenkins jenkins, String jobName, boolean resetBuildNumber, int cleanedJobsLimit, int buildTotal) {
+        this.jenkins = validateNotNull(jenkins, "Jenkins instance cannot be null");
+        this.jobName = validateNotNullOrEmpty(jobName, "Job name cannot be null or empty").trim();
+        this.resetBuildNumber = resetBuildNumber;
+        this.cleanedJobsLimit = Math.max(1, cleanedJobsLimit);
+        this.buildTotal = Math.max(1, buildTotal);
     }
 
     /**
-     * Initiates the cleaning process for the specified job or folder.
-     * It checks if the item is a folder or a job and applies the appropriate cleaning method.
+     * Initiates the cleaning process.
      */
-    void clean() {
-        def item = jenkins.getItemByFullName(jobName)
-        if (item instanceof AbstractFolder) {
-            cleanFolder(item as AbstractFolder)
-        } else if (item instanceof Job) {
-            cleanJob(item as Job)
+    public void clean() {
+        TopLevelItem item = jenkins.getItemByFullName(jobName, TopLevelItem.class);
+        if (item == null) {
+            LOGGER.warning("Item not found: " + jobName);
+            return;
+        }
+
+        if (item instanceof AbstractProject) {
+            cleanJob((AbstractProject) item);
         } else {
-            LOGGER.warning("Item not found or not a job/folder: $jobName")
+            LOGGER.warning("Unsupported job type: " + jobName);
         }
     }
 
-    /**
-     * Cleans jobs within a folder, limiting the number of cleaned jobs to the specified limit.
-     * 
-     * @param folder the folder to clean jobs within
-     */
-    private void cleanFolder(AbstractFolder folder) {
-        folder.getItems(AbstractItem.class).take(cleanedJobsLimit).each { subJob ->
-            new JobCleaner(jenkins, subJob.name, resetBuildNumber).clean()
+    private void cleanJob(AbstractProject<?, ?> job) {
+        try {
+            job.getBuilds().stream().limit(buildTotal).forEach(build -> {
+                try {
+                    build.delete();
+                } catch (IOException e) {
+                    LOGGER.log(Level.SEVERE, "Failed to delete build " + build.getNumber() + " for job " + job.getName(), e);
+                }
+            });
+            if (resetBuildNumber) {
+                resetBuildNumber(job);
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "Error accessing builds for job " + job.getName(), e);
         }
     }
 
-    /**
-     * Deletes builds from a job up to the specified limit and resets the build number if specified.
-     * 
-     * @param job the job from which builds will be deleted
-     */
-    private void cleanJob(Job job) {
-        boolean buildsDeleted = false
-        job.getBuilds().take(buildTotal).each { build ->
-            try {
-                build.delete()
-                buildsDeleted = true
-            } catch (Exception e) {
-                LOGGER.severe("Failed to delete build ${build.id} for job ${job.name}: ${e.message}")
-            }
+    private void resetBuildNumber(AbstractProject<?, ?> job) {
+        job.updateNextBuildNumber(1);
+        try {
+            job.save();
+        } catch (IOException e) {
+            LOGGER.log(Level.SEVERE, "Failed to reset build number for job " + job.getName(), e);
         }
-        if (buildsDeleted && resetBuildNumber) {
-            job.nextBuildNumber = 1
-            try {
-                job.save()
-            } catch (Exception e) {
-                LOGGER.severe("Failed to reset build number for job ${job.name}: ${e.message}")
-            }
+    }
+
+    private static <T> T validateNotNull(T arg, String message) {
+        if (arg == null) {
+            throw new IllegalArgumentException(message);
         }
+        return arg;
+    }
+
+    private static String validateNotNullOrEmpty(String arg, String message) {
+        if (arg == null || arg.trim().isEmpty()) {
+            throw new IllegalArgumentException(message);
+        }
+        return arg;
     }
 }
