@@ -1,49 +1,53 @@
-import jenkins.model.Jenkins
-import hudson.model.Job
-import hudson.security.Permission
-import java.util.logging.Logger
+import jenkins.model.Jenkins;
+import hudson.model.Job;
+import hudson.security.Permission;
+import java.util.logging.Logger;
+import java.util.List;
 
 /**
- * This script disables all buildable jobs in a Jenkins instance.
- * It checks user permissions before performing any operations and logs all significant actions and errors.
- * This ensures that only authorized users can perform disable operations and provides a traceable log of actions performed.
- *
- * @author Thomas Vincent
+ * Disables all buildable jobs in a Jenkins instance securely and responsibly:
+ * ensures operations are performed only by authorized administrators.
  */
 public class JenkinsJobDisabler {
 
-    private static final Logger LOGGER = Logger.getLogger("JenkinsJobDisabler");
+    private static final Logger LOGGER = Logger.getLogger(JenkinsJobDisabler.class.getName());
 
     /**
-     * The main method that runs the job disable process.
-     * It first checks for administrative permissions and then processes each job, disabling it if it is currently buildable.
+     * The main method that manages the job disablement process.
+     * It verifies administrator permissions before proceeding to disable buildable jobs.
      *
      * @param args Command-line arguments (not used).
      */
     public static void main(String[] args) {
-        LOGGER.info("Starting cleanup operation");
-        Jenkins jenkins = Jenkins.getInstance();
-        def user = jenkins.getMe();
-
-        // Check for administrative permissions before proceeding
-        if (!user.hasPermission(Jenkins.ADMINISTER)) {
-            throw new SecurityException("User does not have necessary permissions to perform cleanup");
+        LOGGER.info("Starting job disablement operation");
+        
+        Jenkins jenkins = Jenkins.get(); // Updated method to the recommended Jenkins.get()
+        if (!jenkins.hasPermission(Permission.ADMINISTER)) {
+            LOGGER.severe("Operation aborted. User lacks required administrative privileges.");
+            return;
         }
 
-        // Process all items, specifically looking for jobs
-        jenkins.allItems.findAll { it instanceof Job }.each { job ->
-            try {
-                // Disable the job if it is buildable
-                if (job.isBuildable()) {
-                    job.setBuildable(false);
-                    job.save();
-                    LOGGER.info("Disabled job: ${job.name}");
-                }
-            } catch (Exception e) {
-                LOGGER.severe("Failed to disable job ${job.name}: ${e.message}");
-            }
-        }
+        List<Job> buildableJobs = jenkins.getAllItems(Job.class).stream()
+            .filter(Job::isBuildable)
+            .toList();
 
-        LOGGER.info("Completed cleanup operation");
+        buildableJobs.forEach(job -> disableJob(job));
+
+        LOGGER.info("Job disablement operation completed");
+    }
+
+    /**
+     * Disables a single buildable job and logs the outcome.
+     *
+     * @param job The job to be disabled.
+     */
+    private static void disableJob(Job job) {
+        try {
+            job.setBuildable(false);
+            job.save();
+            LOGGER.info("Successfully disabled job: " + job.getFullName());
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "Failed to disable job " + job.getFullName(), e);
+        }
     }
 }
