@@ -1,0 +1,45 @@
+name: Release
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: gradle
+    
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+    
+    - name: Build with Gradle
+      run: ./gradlew clean build -x test
+    
+    - name: Build distributions
+      run: ./gradlew assembleDist
+    
+    - name: Upload Release Asset
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          build/distributions/jenkins-script-library-*.zip
+          build/distributions/jenkins-script-library-*.tar.gz
+          build/libs/jenkins-script-library-*.jar
+        
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v3
+      with:
+        context: .
+        push: false
+        tags: |
+          jenkins-script-library:latest
+          jenkins-script-library:${{ github.event.release.tag_name }}

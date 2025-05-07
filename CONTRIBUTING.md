@@ -1,108 +1,101 @@
 # Contributing to Jenkins Script Library
 
-Thank you for your interest in contributing to the Jenkins Script Library! This document provides guidelines and instructions for contributing to this project.
+Thank you for your interest in contributing to the Jenkins Script Library! This document provides guidelines for contributions and how to get started with development.
 
-## Table of Contents
+## Development Environment
 
-- [Contributing to Jenkins Script Library](#contributing-to-jenkins-script-library)
-  - [Table of Contents](#table-of-contents)
-  - [Code of Conduct](#code-of-conduct)
-  - [Getting Started](#getting-started)
-  - [How to Contribute](#how-to-contribute)
-    - [Reporting Bugs](#reporting-bugs)
-    - [Suggesting Enhancements](#suggesting-enhancements)
-    - [Pull Requests](#pull-requests)
-  - [Development Guidelines](#development-guidelines)
-    - [Coding Standards](#coding-standards)
-    - [Testing](#testing)
-    - [Documentation](#documentation)
-  - [Commit Guidelines](#commit-guidelines)
+### Prerequisites
 
-## Code of Conduct
+- Java 11 or higher
+- Groovy 2.4.x (Jenkins LTS built-in version)
+- Gradle 7.6.2+
+- Docker (for testing with Jenkins)
 
-This project adheres to the Contributor Covenant Code of Conduct. By participating, you are expected to uphold this code. Please read the [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for details.
+### Getting Started
 
-## Getting Started
-
-1. Fork the repository on GitHub
-2. Clone your fork locally
+1. Fork the repository
+2. Clone your fork: `git clone https://github.com/YOUR-USERNAME/jenkins-script-library.git`
+3. Set up the development environment:
    ```bash
-   git clone https://github.com/your-username/jenkins-script-library.git
    cd jenkins-script-library
-   ```
-3. Add the original repository as a remote to keep your fork in sync
-   ```bash
-   git remote add upstream https://github.com/thomasvincent/jenkins-script-library.git
-   ```
-4. Create a branch for your work
-   ```bash
-   git checkout -b feature/your-feature-name
+   ./gradlew build
    ```
 
-## How to Contribute
+## Using Docker for Testing
 
-### Reporting Bugs
+The repository includes a Docker environment for easy testing:
 
-If you find a bug, please create an issue using the bug report template. Include:
+```bash
+# Build the Docker image
+docker build -t jenkins-script-library:latest .
 
-- A clear, descriptive title
-- Steps to reproduce the issue
-- Expected behavior
-- Actual behavior
-- Jenkins version and relevant plugin versions
-- Any additional context or screenshots
+# Start Jenkins with the library loaded
+docker-compose up -d
 
-### Suggesting Enhancements
+# Access Jenkins at http://localhost:8080/
+```
 
-For feature requests or enhancements:
+## Project Structure
 
-- Use the feature request issue template
-- Clearly describe the feature and its benefits
-- Provide examples of how the feature would be used
-- Indicate if you're willing to help implement the feature
+```
+jenkins-script-library/
+├── src/
+│   ├── main/groovy/          # Main source code
+│   │   └── com/github/thomasvincent/jenkinsscripts/
+│   │       ├── config/       # Configuration management 
+│   │       ├── helm/         # Helm management
+│   │       ├── jobs/         # Job management
+│   │       ├── nodes/        # Node management
+│   │       ├── scripts/      # Command-line scripts
+│   │       ├── security/     # Security functions
+│   │       └── util/         # Utility classes
+│   ├── test/groovy/          # Unit tests
+│   └── integration-test/groovy/ # Integration tests
+├── build.gradle              # Gradle build configuration
+```
 
-### Pull Requests
+## Coding Guidelines
 
-1. Update your fork to the latest upstream version
-   ```bash
-   git fetch upstream
-   git checkout main
-   git merge upstream/main
-   ```
-2. Create a new branch for your changes
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
-3. Make your changes
-4. Commit your changes following the [commit guidelines](#commit-guidelines)
-5. Push your branch to your fork
-   ```bash
-   git push origin feature/your-feature-name
-   ```
-6. Open a pull request against the main branch of the original repository
+1. Follow the existing code style and formatting
+2. Write comprehensive JavaDoc comments for all public classes and methods
+3. Add license headers to all new files
+4. Include unit tests for all new features
+5. Follow SOLID principles
+6. Keep code DRY (Don't Repeat Yourself)
+7. Use idiomatic Groovy style compatible with Jenkins
 
-## Development Guidelines
+## Testing
 
-### Coding Standards
+Run tests using Gradle:
 
-- Follow the [Jenkins Groovy coding style](https://wiki.jenkins.io/display/JENKINS/Groovy+Guidelines)
-- Use meaningful variable and function names
-- Include comments for complex logic
-- Keep functions focused on a single responsibility
-- Avoid hardcoded values; use constants or configuration
+```bash
+# Run unit tests
+./gradlew test
 
-### Testing
+# Run integration tests
+./gradlew integrationTest
 
-- Add appropriate tests for your changes
-- Ensure all tests pass before submitting a pull request
-- Test your scripts in a Jenkins environment similar to where they will be used
+# Run all tests
+./gradlew check
+```
 
-### Documentation
+## Creating Pull Requests
 
-- Update documentation to reflect your changes
-- Include examples for new features
-- Document parameters, return values, and exceptions
-- Add inline comments for complex code sections
+1. Create a feature branch: `git checkout -b my-new-feature`
+2. Make your changes
+3. Add tests for your changes
+4. Run tests: `./gradlew check`
+5. Commit your changes using conventional commit format: `git commit -am 'feat: add some feature'`
+6. Push to the branch: `git push origin my-new-feature`
+7. Submit a pull request
+
+## Pull Request Guidelines
+
+- Include a clear description of the changes
+- Link any related issues
+- Ensure all tests pass
+- Update documentation if needed
+- Verify that your code works with supported Groovy and Java versions
 
 ## Commit Guidelines
 
@@ -126,9 +119,6 @@ Types include:
 - `test`: Adding or updating tests
 - `chore`: Changes to the build process or auxiliary tools
 
-Examples:
-- `feat: add support for Jenkins Pipeline jobs`
-- `fix: correct handling of special characters in job names`
-- `docs: update README with new script examples`
+## License
 
-Thank you for contributing to the Jenkins Script Library!
+By contributing to this project, you agree that your contributions will be licensed under the project's MIT License.

@@ -1,24 +1,44 @@
-## Security Policy
+# Security Policy
 
-We take security seriously. If you discover any security related issues, please email thomasvincent@gmail.com instead of using the issue tracker.
+## Supported Versions
 
-### Supported Versions
+The following versions of Jenkins Script Library are currently supported with security updates:
 
 | Version | Supported          |
 | ------- | ------------------ |
 | 1.0.x   | :white_check_mark: |
 | < 1.0   | :x:                |
 
-### Reporting a Vulnerability
+## Reporting a Vulnerability
 
-Please report (suspected) security vulnerabilities to thomasvincent@gmail.com. You will receive a response from us within 48 hours. If the issue is confirmed, we will release a patch as soon as possible depending on complexity but historically within 7 days.
+To report a security vulnerability, please follow these steps:
 
-### Additional Security Considerations
+1. **Do NOT disclose the vulnerability publicly** 
+2. Email security details to thomas.vincent@gmail.com
+3. Include as much information as possible:
+   - Description of the vulnerability
+   - Steps to reproduce
+   - Potential impact
+   - Suggested fixes (if any)
 
-When using these Jenkins scripts, please consider the following security best practices:
+## Response Timeline
 
-1. Always run scripts with the minimum required permissions in Jenkins
-2. Review code before execution, especially when dealing with system operations
-3. Keep your Jenkins instance and plugins up to date
-4. Use credential binding rather than hardcoding secrets in scripts
+- Initial response: Within 48 hours
+- Assessment: Within 1 week
+- Fix timeline: Communicated after assessment
+
+## Security Best Practices
+
+When using this library:
+
+1. Always run scripts with the minimum required permissions
+2. Keep your Jenkins instance updated
+3. Review all scripts before execution
+4. Use credential binding rather than hardcoded credentials
 5. Implement audit logging for script executions
+
+## License
+
+MIT License
+
+Copyright (c) 2023-2025 Thomas Vincent
