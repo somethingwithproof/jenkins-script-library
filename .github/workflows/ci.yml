@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up JDK 11
+      uses: actions/setup-java@v3
+      with:
+        java-version: '11'
+        distribution: 'temurin'
+        
+    - name: Set up Groovy
+      run: |
+        wget https://groovy.jfrog.io/artifactory/dist-release-local/groovy-zips/apache-groovy-binary-4.0.11.zip
+        unzip apache-groovy-binary-4.0.11.zip
+        echo "$GITHUB_WORKSPACE/groovy-4.0.11/bin" >> $GITHUB_PATH
+      
+    - name: Install Jenkins CLI
+      run: |
+        mkdir -p $HOME/jenkins-cli
+        wget https://repo.jenkins-ci.org/releases/org/jenkins-ci/main/cli/2.426.3/cli-2.426.3.jar -O $HOME/jenkins-cli/jenkins-cli.jar
+        
+    - name: Lint Groovy Scripts
+      run: |
+        for file in $(find . -name "*.groovy"); do
+          echo "Linting $file"
+          # Simple syntax check
+          groovy -c "$file" || exit 1
+        done
+        
+    - name: Check for Hardcoded Credentials
+      run: |
+        if grep -r --include="*.groovy" -E "(password|token|secret|key).*=.*['\"][^'\"]+['\"]" .; then
+          echo "Warning: Potential hardcoded credentials found"
+          exit 1
+        else
+          echo "No hardcoded credentials found"
+        fi
+        
+    - name: Check for Jenkins Best Practices
+      run: |
+        # Check for proper exception handling
+        if grep -r --include="*.groovy" -L "try.*catch" . | grep -v "README\|LICENSE\|.git"; then
+          echo "Warning: Some files may be missing exception handling"
+        else
+          echo "Exception handling check passed"
+        fi
+        
+        # Check for proper logging
+        if grep -r --include="*.groovy" -L "log\." . | grep -v "README\|LICENSE\|.git"; then
+          echo "Warning: Some files may be missing proper logging"
+        else
+          echo "Logging check passed"
+        fi
