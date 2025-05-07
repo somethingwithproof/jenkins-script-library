@@ -170,8 +170,14 @@ class StringUtils {
             return ""
         }
         
+        // Special case for all-caps acronyms like "ABC"
+        if (camelCase.matches("[A-Z]+")) {
+            return camelCase.split("").join("-").toLowerCase()
+        }
+        
         return camelCase
             .replaceAll(/([a-z0-9])([A-Z])/, '$1-$2')
+            .replaceAll(/([A-Z])([A-Z][a-z])/, '$1-$2')
             .toLowerCase()
     }
     
