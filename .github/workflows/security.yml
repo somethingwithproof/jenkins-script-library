@@ -1,0 +1,50 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 0 * * 0'  # Run weekly on Sundays
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up JDK 11
+      uses: actions/setup-java@v3
+      with:
+        java-version: '11'
+        distribution: 'temurin'
+    
+    - name: Check for Hardcoded Secrets
+      run: |
+        # Simple check for potential secrets
+        if grep -r --include="*.groovy" -E "(password|token|secret|key|credential).*=.*['\"][^'\"]{8,}['\"]" .; then
+          echo "Warning: Potential hardcoded secrets found"
+          exit 1
+        else
+          echo "No hardcoded secrets found"
+        fi
+        
+    - name: Check for Security Best Practices
+      run: |
+        # Check for proper input validation
+        echo "Checking for input validation..."
+        if grep -r --include="*.groovy" -L "validate" . | grep -v "README\|LICENSE\|.git"; then
+          echo "Warning: Some files may be missing input validation"
+        else
+          echo "Input validation check passed"
+        fi
+        
+        # Check for secure coding patterns
+        echo "Checking for secure coding patterns..."
+        if grep -r --include="*.groovy" -E "(System\.exit|Runtime\.exec)" .; then
+          echo "Warning: Potentially unsafe system calls found"
+        else
+          echo "No unsafe system calls found"
+        fi
