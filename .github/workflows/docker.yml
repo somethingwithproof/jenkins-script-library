@@ -1,0 +1,49 @@
+name: Docker Build
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+      - 'docker-entrypoint.sh'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+      - 'docker-entrypoint.sh'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v2
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+    
+    - name: Build and export
+      uses: docker/build-push-action@v3
+      with:
+        context: .
+        load: true
+        tags: jenkins-script-library:latest
+    
+    - name: Test Docker image
+      run: |
+        docker run --rm jenkins-script-library:latest --version
+    
+    - name: Build and push (on main branch only)
+      if: github.ref == 'refs/heads/main'
+      uses: docker/build-push-action@v3
+      with:
+        context: .
+        push: false
+        tags: |
+          jenkins-script-library:latest
+          jenkins-script-library:${{ github.sha }}
