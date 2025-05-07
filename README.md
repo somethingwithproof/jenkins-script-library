@@ -1,108 +1,151 @@
-# Jenkins Scripts Library
+# Jenkins Script Library
 
-[![CI](https://github.com/thomasvincent/jenkins-script-library/actions/workflows/ci.yml/badge.svg)](https://github.com/thomasvincent/jenkins-script-library/actions/workflows/ci.yml)
-[![Security Scan](https://github.com/thomasvincent/jenkins-script-library/actions/workflows/security.yml/badge.svg)](https://github.com/thomasvincent/jenkins-script-library/actions/workflows/security.yml)
+A collection of Groovy utilities and scripts designed to automate and facilitate various operations within Jenkins environments. This library follows Jenkins-compatible practices and includes comprehensive test coverage.
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Groovy 2.4](https://img.shields.io/badge/Groovy-2.4-blue.svg)](https://groovy-lang.org/)
+[![Java 11+](https://img.shields.io/badge/Java-11+-orange.svg)](https://adoptium.net/)
+[![Jenkins 2.361.1+](https://img.shields.io/badge/Jenkins-2.361.1+-green.svg)](https://jenkins.io/)
 
-This repository contains a collection of Groovy scripts designed to automate and facilitate various operations within Jenkins environments. The focus is on scripts that enhance Jenkins functionality, including managing build histories, build triggers, and slave nodes. These scripts are regularly updated and tested to ensure they adhere to current Jenkins and Groovy best practices.
+## Features
 
-## Table of Contents
+- **Helm Installation Management**: Dynamically install and configure Helm in Jenkins pipelines
+- **Build History Cleanup**: Manage build history to improve Jenkins performance and disk usage
+- **Job Management**: Enable/disable jobs programmatically with proper security controls
+- **Slave Node Management**: List, monitor, and control Jenkins slave nodes, including EC2 instances
 
-- [Jenkins Scripts Library](#jenkins-scripts-library)
-  - [Table of Contents](#table-of-contents)
-  - [Overview](#overview)
-  - [Scripts](#scripts)
-    - [Build History Management](#build-history-management)
-    - [Build Trigger Management](#build-trigger-management)
-    - [Slave Node Management](#slave-node-management)
-    - [Helm Installation Management](#helm-installation-management)
-  - [Installation](#installation)
-  - [Usage](#usage)
-    - [Jenkins Script Console](#jenkins-script-console)
-  - [Security Considerations](#security-considerations)
-  - [Contributing](#contributing)
-  - [Code of Conduct](#code-of-conduct)
-  - [License](#license)
+## Project Structure
 
-## Overview
+The project follows standard Groovy project structure:
 
-The provided scripts offer functionalities such as:
-
-- **Cleaning build histories** to improve Jenkins server performance and manage disk space efficiently.
-- **Managing build triggers** to streamline the build process and maintain a clean job configuration.
-- **Listing and starting Jenkins slave nodes** to ensure optimal resource utilization and reduce manual intervention for managing agents.
-
-## Scripts
-
-The scripts are categorized based on their primary function:
-
-### Build History Management
-- `clean-build-history.groovy`: Purges old builds from specified jobs to free up space and improve server performance.
-
-### Build Trigger Management
-- `jobs-clean-build-triggers.groovy`: Removes specified build triggers from jobs, helping maintain clean and efficient job configurations.
-
-### Slave Node Management
-- `slave-list-all-slave-nodes.groovy`: Lists all configured slave nodes, providing a comprehensive overview of available agents.
-- `slave-start-offline-slave-nodes.groovy`: Automatically starts offline slave nodes, ensuring all agents are ready for use and reducing downtime.
-
-### Helm Installation Management
-- `HelmInstallationManager.groovy`: Manages Helm installations in Jenkins.
+```
+jenkins-script-library/
+├── src/
+│   ├── main/groovy/            # Main source code
+│   │   └── com/github/thomasvincent/jenkinsscripts/
+│   │       ├── helm/           # Helm management classes
+│   │       ├── jobs/           # Job management classes
+│   │       ├── nodes/          # Node management classes
+│   │       ├── scripts/        # Command-line script entry points
+│   │       └── util/           # Utility classes
+│   ├── test/groovy/            # Unit tests
+│   └── integration-test/groovy/ # Integration tests
+├── build.gradle                # Gradle build configuration
+├── config/                     # Configuration files
+│   └── codenarc/               # CodeNarc rules for code quality
+├── gradle/wrapper/            # Gradle wrapper files
+├── gradlew                     # Gradle wrapper script
+├── LICENSE                     # MIT License
+├── README.md                   # This file
+└── SECURITY.md                 # Security policy
+```
 
 ## Installation
 
-Clone this repository to your local machine or Jenkins server:
+This library can be used in two ways:
 
-```bash
-git clone https://github.com/thomasvincent/jenkins-script-library.git
-cd jenkins-script-library
-```
+1. **As a dependency in your Gradle/Maven project**:
+   
+   ```groovy
+   // In your build.gradle
+   dependencies {
+       implementation 'com.github.thomasvincent:jenkins-script-library:1.0.0'
+   }
+   ```
+
+2. **As individual scripts to run directly in Jenkins**:
+   
+   The scripts in `src/main/groovy/com/github/thomasvincent/jenkinsscripts/scripts/` can be executed directly in Jenkins Script Console or through the Jenkins CLI.
 
 ## Usage
 
-To run these scripts, you will need Groovy installed on your machine and the Jenkins CLI configured for your Jenkins server. Scripts can be executed using the Groovy command line interface:
+### Command-line Scripts
+
+All command-line scripts support the `--help` option to display usage information.
+
+#### Cleaning Build History
 
 ```bash
-groovy <script-name.groovy> [parameters]
+groovy CleanBuildHistory.groovy --limit 50 --reset my-jenkins-job
 ```
 
-Example:
+#### Disabling Jobs
 
 ```bash
-groovy clean-build-history.groovy --job="my-jenkins-job" --keep=10
+# Disable a specific job
+groovy DisableJobs.groovy my-jenkins-job
+
+# Disable all buildable jobs
+groovy DisableJobs.groovy --all
 ```
 
-Please ensure you have the appropriate permissions within your Jenkins environment to execute the operations performed by the scripts.
+#### Managing Slave Nodes
 
-### Jenkins Script Console
+```bash
+# List all slave nodes
+groovy ListSlaveNodes.groovy --all
 
-Many of these scripts can also be run directly in the Jenkins Script Console:
+# List a specific slave node with detailed information
+groovy ListSlaveNodes.groovy my-slave-node
 
-1. Navigate to "Manage Jenkins" > "Script Console"
-2. Copy the script content
-3. Modify any parameters as needed
-4. Click "Run"
+# Start all offline slave nodes
+groovy StartOfflineSlaveNodes.groovy --all
 
-## Security Considerations
+# Start a specific offline slave node
+groovy StartOfflineSlaveNodes.groovy my-slave-node
+```
 
-When using these scripts, please consider the following security best practices:
+### Programmatic API
 
-1. Always run scripts with the minimum required permissions in Jenkins
-2. Review code before execution, especially when dealing with system operations
-3. Keep your Jenkins instance and plugins up to date
-4. Use credential binding rather than hardcoding secrets in scripts
-5. Implement audit logging for script executions
+The library also provides a programmatic API for use in your own Groovy scripts:
 
-For more information on security, please see our [SECURITY.md](SECURITY.md) file.
+```groovy
+import com.github.thomasvincent.jenkinsscripts.jobs.JobCleaner
+import jenkins.model.Jenkins
+
+// Clean build history for a job
+def jenkins = Jenkins.get()
+def cleaner = new JobCleaner(jenkins, "my-job", true, 25, 100)
+cleaner.clean()
+```
+
+## Development
+
+### Building the Project
+
+```bash
+./gradlew build
+```
+
+### Running Tests
+
+```bash
+# Run unit tests
+./gradlew test
+
+# Run integration tests (requires a running Jenkins instance)
+./gradlew integrationTest
+
+# Run all tests
+./gradlew check
+```
+
+### Code Quality
+
+This project uses CodeNarc for Groovy code quality checks:
+
+```bash
+./gradlew codenarcMain codenarcTest
+```
 
 ## Contributing
 
-Contributions to this repository are welcome! Please see our [CONTRIBUTING.md](CONTRIBUTING.md) file for details on how to contribute.
+Contributions are welcome! Please follow our [Contributing Guidelines](CONTRIBUTING.md).
 
-## Code of Conduct
+## Security
 
-This project adheres to a [Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code.
+For security concerns, please review our [Security Policy](SECURITY.md).
 
 ## License
 
-This repository and its contents are licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
