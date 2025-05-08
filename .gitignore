@@ -46,3 +46,4 @@ bin/
 *~
 *.swp
 *.bak
+**/.claude/settings.local.json
