@@ -11,8 +11,7 @@ FROM jenkins/jenkins:lts-jdk17
 USER root
 
 # Set environment variables
-ENV GROOVY_VERSION=4.0.14 \
-    GRADLE_VERSION=7.6.2 \
+ENV GRADLE_VERSION=7.6.2 \
     JENKINS_HOME=/var/jenkins_home
 
 # Install required packages
@@ -24,11 +23,8 @@ RUN apt-get update && apt-get install -y \
     jq \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Groovy
-RUN wget -q https://groovy.jfrog.io/artifactory/dist-release-local/groovy-zips/apache-groovy-binary-${GROOVY_VERSION}.zip -O /tmp/groovy.zip \
-    && unzip /tmp/groovy.zip -d /opt \
-    && ln -s /opt/groovy-${GROOVY_VERSION} /opt/groovy \
-    && rm /tmp/groovy.zip
+# Use Jenkins' built-in Groovy version instead of installing a separate one
+# This ensures compatibility with the version Jenkins uses internally
 
 # Install Gradle
 RUN wget -q https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip -O /tmp/gradle.zip \
@@ -37,7 +33,7 @@ RUN wget -q https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-b
     && rm /tmp/gradle.zip
 
 # Add to PATH
-ENV PATH="$PATH:/opt/groovy/bin:/opt/gradle/bin"
+ENV PATH="$PATH:/opt/gradle/bin"
 
 # Copy library scripts
 COPY --chown=jenkins:jenkins . /var/jenkins_library
