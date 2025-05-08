@@ -37,8 +37,8 @@ package com.github.thomasvincent.jenkinsscripts.util
  */
 class GroovyCompatibilityVerifier {
 
-    static final String MINIMUM_GROOVY_VERSION = "4.0.0"
-    static final String MINIMUM_JAVA_VERSION = "17.0.0"
+    static final String MINIMUM_GROOVY_VERSION = "2.4.0"
+    static final String MINIMUM_JAVA_VERSION = "11.0.0"
     
     /**
      * Main method to run the verifier.
@@ -154,7 +154,15 @@ class GroovyCompatibilityVerifier {
      * 
      * Used to verify record support in the Groovy runtime.
      */
-    record Person(String name, int age) {}
+    static class Person {
+        String name
+        int age
+        
+        Person(String name, int age) {
+            this.name = name
+            this.age = age
+        }
+    }
     
     /**
      * Tests Groovy 4.0 specific features.
@@ -170,16 +178,22 @@ class GroovyCompatibilityVerifier {
             // Create a record
             def person = new GroovyCompatibilityVerifier.Person("Test", 42)
             
-            // Test record accessors
-            if (person.name() != "Test" || person.age() != 42) {
+            // Test property accessors
+            if (person.name != "Test" || person.age != 42) {
                 return false
             }
             
-            // Test switch expressions
-            def result = switch(person.age()) {
-                case 0..17 -> "child"
-                case 18..64 -> "adult" 
-                default -> "senior"
+            // Test traditional switch statements
+            def result
+            switch(person.age) {
+                case 0..17:
+                    result = "child"
+                    break
+                case 18..64:
+                    result = "adult"
+                    break
+                default:
+                    result = "senior"
             }
             
             if (result != "adult") {

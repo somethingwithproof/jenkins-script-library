@@ -35,8 +35,16 @@ package com.github.thomasvincent.jenkinsscripts.util
  */
 class GroovyVersionCheck {
     
-    // Using Groovy 4.0 feature: record pattern matching
-    record Person(String name, int age) {}
+    // Simple class compatible with Jenkins' Groovy version
+    static class Person {
+        String name
+        int age
+        
+        Person(String name, int age) {
+            this.name = name
+            this.age = age
+        }
+    }
     
     /**
      * Verifies that the current Groovy runtime is compatible.
@@ -55,8 +63,8 @@ class GroovyVersionCheck {
         def majorVersion = versionParts[0].toInteger()
         def minorVersion = versionParts.size() > 1 ? versionParts[1].toInteger() : 0
         
-        // Check for Groovy 4.0 or later
-        return majorVersion >= 4
+        // Check for Groovy 2.4 or later (Jenkins compatible)
+        return (majorVersion > 2) || (majorVersion == 2 && minorVersion >= 4)
     }
     
     /**
@@ -73,15 +81,21 @@ class GroovyVersionCheck {
             // Test record pattern matching from Groovy 4.0
             def person = new Person("John", 30)
             
-            // Using records (Groovy 4.0 feature)
-            assert person.name() == "John"
-            assert person.age() == 30
+            // Using standard Groovy 2.4 property access
+            assert person.name == "John"
+            assert person.age == 30
             
-            // Using switch expression (Groovy 4.0 feature)
-            def result = switch(person.age()) {
-                case 0..17 -> "minor"
-                case 18..64 -> "adult"
-                default -> "senior"
+            // Using traditional switch statement (Groovy 2.4 compatible)
+            def result
+            switch(person.age) {
+                case 0..17:
+                    result = "minor"
+                    break
+                case 18..64:
+                    result = "adult"
+                    break
+                default:
+                    result = "senior"
             }
             
             assert result == "adult"
