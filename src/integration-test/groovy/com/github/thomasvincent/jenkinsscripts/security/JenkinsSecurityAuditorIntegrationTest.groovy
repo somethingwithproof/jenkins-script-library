@@ -28,7 +28,8 @@ import jenkins.model.Jenkins
 import hudson.security.AuthorizationStrategy
 import hudson.security.SecurityRealm
 import hudson.security.HudsonPrivateSecurityRealm
-import hudson.security.GlobalMatrixAuthorizationStrategy
+// Using fully qualified name instead of import to avoid dependency issues
+// import hudson.security.GlobalMatrixAuthorizationStrategy
 import hudson.model.User
 import hudson.model.Item
 import jenkins.security.ApiTokenProperty
@@ -132,9 +133,15 @@ class JenkinsSecurityAuditorIntegrationTest {
         HudsonPrivateSecurityRealm realm = new HudsonPrivateSecurityRealm(false, false, null)
         jenkins.setSecurityRealm(realm)
         
-        GlobalMatrixAuthorizationStrategy strategy = new GlobalMatrixAuthorizationStrategy()
-        strategy.add(Jenkins.ADMINISTER, "admin")
-        strategy.add(Item.READ, "user")
+        // Create authorization strategy using reflection to avoid direct dependency
+        def strategyClass = Class.forName("hudson.security.GlobalMatrixAuthorizationStrategy")
+        def strategy = strategyClass.newInstance()
+        
+        // Add permissions using reflection
+        def addMethod = strategyClass.getMethod("add", hudson.security.Permission.class, String.class)
+        addMethod.invoke(strategy, Jenkins.ADMINISTER, "admin")
+        addMethod.invoke(strategy, Item.READ, "user")
+        
         jenkins.setAuthorizationStrategy(strategy)
         
         // Create test users

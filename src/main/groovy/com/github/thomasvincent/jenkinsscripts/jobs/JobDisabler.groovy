@@ -85,7 +85,7 @@ class JobDisabler implements Serializable {
         int disabledCount = 0
         
         buildableJobs.each { job ->
-            if (disableJob(job)) {
+            if (disableJobInternal(job)) {
                 disabledCount++
             }
         }
@@ -124,7 +124,7 @@ class JobDisabler implements Serializable {
             return false
         }
         
-        return disableJob(job)
+        return disableJobInternal(job)
     }
     
     /**
@@ -148,14 +148,14 @@ class JobDisabler implements Serializable {
     }
     
     /**
-     * Disables a job.
+     * Disables a job internally.
      * 
      * Sets job buildable property to false with error handling.
      * 
      * @param job Job to disable
      * @return true if successful, false otherwise
      */
-    private boolean disableJob(Job job) {
+    private boolean disableJobInternal(Job job) {
         try {
             job.setBuildable(false)
             job.save()

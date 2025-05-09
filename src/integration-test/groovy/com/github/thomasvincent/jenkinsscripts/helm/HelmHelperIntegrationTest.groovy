@@ -87,15 +87,14 @@ class HelmHelperIntegrationTest {
     void cleanup() {
         // Delete temp directory and contents
         if (tempDir != null) {
-            Files.walk(tempDir)
-                .sorted(Comparator.reverseOrder())
-                .forEach(path -> {
-                    try {
-                        Files.deleteIfExists(path)
-                    } catch (IOException e) {
-                        // Ignore deletion errors
-                    }
-                })
+            def paths = Files.walk(tempDir).sorted(Comparator.reverseOrder()).toArray()
+            paths.each { path ->
+                try {
+                    Files.deleteIfExists(path)
+                } catch (IOException e) {
+                    // Ignore deletion errors
+                }
+            }
         }
     }
     

@@ -28,6 +28,7 @@ import jenkins.model.Jenkins
 import hudson.security.Permission
 import java.nio.file.Files
 import java.nio.file.Paths
+import java.nio.file.Path
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.logging.Level
