@@ -35,69 +35,54 @@ configurations {
 }
 
 dependencies {
-    // Groovy 4.0.14 - Current supported version as of 2025
-    implementation platform('org.apache.groovy:groovy-bom:4.0.14')
-    implementation 'org.apache.groovy:groovy'
-    implementation 'org.apache.groovy:groovy-cli-commons'
-    implementation 'org.apache.groovy:groovy-json'
-    implementation 'org.apache.groovy:groovy-templates'
+    // Use Groovy 2.4.x to match Jenkins LTS built-in version
+    implementation 'org.codehaus.groovy:groovy-all:2.4.21'
     
     // Standard dependencies
     implementation 'org.apache.logging.log4j:log4j-api:2.20.0'
     implementation 'org.apache.logging.log4j:log4j-core:2.20.0'
-    implementation 'javax.servlet:javax.servlet-api:4.0.1'
     
-    // Instead of using real Jenkins dependencies, mark them as provided
+    // Jenkins dependencies - marked as provided since they're provided by Jenkins
     compileOnly 'javax.annotation:javax.annotation-api:1.3.2'
+    compileOnly 'javax.servlet:javax.servlet-api:4.0.1'
+    compileOnly 'org.jenkins-ci.main:jenkins-core:2.361.1'
+    compileOnly 'org.jenkins-ci.plugins:credentials:2.6.1'
+    compileOnly 'org.jenkins-ci.plugins.workflow:workflow-api:2.46'
+    compileOnly 'org.jenkins-ci.plugins.workflow:workflow-step-api:2.24'
     
-    // Mock dependencies to replace Jenkins dependencies at test time
-    testImplementation 'org.mockito:mockito-core:5.3.1'
+    // Unit test dependencies
+    testImplementation 'org.mockito:mockito-core:4.11.0'
+    testImplementation 'junit:junit:4.13.2'
     
-    // Use Spock 2.3-groovy-4.0 for Groovy 4.0 compatibility
-    testImplementation 'org.spockframework:spock-core:2.3-groovy-4.0'
-    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.0'
-    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.0'
-    
+    // Integration test dependencies for running real Jenkins tests
+    integrationTestImplementation 'org.jenkins-ci.main:jenkins-test-harness:2.80'
     integrationTestImplementation 'org.jenkins-ci:test-annotations:1.3'
+    integrationTestImplementation 'org.jenkins-ci.main:jenkins-core:2.361.1'
+    integrationTestImplementation 'org.jenkins-ci.plugins:credentials:2.6.1'
+    integrationTestImplementation 'org.jenkins-ci.plugins:matrix-auth:3.1.5'
+    integrationTestImplementation 'javax.servlet:javax.servlet-api:4.0.1'
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
 }
 
-// Configure source set compileOnly and runtime exclusions to make testing easier
+// Configure source set exclusions to make testing easier
 sourceSets {
     main {
         groovy {
-            exclude '**/jobs/**'
-            exclude '**/nodes/**'
             exclude '**/scripts/**'
-            exclude '**/helm/**'
-            exclude '**/config/**'
-            exclude '**/security/**'
-            exclude 'hudson/**'
-        }
-    }
-    
-    test {
-        groovy {
-            exclude '**/jobs/**'
-            exclude '**/nodes/**'
-            exclude '**/config/**'
-            exclude '**/security/**'
-            include '**/util/**'
         }
     }
 }
 
-// Temporarily disable codenarc as rules need to be updated
 tasks.withType(CodeNarc) {
     enabled = false
 }
 
 jacoco {
-    toolVersion = "0.8.11"
+    toolVersion = "0.8.8"
 }
 
 jacocoTestReport {
@@ -108,7 +93,9 @@ jacocoTestReport {
 }
 
 test {
-    useJUnitPlatform()
+    testLogging {
+        events "passed", "skipped", "failed"
+    }
     finalizedBy jacocoTestReport
     
     // Skip tests if the system property is set
@@ -123,15 +110,18 @@ task integrationTest(type: Test) {
     classpath = sourceSets.integrationTest.runtimeClasspath
     
     mustRunAfter test
-
-    useJUnitPlatform()
+    
+    testLogging {
+        events "passed", "skipped", "failed"
+        showStandardStreams = true
+    }
     
     // Skip integration tests if the system property is set
     onlyIf { !project.hasProperty('skipTests') }
 }
 
-// Skipping integration tests in build for now
-//check.dependsOn integrationTest
+// Enable integration tests in the build process
+check.dependsOn integrationTest
 
 tasks.withType(GroovyCompile) {
     groovyOptions.optimizationOptions.indy = true
