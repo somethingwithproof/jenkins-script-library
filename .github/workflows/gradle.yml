@@ -11,10 +11,10 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: Set up JDK 17
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
@@ -35,7 +35,7 @@ jobs:
         grep -A3 "CodeNarc" build.gradle
     
     - name: Publish Test Report
-      uses: mikepenz/action-junit-report@v3
+      uses: mikepenz/action-junit-report@v5
       if: always()
       with:
         report_paths: '**/build/test-results/test/TEST-*.xml'
