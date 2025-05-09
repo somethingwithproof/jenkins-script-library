@@ -123,12 +123,14 @@ cleaner.clean()
 # Run unit tests
 ./gradlew test
 
-# Run integration tests (requires a running Jenkins instance)
+# Run integration tests
 ./gradlew integrationTest
 
 # Run all tests
 ./gradlew check
 ```
+
+The integration tests use JenkinsRule to create a temporary Jenkins instance for testing, so you don't need a running Jenkins server. These tests verify that the scripts work correctly with real Jenkins APIs and data structures. See the [integration test documentation](src/integration-test/README.md) for more details.
 
 ### Code Quality
 
