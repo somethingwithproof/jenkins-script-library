@@ -182,7 +182,9 @@ class JenkinsConfigBackup {
         String jenkinsHome = jenkins.rootDir.absolutePath
         int filesCopied = 0
         
-        try (ZipOutputStream zipOut = new ZipOutputStream(new FileOutputStream(zipFilePath))) {
+        ZipOutputStream zipOut = null
+        try {
+            zipOut = new ZipOutputStream(new FileOutputStream(zipFilePath))
             for (String configFile : configFiles) {
                 Path source = Paths.get(jenkinsHome, configFile)
                 if (!Files.exists(source)) {
@@ -217,6 +219,10 @@ class JenkinsConfigBackup {
                         LOGGER.log(Level.WARNING, "Failed to add file to zip: ${source}", e)
                     }
                 }
+            }
+        } finally {
+            if (zipOut != null) {
+                zipOut.close()
             }
         }
         
