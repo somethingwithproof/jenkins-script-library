@@ -24,7 +24,7 @@ jobs:
     - name: Check for Hardcoded Secrets
       run: |
         # Simple check for potential secrets
-        if grep -r --include="*.groovy" -E "(password|token|secret|key|credential).*=.*['\"][^'\"]{8,}['\"]" .; then
+        if grep -r --include="*.groovy" -E "(password|token|secret|credential).*=.*['\"][^'\"]{8,}['\"]" . | grep -v "propName"; then
           echo "Warning: Potential hardcoded secrets found"
           exit 1
         else

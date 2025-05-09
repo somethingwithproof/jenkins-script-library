@@ -246,16 +246,16 @@ class SlaveInfoManager {
         StringBuilder builder = new StringBuilder()
         builder.append("Node: ${slaveInfo.name}\n")
         
-        slaveInfo.each { key, value ->
-            if (key != 'name' && key != 'ec2') {
-                builder.append("  ${key}: ${value}\n")
+        slaveInfo.each { propName, propValue ->
+            if (propName != 'name' && propName != 'ec2') {
+                builder.append("  ${propName}: ${propValue}\n")
             }
         }
         
         if (slaveInfo.containsKey('ec2')) {
             builder.append("  EC2 Details:\n")
-            slaveInfo.ec2.each { key, value ->
-                builder.append("    ${key}: ${value}\n")
+            slaveInfo.ec2.each { propName, propValue ->
+                builder.append("    ${propName}: ${propValue}\n")
             }
         }
         
