@@ -89,7 +89,7 @@ class ComputerLauncher {
             return false
         }
         
-        return startComputer(computer)
+        return startComputerInternal(computer)
     }
     
     /**
@@ -108,7 +108,7 @@ class ComputerLauncher {
         
         jenkins.computers.each { computer ->
             if (!(computer instanceof Jenkins.MasterComputer) && computer.offline) {
-                if (startComputer(computer)) {
+                if (startComputerInternal(computer)) {
                     startedCount++
                 }
             }
@@ -119,12 +119,12 @@ class ComputerLauncher {
     }
     
     /**
-     * Starts a specific computer.
+     * Starts a specific computer internally.
      * 
      * Internal helper that manages connect calls with timeout handling.
      * Uses Groovy's exception handling capabilities.
      */
-    private boolean startComputer(Computer computer) {
+    private boolean startComputerInternal(Computer computer) {
         if (!computer.offline) {
             LOGGER.info("Computer ${computer.name} is already online.")
             return true

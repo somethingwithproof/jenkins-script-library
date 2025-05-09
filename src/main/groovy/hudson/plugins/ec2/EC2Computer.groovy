@@ -11,8 +11,9 @@ import hudson.model.Computer
  * Mock implementation of EC2Computer class.
  * This is a minimal implementation that provides just enough functionality
  * to support the importing code in SlaveInfoManager.groovy.
+ * Made abstract as we don't need to implement all Computer abstract methods.
  */
-class EC2Computer extends Computer {
+abstract class EC2Computer extends Computer {
     
     /**
      * Describes the EC2 instance associated with this computer.
