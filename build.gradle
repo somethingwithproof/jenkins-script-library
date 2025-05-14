@@ -36,7 +36,7 @@ configurations {
 
 dependencies {
     // Use Groovy 2.4.x to match Jenkins LTS built-in version
-    implementation 'org.codehaus.groovy:groovy-all:2.4.21'
+    implementation 'org.codehaus.groovy:groovy-all:3.0.24'
     
     // Standard dependencies
     implementation 'org.apache.logging.log4j:log4j-api:2.24.3'
