@@ -65,7 +65,7 @@ dependencies {
     testImplementation 'javax.servlet:javax.servlet-api:4.0.1'
     
     // Integration test dependencies for running real Jenkins tests
-    integrationTestImplementation 'org.jenkins-ci.main:jenkins-test-harness:2.72'
+    integrationTestImplementation 'org.jenkins-ci.main:jenkins-test-harness:1900.v9e128c991ef4'
     integrationTestImplementation 'org.jenkins-ci:test-annotations:1.5'
     integrationTestImplementation 'org.jenkins-ci.main:jenkins-core:2.509'
     integrationTestImplementation 'org.jenkins-ci.plugins:credentials:2.6.1'
