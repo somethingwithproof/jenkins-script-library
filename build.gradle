@@ -49,7 +49,7 @@ dependencies {
     compileOnly 'org.jenkins-ci.plugins:credentials:2.6.1'
     compileOnly 'org.jenkins-ci.plugins:matrix-auth:3.2.6'
     compileOnly 'org.jenkins-ci.plugins.workflow:workflow-api:2.46'
-    compileOnly 'org.jenkins-ci.plugins.workflow:workflow-step-api:2.24'
+    compileOnly 'org.jenkins-ci.plugins.workflow:workflow-step-api:615.vb09dac339255'
     
     // Unit test dependencies
     testImplementation 'org.mockito:mockito-core:5.17.0'
