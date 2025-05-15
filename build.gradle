@@ -406,10 +406,10 @@ configurations.all {
             }
         } else {
             // Ensure modern Jenkins with Spring Security 6 works properly
-            all {
-                if (it.group == 'org.springframework.security') {
+            eachDependency { details ->
+                if (details.requested.group == 'org.springframework.security') {
                     // Use the versions that Jenkins 2.479.1+ expect
-                    if (it.version.startsWith('5.')) {
+                    if (details.requested.version.startsWith('5.')) {
                         force "org.springframework.security:spring-security-web:6.4.5"
                         force "org.springframework.security:spring-security-core:6.4.5"
                         force "org.springframework.security:spring-security-crypto:6.4.5"
