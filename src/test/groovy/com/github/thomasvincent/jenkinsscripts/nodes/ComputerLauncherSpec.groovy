@@ -126,9 +126,29 @@ class ComputerLauncherSpec extends Specification {
         0 * computer2.connect(_)
     }
     
-    def "should return false for null computer name"() {
+    def "should return false for null computer name with validation error"() {
         when:
         def result = launcher.startComputer(null)
+        
+        then:
+        result == false
+        0 * computer1.connect(_)
+        0 * computer2.connect(_)
+    }
+    
+    def "should return false for empty computer name with validation error"() {
+        when:
+        def result = launcher.startComputer("")
+        
+        then:
+        result == false
+        0 * computer1.connect(_)
+        0 * computer2.connect(_)
+    }
+    
+    def "should return false for blank computer name with validation error"() {
+        when:
+        def result = launcher.startComputer("   ")
         
         then:
         result == false

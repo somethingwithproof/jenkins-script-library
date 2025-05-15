@@ -28,6 +28,9 @@ import jenkins.model.Jenkins
 import hudson.model.Job
 import hudson.security.Permission
 
+import com.github.thomasvincent.jenkinsscripts.util.ValidationUtils
+import com.github.thomasvincent.jenkinsscripts.util.ErrorHandler
+
 import java.util.logging.Level
 import java.util.logging.Logger
 
@@ -118,6 +121,12 @@ class JobDisabler implements Serializable {
             return false
         }
         
+        try {
+            jobName = ValidationUtils.requireNonEmpty(jobName, "Job name")
+        } catch (IllegalArgumentException e) {
+            return ErrorHandler.handleErrorWithDefault("validating job name", e, LOGGER, false)
+        }
+        
         Job job = jenkins.getItemByFullName(jobName, Job.class)
         if (job == null) {
             LOGGER.warning("Job not found: ${jobName}")
@@ -156,14 +165,13 @@ class JobDisabler implements Serializable {
      * @return true if successful, false otherwise
      */
     private boolean disableJobInternal(Job job) {
-        try {
+        ValidationUtils.requireNonNull(job, "Job instance")
+        
+        return ErrorHandler.withErrorHandling("disabling job ${job.fullName}", {
             job.setBuildable(false)
             job.save()
             LOGGER.info("Successfully disabled job: ${job.fullName}")
             return true
-        } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "Failed to disable job ${job.fullName}", e)
-            return false
-        }
+        }, LOGGER, false)
     }
 }
