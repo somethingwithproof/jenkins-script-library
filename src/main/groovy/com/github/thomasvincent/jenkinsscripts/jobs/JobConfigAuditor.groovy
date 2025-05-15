@@ -451,10 +451,11 @@ class InsecureCredentialsRule extends BaseAuditRule {
     List<ConfigIssue> check(Job job, String jobXml) {
         List<ConfigIssue> issues = []
         
-        // Check for hardcoded credentials
+        // Check for hardcoded credentials 
         if (jobXml =~ /password=['"][\w\d]+['"]/ || 
             jobXml =~ /token=['"][\w\d]+['"]/ || 
-            jobXml =~ /secret=['"][\w\d]+['"]/) {
+            jobXml =~ /secret=['"][\w\d]+['"]/ ||
+            jobXml =~ /pass=['"][\w\d]+['"]/) {
             
             issues.add(createIssue(
                 job,
