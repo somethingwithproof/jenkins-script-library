@@ -29,6 +29,9 @@ import hudson.model.Computer
 import hudson.plugins.ec2.EC2Computer
 import jenkins.model.Jenkins
 
+import com.github.thomasvincent.jenkinsscripts.util.ValidationUtils
+import com.github.thomasvincent.jenkinsscripts.util.ErrorHandler
+
 import java.text.SimpleDateFormat
 import java.util.logging.Level
 import java.util.logging.Logger
@@ -56,7 +59,9 @@ import java.util.logging.Logger
 class SlaveInfoManager {
 
     private static final Logger LOGGER = Logger.getLogger(SlaveInfoManager.class.getName())
-    private static final SimpleDateFormat DATE_FORMATTER = new SimpleDateFormat("yyyy-MM-dd HH:mm")
+    private static final ThreadLocal<SimpleDateFormat> DATE_FORMATTER = ThreadLocal.withInitial({ 
+        new SimpleDateFormat("yyyy-MM-dd HH:mm") 
+    })
     
     private final Jenkins jenkins
     
@@ -96,14 +101,13 @@ class SlaveInfoManager {
         List<Map<String, Object>> result = []
         
         jenkins.nodes.each { node ->
-            try {
+            ErrorHandler.withErrorHandling("collecting information for node ${node.nodeName}", {
                 Map<String, Object> info = collectSlaveInfo(node)
                 if (info) {
                     result.add(info)
                 }
-            } catch (Exception e) {
-                LOGGER.log(Level.WARNING, "Error collecting information for node ${node.nodeName}", e)
-            }
+                return null // No specific return value needed
+            }, LOGGER, Level.WARNING)
         }
         
         return result
@@ -125,6 +129,13 @@ class SlaveInfoManager {
      * ```
      */
     Map<String, Object> getSlaveInfo(String slaveName) {
+        try {
+            slaveName = ValidationUtils.requireNonEmpty(slaveName, "Slave name")
+        } catch (IllegalArgumentException e) {
+            ErrorHandler.handleError("validating slave name", e, LOGGER)
+            return null
+        }
+        
         def node = jenkins.getNode(slaveName)
         if (!node) {
             LOGGER.warning("Slave node not found: ${slaveName}")
@@ -143,6 +154,8 @@ class SlaveInfoManager {
      * Uses Groovy's concise map syntax for collecting properties.
      */
     private Map<String, Object> collectSlaveInfo(Slave node) {
+        ValidationUtils.requireNonNull(node, "Slave node")
+        
         Computer computer = node.computer
         if (computer == null) {
             LOGGER.warning("Computer is null for node ${node.nodeName}")
@@ -182,7 +195,10 @@ class SlaveInfoManager {
      * ```
      */
     private void addEC2Info(Map<String, Object> info, EC2Computer ec2Computer) {
-        try {
+        ValidationUtils.requireNonNull(info, "Info map")
+        ValidationUtils.requireNonNull(ec2Computer, "EC2 computer")
+        
+        ErrorHandler.withErrorHandling("collecting EC2 information for ${ec2Computer.name}", {
             def instance = ec2Computer.describeInstance()
             if (instance) {
                 info.ec2 = [
@@ -191,14 +207,16 @@ class SlaveInfoManager {
                     privateIp: instance.getPrivateIpAddress(),
                     publicIp: instance.getPublicIpAddress(),
                     amiId: instance.getImageId(),
-                    launchTime: instance.getLaunchTime() ? DATE_FORMATTER.format(instance.getLaunchTime()) : null,
+                    launchTime: instance.getLaunchTime() ? DATE_FORMATTER.get().format(instance.getLaunchTime()) : null,
                     state: instance.getState()?.getName(),
                     tags: instance.getTags()?.collectEntries { [(it.key): it.value] }
                 ]
             }
-        } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "Error collecting EC2 information for ${ec2Computer.name}", e)
-            info.ec2Error = e.message
+            return null // No specific return value needed
+        }, LOGGER, Level.WARNING)
+        
+        if (!info.containsKey('ec2')) {
+            info.ec2Error = "Failed to retrieve EC2 instance information"
         }
     }
     
@@ -215,7 +233,7 @@ class SlaveInfoManager {
      */
     private void addStandardComputerInfo(Map<String, Object> info, Computer computer) {
         info.hostName = computer.hostName
-        info.connectionTime = computer.connectTime > 0 ? DATE_FORMATTER.format(new Date(computer.connectTime)) : null
+        info.connectionTime = computer.connectTime > 0 ? DATE_FORMATTER.get().format(new Date(computer.connectTime)) : null
         info.offlineCause = computer.offlineCause?.getShortDescription()
     }
     
@@ -239,6 +257,7 @@ class SlaveInfoManager {
      * ```
      */
     String formatSlaveInfo(Map<String, Object> slaveInfo) {
+        // No need to use ValidationUtils here - null check is appropriate since we return a default message
         if (!slaveInfo) {
             return "No information available"
         }
