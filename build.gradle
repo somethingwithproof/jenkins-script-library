@@ -71,7 +71,8 @@ configurations {
 ext {
     // Detect Java version
     isJava11Plus = JavaVersion.current().isJava11Compatible()
-    isJava17Plus = JavaVersion.current().isJava17Compatible()
+    // Custom check for Java 17+ compatibility since isJava17Compatible() doesn't exist
+    isJava17Plus = JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_17)
 
     // NOTE: As of 2025, Jenkins requires Java 17+ for both controller and agents
     // These versions are for backward compatibility with legacy Jenkins installations only
