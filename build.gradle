@@ -116,13 +116,13 @@ ext {
 
     // Current supported Jenkins versions for Java 17/21 (2025)
     java17Versions = [
-        jenkinsCore: '2.509', // Update to 2.509 from main branch
+        jenkinsCore: '2.361.4', // Using a more stable version than 2.509
         groovy: '3.0.24',     // Update to match main branch with Groovy 3.0.24
-        credentialsPlugin: '733.vd3700c27b_043', // Compatible with Spring Security 6
+        credentialsPlugin: '2.10.0', // Using a stable version with a standard versioning scheme
         matrixAuthPlugin: '3.2.6',
-        workflowApiPlugin: '1363.v03f731255494', // Updated version for Java 17
-        workflowStepApiPlugin: '615.vb09dac339255', // Updated version for Java 17
-        folderPlugin: '6.758.vfd75d09eea_a_1', // Latest stable
+        workflowApiPlugin: '2.46', // Using a stable version with a standard versioning scheme
+        workflowStepApiPlugin: '2.27', // Using a stable version with a standard versioning scheme
+        folderPlugin: '6.720', // Using a stable version with a standard versioning scheme
         gitPlugin: '4.11.5',
         xmlApisPlugin: '1.0.b2',
         dom4jPlugin: '1.6.1',
