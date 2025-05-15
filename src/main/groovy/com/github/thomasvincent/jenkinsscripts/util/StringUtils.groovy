@@ -24,6 +24,9 @@
 
 package com.github.thomasvincent.jenkinsscripts.util
 
+import java.util.logging.Level
+import java.util.logging.Logger
+
 /**
  * String utilities for Jenkins scripts.
  * 
@@ -34,6 +37,7 @@ package com.github.thomasvincent.jenkinsscripts.util
  * @since 1.0
  */
 class StringUtils {
+    private static final Logger LOGGER = Logger.getLogger(StringUtils.class.getName())
 
     /**
      * Sanitizes a string for use as a Jenkins job name.
@@ -74,11 +78,9 @@ class StringUtils {
             return defaultValue
         }
         
-        try {
+        return ErrorHandler.withErrorHandling("parsing integer value from '${str}'", {
             return str.trim().toInteger()
-        } catch (Exception e) {
-            return defaultValue
-        }
+        }, LOGGER, defaultValue, Level.FINE)
     }
     
     /**

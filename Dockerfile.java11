@@ -1,0 +1,18 @@
+FROM eclipse-temurin:11-jdk
+
+WORKDIR /app
+
+# Copy build files
+COPY gradlew ./
+COPY gradle ./gradle
+COPY build.gradle ./
+COPY gradle.properties ./
+
+# Copy source code
+COPY src ./src
+
+# Make gradlew executable
+RUN chmod +x ./gradlew
+
+# Run build with Java 11
+RUN ./gradlew clean build --info

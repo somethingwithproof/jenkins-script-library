@@ -30,6 +30,9 @@ import hudson.model.Job
 import hudson.model.TopLevelItem
 import org.kohsuke.stapler.DataBoundConstructor
 
+import com.github.thomasvincent.jenkinsscripts.util.ValidationUtils
+import com.github.thomasvincent.jenkinsscripts.util.ErrorHandler
+
 import java.io.IOException
 import java.util.logging.Level
 import java.util.logging.Logger
@@ -71,11 +74,11 @@ class JobCleaner {
     JobCleaner(Jenkins jenkins, String jobName, boolean resetBuildNumber = false, 
                int cleanedJobsLimit = DEFAULT_CLEANED_JOBS_LIMIT, 
                int buildTotal = DEFAULT_BUILD_TOTAL) {
-        this.jenkins = validateNotNull(jenkins, "Jenkins instance cannot be null")
-        this.jobName = validateNotNullOrEmpty(jobName, "Job name cannot be null or empty").trim()
+        this.jenkins = ValidationUtils.requireNonNull(jenkins, "Jenkins instance")
+        this.jobName = ValidationUtils.requireNonEmpty(jobName, "Job name")
         this.resetBuildNumber = resetBuildNumber
-        this.cleanedJobsLimit = validatePositive(cleanedJobsLimit, "cleanedJobsLimit", DEFAULT_CLEANED_JOBS_LIMIT)
-        this.buildTotal = validatePositive(buildTotal, "buildTotal", DEFAULT_BUILD_TOTAL)
+        this.cleanedJobsLimit = ValidationUtils.requirePositive(cleanedJobsLimit, "cleanedJobsLimit", DEFAULT_CLEANED_JOBS_LIMIT)
+        this.buildTotal = ValidationUtils.requirePositive(buildTotal, "buildTotal", DEFAULT_BUILD_TOTAL)
     }
 
     /**
@@ -123,7 +126,7 @@ class JobCleaner {
      * @return true if successful, false otherwise
      */
     private boolean cleanProject(AbstractProject<?, ?> project) {
-        try {
+        return ErrorHandler.withErrorHandling("cleaning project ${project.name}", {
             deleteBuilds(project)
             
             if (resetBuildNumber) {
@@ -131,10 +134,7 @@ class JobCleaner {
             }
             
             return true
-        } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "Error cleaning project ${project.name}", e)
-            return false
-        }
+        }, LOGGER, false)
     }
     
     /**
@@ -149,12 +149,14 @@ class JobCleaner {
         
         project.getBuilds().each { build ->
             if (deletedCount < buildTotal) {
-                try {
+                boolean deleted = ErrorHandler.withErrorHandling("deleting build ${build.number} for job ${project.name}", {
                     build.delete()
+                    return true
+                }, LOGGER, false)
+                
+                if (deleted) {
                     deletedCount++
                     LOGGER.fine("Deleted build ${build.number} for job ${project.name}")
-                } catch (IOException e) {
-                    LOGGER.log(Level.SEVERE, "Failed to delete build ${build.number} for job ${project.name}", e)
                 }
             }
         }
@@ -169,72 +171,12 @@ class JobCleaner {
      * @return true if successful, false otherwise
      */
     private boolean resetBuildNumber(AbstractProject<?, ?> project) {
-        try {
+        return ErrorHandler.withErrorHandling("resetting build number for job ${project.name}", {
             project.updateNextBuildNumber(1)
             project.save()
             LOGGER.info("Reset build number for job ${project.name}")
             return true
-        } catch (IOException e) {
-            LOGGER.log(Level.SEVERE, "Failed to reset build number for job ${project.name}", e)
-            return false
-        }
+        }, LOGGER, false)
     }
 
-    /**
-     * Validates non-null value.
-     * 
-     * ```groovy
-     * validateNotNull(obj, "Object must not be null")
-     * ```
-     * 
-     * @param arg Value to validate
-     * @param message Error message
-     * @return Validated value
-     */
-    private static <T> T validateNotNull(T arg, String message) {
-        if (arg == null) {
-            throw new IllegalArgumentException(message)
-        }
-        return arg
-    }
-
-    /**
-     * Validates non-empty string.
-     * 
-     * ```groovy
-     * validateNotNullOrEmpty(name, "Name is required")
-     * ```
-     * 
-     * @param arg String to validate
-     * @param message Error message
-     * @return Validated string
-     */
-    private static String validateNotNullOrEmpty(String arg, String message) {
-        if (arg == null || arg.trim().isEmpty()) {
-            throw new IllegalArgumentException(message)
-        }
-        return arg
-    }
-    
-    /**
-     * Validates positive integer.
-     * 
-     * Uses default if value is non-positive.
-     * 
-     * ```groovy
-     * validatePositive(count, "count", 10)  // Returns count if positive, 10 otherwise
-     * ```
-     * 
-     * @param value Value to validate
-     * @param name Parameter name for logging
-     * @param defaultValue Fallback value
-     * @return Validated or default value
-     */
-    private static int validatePositive(int value, String name, int defaultValue) {
-        if (value <= 0) {
-            LOGGER.warning("${name} must be positive. Using default value ${defaultValue}")
-            return defaultValue
-        }
-        return value
-    }
 }

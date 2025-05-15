@@ -30,6 +30,9 @@ import java.util.concurrent.Future
 import java.util.logging.Level
 import java.util.logging.Logger
 
+import com.github.thomasvincent.jenkinsscripts.util.ValidationUtils
+import com.github.thomasvincent.jenkinsscripts.util.ErrorHandler
+
 /**
  * Utility for starting Jenkins agent computers.
  * 
@@ -59,6 +62,7 @@ class ComputerLauncher {
      */
     ComputerLauncher(Jenkins jenkins) {
         this.jenkins = jenkins ?: Jenkins.get()
+        // No need to validate jenkins here as we use a default if null
     }
     
     /**
@@ -73,9 +77,10 @@ class ComputerLauncher {
      * ```
      */
     boolean startComputer(String computerName) {
-        if (computerName == null) {
-            LOGGER.warning("No computer name provided.")
-            return false
+        try {
+            computerName = ValidationUtils.requireNonEmpty(computerName, "Computer name")
+        } catch (IllegalArgumentException e) {
+            return ErrorHandler.handleErrorWithDefault("validating computer name", e, LOGGER, false)
         }
         
         Computer computer = jenkins.getComputer(computerName)
@@ -125,12 +130,14 @@ class ComputerLauncher {
      * Uses Groovy's exception handling capabilities.
      */
     private boolean startComputerInternal(Computer computer) {
+        ValidationUtils.requireNonNull(computer, "Computer instance")
+        
         if (!computer.offline) {
             LOGGER.info("Computer ${computer.name} is already online.")
             return true
         }
         
-        try {
+        return ErrorHandler.withErrorHandling("starting computer ${computer.name}", {
             LOGGER.info("Attempting to start computer ${computer.name}...")
             Future<?> connectionResult = computer.connect(false)
             
@@ -144,9 +151,6 @@ class ComputerLauncher {
                               "The connection attempt will continue in the background.")
                 return false
             }
-        } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "Failed to start computer ${computer.name}", e)
-            return false
-        }
+        }, LOGGER, false)
     }
 }
