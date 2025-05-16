@@ -4,25 +4,31 @@
 
 This library is officially tested and supported on:
 
-- **Groovy**: 2.4.x (Jenkins LTS built-in version)
-- **Java**: JDK 11+ (Jenkins LTS requirement)
-- **Jenkins**: 2.361.1+
+- **Groovy**: 4.0.x (Latest for Jenkins 2.4xx+)
+- **Java**: JDK 17+ (Current Jenkins LTS requirement)
+- **Jenkins**: 2.479.3+ (Current LTS stream)
 
 ## Groovy Version Compatibility
 
-Groovy 2.4.x is used as it is the version bundled with Jenkins LTS. Key benefits include:
+Groovy compatibility is maintained across versions:
 
-- Direct compatibility with Jenkins' runtime environment
-- Consistent behavior across different Jenkins installations
-- No need for additional Groovy installations
-- Reliable execution in Jenkins Pipeline environments
+- Jenkins 2.4xx+ uses Groovy 4.0.x
+- Backward compatibility with Groovy 3.0.x is maintained
+- Legacy support for Groovy 2.4.x is limited and not recommended
+
+Key benefits of using modern Groovy versions:
+
+- Enhanced performance and security
+- Better error handling and diagnostics
+- Access to newer language features
+- Improved integration with Java 17+
 
 ## Verification Status
 
 The library has been tested and verified to work with:
 
 ```
-Groovy 2.4.x on Java 11+ (Jenkins LTS)
+Groovy 4.0.x on Java 17+ (Current Jenkins LTS)
 ```
 
 All Jenkins-compatible Groovy features have been tested and function correctly, including:
@@ -33,35 +39,37 @@ All Jenkins-compatible Groovy features have been tested and function correctly, 
 
 ## Java Version Compatibility
 
-Java 11+ is used as it is:
+Java 17+ is the primary supported platform as it is:
 
-- Required by current Jenkins LTS versions
-- Widely supported in enterprise environments
-- Compatible with most Jenkins plugins
-- Provides good performance while maintaining compatibility
+- Required by current Jenkins LTS versions (2.4xx+)
+- The current LTS version of Java with long-term support
+- Provides significant performance and security improvements
+- Standard in most enterprise environments
+
+> **Note**: Java 11 support is maintained for compatibility but will be phased out in future releases as Jenkins moves to Java 17+ requirements.
 
 ## Jenkins Compatibility Notes
 
 When using this library with Jenkins:
 
-1. This library is designed to work with Jenkins' built-in Groovy runtime (2.4.x)
-2. For full feature support, Jenkins 2.361.1 or newer is required
-3. Some plugins might require updates to be compatible with this library
+1. This library is designed to work with Jenkins 2.479.3+ using Groovy 4.0.x
+2. For full feature support, the latest Jenkins LTS is recommended
+3. Some plugins may require updates to be compatible with this library
 4. No additional Groovy installation is needed
 
 ## Development Environment
 
 For development, we recommend:
 
-- Java 11 SDK (to match Jenkins LTS requirements)
-- Groovy 2.4.x (to match Jenkins built-in version)
-- Gradle 7.6.2 or newer
+- Java 17 SDK (to match current Jenkins LTS requirements)
+- Gradle 8.x or newer
 - An IDE with Groovy support (IntelliJ IDEA, Eclipse, etc.)
+- Docker for containerized testing
 
 ## Building for Other Environments
 
 If you need to use this library in environments with different version requirements:
 
-- For newer Groovy versions: the library will continue to work as it uses features compatible with Groovy 2.4+
-- For Java 8 environments: some features may need adjustment, but core functionality should work
-- For older Jenkins versions: use the library with caution, as not all features may work
+- For Java 11 environments: limited support is maintained but will be phased out
+- For newer Java versions (Java 21+): the library should work without modifications
+- For older Jenkins versions: use with caution as compatibility is not guaranteed
