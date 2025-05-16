@@ -1,0 +1,68 @@
+---
+# .pre-commit-config.yaml
+# Pre-commit hooks configuration for Jenkins Script Library
+# https://pre-commit.com
+
+repos:
+  # General file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-xml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+      - id: detect-private-key
+        
+  # Credential check
+  - repo: https://github.com/yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        exclude: '.*\.gradle$'
+        args: ['--baseline', '.secrets.baseline']
+        
+  # YAML validation
+  - repo: https://github.com/adrienverge/yamllint.git
+    rev: v1.33.0
+    hooks:
+      - id: yamllint
+        args: ['-d', '{extends: relaxed, rules: {line-length: {max: 120}}}']
+        
+  # Groovy linting
+  - repo: local
+    hooks:
+      - id: codenarc
+        name: codenarc
+        entry: ./gradlew codenarcMain
+        language: system
+        pass_filenames: false
+        files: '\.groovy$'
+        
+      - id: credential-check
+        name: Check for hardcoded credentials
+        entry: bash -c 'grep -r --include="*.groovy" -E "(password|token|secret).*=.*['"'"'\""][^'"'"'\"]+['"'"'\"]" . && exit 1 || exit 0'
+        language: system
+        pass_filenames: false
+        
+      - id: groovy-syntax
+        name: groovy syntax check
+        language: system
+        entry: groovy -e
+        args: ["import org.codehaus.groovy.control.*; new GroovyShell(new CompilerConfiguration(scriptBaseClass: 'groovy.lang.Script')).parse(new File('$1'));"]
+        files: '\.groovy$'
+        
+  # Gradle validation
+  - repo: local
+    hooks:
+      - id: gradle-validate
+        name: gradle validate
+        entry: ./gradlew tasks
+        language: system
+        pass_filenames: false
+        files: '(build\.gradle|settings\.gradle)$'

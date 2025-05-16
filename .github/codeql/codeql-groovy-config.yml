@@ -1,4 +1,4 @@
-name: "Jenkins Script Library CodeQL Config"
+name: "Groovy as Java"
 
 queries:
   - uses: security-and-quality
@@ -18,5 +18,5 @@ paths-ignore:
   - 'config/**'
 
 # Treat .groovy files as Java
-extensions:
-  - .groovy
+fileExtensions:
+  - .groovy=java
