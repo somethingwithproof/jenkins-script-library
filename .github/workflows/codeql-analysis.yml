@@ -1,4 +1,4 @@
-name: "CodeQL Status"
+name: "CodeQL Status Check"
 
 on:
   push:
@@ -11,7 +11,7 @@ on:
 
 jobs:
   codeql-status:
-    name: CodeQL Status
+    name: CodeQL Compatibility Status
     runs-on: ubuntu-latest
     permissions:
       actions: read
