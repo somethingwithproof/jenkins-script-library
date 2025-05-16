@@ -11,7 +11,7 @@ FROM jenkins/jenkins:lts-jdk17
 USER root
 
 # Set environment variables
-ENV GRADLE_VERSION=7.6.2 \
+ENV GRADLE_VERSION=8.7 \
     JENKINS_HOME=/var/jenkins_home
 
 # Install required packages

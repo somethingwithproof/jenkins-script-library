@@ -1,22 +1,20 @@
 version: '3.8'
 
 services:
-  # Java 8 (default)
-  java8:
-    image: eclipse-temurin:8-jdk
-    volumes:
-      - .:/app
-    working_dir: /app
-    command: ./gradlew clean build --info
-  
-  # Java 11
+  # Java 11 (Legacy Support)
   java11:
     build:
       context: .
       dockerfile: Dockerfile.java11
   
-  # Java 17
+  # Java 17 (Current LTS)
   java17:
     build:
       context: .
       dockerfile: Dockerfile.java17
+  
+  # Java 21 (Future Compatibility)
+  java21:
+    build:
+      context: .
+      dockerfile: Dockerfile.java21
