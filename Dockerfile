@@ -55,5 +55,12 @@ RUN jenkins-plugin-cli --plugins \
     matrix-auth \
     cloudbees-folder
 
+# Add version support
+COPY --chown=jenkins:jenkins version.sh /usr/local/bin/version.sh
+RUN chmod +x /usr/local/bin/version.sh
+
 # Define an entrypoint that adds our library to Jenkins
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+
+# Default command
+CMD ["jenkins"]
