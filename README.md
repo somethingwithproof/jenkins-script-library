@@ -1,6 +1,6 @@
 # Jenkins Script Library
 
-A collection of Groovy utilities and scripts designed to automate and facilitate various operations within Jenkins environments. This library follows Jenkins-compatible practices and includes comprehensive test coverage.
+A collection of Groovy utilities and scripts designed to automate and facilitate various operations within Jenkins environments. This library follows Jenkins-compatible practices and includes comprehensive test coverage. Supports Jenkins automation for modern environments.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Groovy 2.4](https://img.shields.io/badge/Groovy-2.4-blue.svg)](https://groovy-lang.org/)
