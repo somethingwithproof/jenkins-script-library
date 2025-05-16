@@ -46,4 +46,10 @@ bin/
 *~
 *.swp
 *.bak
+
+# Claude Code
+.claude/
+**/.claude/
 **/.claude/settings.local.json
+.CLAUDE.md
+CLAUDE.md
