@@ -33,11 +33,13 @@ import com.github.thomasvincent.jenkinsscripts.util.ErrorHandler
 
 import java.util.logging.Level
 import java.util.logging.Logger
+import java.util.regex.Pattern
 
 /**
  * Disables Jenkins jobs with proper security checks.
  * 
  * Provides methods to disable individual or multiple Jenkins jobs securely.
+ * Supports disabling by name, pattern matching, or all buildable jobs.
  * 
  * @author Thomas Vincent
  * @since 1.0
@@ -48,6 +50,8 @@ class JobDisabler implements Serializable {
     private static final Logger LOGGER = Logger.getLogger(JobDisabler.class.getName())
     
     private final Jenkins jenkins
+    private List<String> jobNames = []
+    private Pattern pattern = null
     
     /**
      * Creates a JobDisabler instance.
@@ -63,6 +67,29 @@ class JobDisabler implements Serializable {
      */
     JobDisabler(Jenkins jenkins) {
         this.jenkins = jenkins ?: Jenkins.get()
+    }
+    
+    /**
+     * Specifies job names to disable.
+     * 
+     * @param jobNames List of job names to disable
+     * @return This JobDisabler instance for method chaining
+     */
+    JobDisabler withJobNames(List<String> jobNames) {
+        this.jobNames = ValidationUtils.requireNonNull(jobNames, "Job names list")
+        return this
+    }
+    
+    /**
+     * Specifies a pattern for job names to disable.
+     * 
+     * @param patternString Regex pattern string for matching job names
+     * @return This JobDisabler instance for method chaining
+     */
+    JobDisabler withPattern(String patternString) {
+        ValidationUtils.requireNonEmpty(patternString, "Pattern string")
+        this.pattern = Pattern.compile(patternString)
+        return this
     }
     
     /**
@@ -84,16 +111,37 @@ class JobDisabler implements Serializable {
             return 0
         }
         
-        List<Job> buildableJobs = findBuildableJobs()
+        return disableJobs()
+    }
+    
+    /**
+     * Disables all jobs that match the configured criteria.
+     * 
+     * ```groovy
+     * def disabler = new JobDisabler(Jenkins.get())
+     *     .withPattern("test-.*")
+     * int count = disabler.disableJobs()
+     * println "Disabled ${count} matching jobs"
+     * ```
+     * 
+     * @return Number of jobs successfully disabled
+     */
+    int disableJobs() {
+        if (!hasAdminPermission()) {
+            LOGGER.severe("Operation aborted. User lacks required administrative privileges.")
+            return 0
+        }
+        
+        List<Job> jobsToDisable = findJobsToDisable()
         int disabledCount = 0
         
-        buildableJobs.each { job ->
+        jobsToDisable.each { job ->
             if (disableJobInternal(job)) {
                 disabledCount++
             }
         }
         
-        LOGGER.info("Disabled ${disabledCount} of ${buildableJobs.size()} buildable jobs")
+        LOGGER.info("Disabled ${disabledCount} of ${jobsToDisable.size()} jobs")
         return disabledCount
     }
     
@@ -145,6 +193,35 @@ class JobDisabler implements Serializable {
         return jenkins.hasPermission(Permission.ADMINISTER)
     }
     
+    /**
+     * Finds jobs to disable based on the configured criteria.
+     * 
+     * @return List of Jenkins jobs that match the criteria
+     */
+    List<Job> findJobsToDisable() {
+        List<Job> allJobs = jenkins.getAllItems(Job.class)
+        List<Job> matchingJobs = []
+        
+        // Filter jobs based on criteria
+        if (!jobNames.isEmpty()) {
+            // Filter by job names
+            Set<String> jobNameSet = new HashSet<>(jobNames)
+            matchingJobs = allJobs.findAll { job -> 
+                jobNameSet.contains(job.getName()) || jobNameSet.contains(job.getFullName())
+            }
+        } else if (pattern != null) {
+            // Filter by pattern
+            matchingJobs = allJobs.findAll { job -> 
+                pattern.matcher(job.getName()).matches() || pattern.matcher(job.getFullName()).matches()
+            }
+        } else {
+            // Default: all buildable jobs
+            matchingJobs = findBuildableJobs()
+        }
+        
+        return matchingJobs
+    }
+
     /**
      * Finds all buildable jobs in Jenkins.
      * 
