@@ -31,6 +31,7 @@ jobs:
       uses: github/codeql-action/init@v3
       with:
         languages: ${{ matrix.language }}
+        setup-python-dependencies: false
 
     # For javascript/groovy, we'll use Autobuild instead
     - name: Autobuild
