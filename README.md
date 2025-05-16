@@ -6,6 +6,9 @@ A collection of Groovy utilities and scripts designed to automate and facilitate
 [![Groovy 2.4](https://img.shields.io/badge/Groovy-2.4-blue.svg)](https://groovy-lang.org/)
 [![Java 8+](https://img.shields.io/badge/Java-8+-orange.svg)](https://adoptium.net/)
 [![Jenkins 2.249.3+](https://img.shields.io/badge/Jenkins-2.249.3+-green.svg)](https://jenkins.io/)
+[![CI](https://github.com/thomasvincent/jenkins-script-library/actions/workflows/ci.yml/badge.svg)](https://github.com/thomasvincent/jenkins-script-library/actions/workflows/ci.yml)
+[![Gradle Build](https://github.com/thomasvincent/jenkins-script-library/actions/workflows/gradle.yml/badge.svg)](https://github.com/thomasvincent/jenkins-script-library/actions/workflows/gradle.yml)
+[![Security Scan](https://github.com/thomasvincent/jenkins-script-library/actions/workflows/security.yml/badge.svg)](https://github.com/thomasvincent/jenkins-script-library/actions/workflows/security.yml)
 
 ## Features
 
