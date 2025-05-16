@@ -6,6 +6,12 @@
 
 set -e
 
+# Handle version request
+if [ "$1" = "--version" ]; then
+  exec /usr/local/bin/version.sh
+  exit 0
+fi
+
 # If first arg is jenkins, skip and run original entrypoint
 if [ "$1" = "jenkins" ]; then
   exec /usr/local/bin/jenkins.sh "$@"
@@ -13,6 +19,9 @@ fi
 
 # Setup the library
 echo "Setting up Jenkins Script Library..."
+
+# Ensure init directory exists
+mkdir -p /var/jenkins_home/init.groovy.d
 
 # Create init script to configure the library
 cat > /var/jenkins_home/init.groovy.d/add-script-library.groovy << 'EOF'
