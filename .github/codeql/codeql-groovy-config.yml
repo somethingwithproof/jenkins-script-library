@@ -1,6 +1,14 @@
-name: "Disable CodeQL Analysis"
+name: "Disable CodeQL Analysis for Groovy"
 
+# Completely disable default queries
 disable-default-queries: true
 
+# Disable custom queries
+queries:
+  - name: Disable custom queries
+    uses: security-and-quality
+    disable: true
+
+# Explicitly exclude all paths
 paths-ignore:
   - '**/*'
