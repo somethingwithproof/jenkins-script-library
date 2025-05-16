@@ -11,6 +11,9 @@ jobs:
   test:
     name: Run Gradle Tests
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
 
     steps:
     - name: Checkout repository
