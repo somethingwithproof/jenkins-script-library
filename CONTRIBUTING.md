@@ -119,6 +119,54 @@ Types include:
 - `test`: Adding or updating tests
 - `chore`: Changes to the build process or auxiliary tools
 
+## Pre-commit Hooks
+
+This project uses pre-commit hooks to ensure code quality and prevent issues before committing changes.
+
+### Installation
+
+1. Install pre-commit:
+   ```bash
+   # Using pip
+   pip install pre-commit
+   
+   # Or using Homebrew on macOS
+   brew install pre-commit
+   ```
+
+2. Install the hooks:
+   ```bash
+   pre-commit install
+   ```
+
+### Available Hooks
+
+The following pre-commit hooks are configured:
+
+- **trailing-whitespace**: Removes trailing whitespace
+- **end-of-file-fixer**: Ensures files end with a newline
+- **check-yaml**: Validates YAML syntax
+- **check-added-large-files**: Prevents giant files from being committed
+- **check-merge-conflict**: Ensures merge conflicts aren't committed
+- **detect-private-key**: Prevents private keys from being committed
+- **groovy-syntax-check**: Validates Groovy syntax
+- **credential-check**: Checks for hardcoded credentials
+- **detect-secrets**: Scans for unintentional secrets
+
+### Running Hooks Manually
+
+You can run all hooks against all files:
+
+```bash
+pre-commit run --all-files
+```
+
+Or run a specific hook:
+
+```bash
+pre-commit run detect-secrets --all-files
+```
+
 ## License
 
 By contributing to this project, you agree that your contributions will be licensed under the project's MIT License.
