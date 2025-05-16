@@ -332,11 +332,9 @@ configurations.all {
         if (!isJava17Plus) {
             // Exclude Spring Security 6.x which requires Java 17+
             // Jenkins 2.479.1+ requires Spring Security 6
-            all {
-                if (it.group == 'org.springframework.security' && it.version.startsWith('6.')) {
-                    force "org.springframework.security:spring-security-web:5.8.13"
-                    force "org.springframework.security:spring-security-core:5.8.13"
-                    force "org.springframework.security:spring-security-crypto:5.8.13"
+            eachDependency { details ->
+                if (details.requested.group == 'org.springframework.security' && details.requested.version.startsWith('6.')) {
+                    details.useVersion('5.8.13')
                     logger.warn("WARNING: Downgrading Spring Security 6.x to 5.8.x for Java 8/11 compatibility")
                     logger.warn("This configuration won't work with Jenkins 2.479.1+ which requires Java 17+")
                 }
