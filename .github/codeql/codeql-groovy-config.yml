@@ -1,0 +1,6 @@
+name: "Disable CodeQL Analysis"
+
+disable-default-queries: true
+
+paths-ignore:
+  - '**/*'
