@@ -1,400 +1,429 @@
-# Jenkins Script Library
+# Jenkins Script Library - Available Scripts
 
-This document provides a comprehensive list of all available scripts in the Jenkins Script Library. These scripts can be executed directly within Jenkins Script Console or as standalone Groovy scripts to automate various Jenkins management tasks.
+This document provides a comprehensive guide to all scripts available in the Jenkins Script Library. These scripts can be used directly in Jenkins Script Console or as part of your Jenkins automation workflows.
+
+## Script Usage
+
+All scripts are located in the `src/main/groovy/com/github/thomasvincent/jenkinsscripts/scripts` directory. To use a script in Jenkins:
+
+1. Navigate to "Manage Jenkins" > "Script Console"
+2. Copy the script content 
+3. Modify parameters as needed
+4. Execute the script
+
+Alternatively, you can use these scripts programmatically or as part of Jenkins Pipeline jobs.
 
 ## Available Scripts
 
-### AnalyzeJobHealth.groovy
+### AnalyzeJobHealth
 
-Analyzes health status of Jenkins jobs and provides detailed reports.
+Analyzes the health of Jenkins jobs and provides metrics on their stability.
 
 **Parameters:**
-- `--job`: (Optional) Specific job name to analyze
-- `--all`: (Optional) Analyze all jobs
-- `--format`: (Optional) Output format (text, json)
+- `jobNamePattern` - Pattern to match job names (regex supported)
+- `daysToAnalyze` - Number of days of build history to analyze
 
 **Example:**
 ```groovy
-./AnalyzeJobHealth.groovy --all --format json
+import com.github.thomasvincent.jenkinsscripts.scripts.AnalyzeJobHealth
+
+def analyzer = new AnalyzeJobHealth()
+analyzer.analyzeJobs(".*-build", 30)
 ```
 
-### AnalyzePipelinePerformance.groovy
+### AnalyzePipelinePerformance
 
-Analyzes performance metrics for Jenkins pipeline jobs including execution time, wait time, and resource utilization.
+Analyzes Jenkins Pipeline job performance to identify bottlenecks and slow stages.
 
 **Parameters:**
-- `--job`: Pipeline job name to analyze
-- `--builds`: (Optional) Number of builds to analyze
-- `--format`: (Optional) Output format (text, json)
+- `jobName` - Name of the pipeline job to analyze
+- `buildsToAnalyze` - Number of builds to include in analysis
 
 **Example:**
 ```groovy
-./AnalyzePipelinePerformance.groovy --job my-pipeline --builds 10
+import com.github.thomasvincent.jenkinsscripts.scripts.AnalyzePipelinePerformance
+
+def analyzer = new AnalyzePipelinePerformance()
+analyzer.analyze("my-pipeline", 10)
 ```
 
-### ArchiveJobs.groovy
+### ArchiveJobs
 
-Archives old or inactive Jenkins jobs to reduce clutter in the Jenkins interface.
+Archives old or unused Jenkins jobs to improve performance.
 
 **Parameters:**
-- `--jobs`: Comma-separated list of job names to archive
-- `--inactive`: (Optional) Archive jobs inactive for specified days
-- `--dry-run`: (Optional) Simulation mode without making actual changes
+- `jobPattern` - Pattern to match job names (regex supported)
+- `daysInactive` - Number of days of inactivity before archiving
+- `archiveAction` - Action to take: "disable", "move", or "backup"
 
 **Example:**
 ```groovy
-./ArchiveJobs.groovy --inactive 90 --dry-run
+import com.github.thomasvincent.jenkinsscripts.scripts.ArchiveJobs
+
+def archiver = new ArchiveJobs()
+archiver.archiveInactiveJobs(".*-test", 90, "disable")
 ```
 
-### AuditJenkinsSecurity.groovy
+### AuditJenkinsSecurity
 
-Performs security audit of Jenkins instance to identify potential vulnerabilities.
+Audits Jenkins security settings and identifies potential vulnerabilities.
 
 **Parameters:**
-- `--full`: (Optional) Perform comprehensive security audit
-- `--report`: (Optional) Output file for audit report
-- `--format`: (Optional) Output format (text, json)
+- `outputFormat` - Format for audit results ("text", "json", or "html")
+- `scanDepth` - Depth of security scan ("basic" or "detailed")
 
 **Example:**
 ```groovy
-./AuditJenkinsSecurity.groovy --full --format json
+import com.github.thomasvincent.jenkinsscripts.scripts.AuditJenkinsSecurity
+
+def auditor = new AuditJenkinsSecurity()
+def results = auditor.audit("json", "detailed")
+println results
 ```
 
-### AuditJobConfigurations.groovy
+### AuditJobConfigurations
 
-Audits job configurations to identify common issues or inconsistencies.
+Audits Jenkins job configurations for best practices and security issues.
 
 **Parameters:**
-- `--pattern`: (Optional) Pattern to match job names
-- `--check`: (Optional) Specific checks to perform
-- `--format`: (Optional) Output format (text, json)
+- `jobPattern` - Pattern to match job names (regex supported)
+- `auditCategories` - List of categories to audit (e.g., "security", "performance")
 
 **Example:**
 ```groovy
-./AuditJobConfigurations.groovy --pattern "frontend-*" --check triggers,parameters
+import com.github.thomasvincent.jenkinsscripts.scripts.AuditJobConfigurations
+
+def auditor = new AuditJobConfigurations()
+auditor.auditJobs(".*", ["security", "performance"])
 ```
 
-### BackupJenkinsConfig.groovy
+### BackupJenkinsConfig
 
-Creates a backup of Jenkins configuration and job definitions.
+Creates a backup of Jenkins configuration files.
 
 **Parameters:**
-- `--target`: Directory to store backup
-- `--jobs`: (Optional) Include job configurations in backup
-- `--plugins`: (Optional) Include plugin information
+- `backupDir` - Directory to store backups
+- `includeJobs` - Whether to include job configurations (true/false)
 
 **Example:**
 ```groovy
-./BackupJenkinsConfig.groovy --target /path/to/backup --jobs --plugins
+import com.github.thomasvincent.jenkinsscripts.scripts.BackupJenkinsConfig
+
+def backup = new BackupJenkinsConfig()
+backup.createBackup("/var/backups/jenkins", true)
 ```
 
-### CleanBuildHistory.groovy
+### CleanBuildHistory
 
-Cleans build history from Jenkins jobs with option to reset build numbers.
+Cleans up old build history to free up disk space.
 
 **Parameters:**
-- `jobName`: Name of the job to clean
-- `--reset`: (Optional) Reset build number to 1 after cleaning
-- `--limit`: (Optional) Maximum number of builds to clean (default: 100)
+- `jobPattern` - Pattern to match job names (regex supported)
+- `daysToKeep` - Number of days of build history to keep
+- `maxBuildsToKeep` - Maximum number of builds to keep per job
 
 **Example:**
 ```groovy
-./CleanBuildHistory.groovy --reset --limit 50 my-jenkins-job
+import com.github.thomasvincent.jenkinsscripts.scripts.CleanBuildHistory
+
+def cleaner = new CleanBuildHistory()
+cleaner.clean(".*", 30, 100)
 ```
 
-### CopyJob.groovy
+### CopyJob
 
-Copies an existing Jenkins job with optional configuration replacements.
+Copies a Jenkins job with customizable parameters.
 
 **Parameters:**
-- `--source`: Full name of the source job (e.g., "Folder/JobToCopy")
-- `--newName`: Name for the new job (simple name, not full path)
-- `--targetFolder`: (Optional) Full path of the target folder for the new job
-- `--replace`: (Optional) Configuration replacement string "oldString:newString"
-- `--overwrite`: (Optional) Allow overwriting if the target job already exists
-- `--dryRun`: (Optional) Simulate without actual changes
+- `sourceJobName` - Name of the source job
+- `targetJobName` - Name of the target job
+- `parameterOverrides` - Map of parameters to override in the target job
 
 **Example:**
 ```groovy
-./CopyJob.groovy --source Folder/OldJob --newName NewJob --replace "old-url:new-url"
+import com.github.thomasvincent.jenkinsscripts.scripts.CopyJob
+
+def copier = new CopyJob()
+copier.copy("source-job", "target-job", [BRANCH: "develop", ENVIRONMENT: "staging"])
 ```
 
-### CreateJobFromTemplate.groovy
+### CreateJobFromTemplate
 
-Creates a new Jenkins job from a predefined template.
+Creates a new Jenkins job from a template.
 
 **Parameters:**
-- `--template`: Name of the template to use
-- `--name`: Name for the new job
-- `--params`: (Optional) Parameters to apply to template
-- `--folder`: (Optional) Target folder
+- `templateName` - Name of the template job
+- `newJobName` - Name for the new job
+- `parameters` - Map of parameters for the new job
 
 **Example:**
 ```groovy
-./CreateJobFromTemplate.groovy --template java-maven --name my-project --params "REPO_URL=https://github.com/org/repo"
+import com.github.thomasvincent.jenkinsscripts.scripts.CreateJobFromTemplate
+
+def creator = new CreateJobFromTemplate()
+creator.create("template-job", "new-feature-job", [REPO: "git@github.com:org/repo.git", BRANCH: "feature/xyz"])
 ```
 
-### DisableJobs.groovy
+### DisableJobs
 
-Disables specified Jenkins jobs to prevent them from running.
+Disables Jenkins jobs matching specified criteria.
 
 **Parameters:**
-- `--jobs`: Comma-separated list of job names to disable
-- `--pattern`: (Optional) Pattern to match job names
-- `--reason`: (Optional) Reason for disabling jobs
-- `--dry-run`: (Optional) Simulation mode
+- `jobPattern` - Pattern to match job names (regex supported)
+- `reason` - Reason for disabling (added as job description)
+- `daysInactive` - Optional: Only disable jobs inactive for this many days
 
 **Example:**
 ```groovy
-./DisableJobs.groovy --pattern "deprecated-*" --reason "Deprecated services"
+import com.github.thomasvincent.jenkinsscripts.scripts.DisableJobs
+
+def disabler = new DisableJobs()
+disabler.disable(".*-legacy", "Project deprecated", 60)
 ```
 
-### EnableJobs.groovy
+### EnableJobs
 
 Enables previously disabled Jenkins jobs.
 
 **Parameters:**
-- `--jobs`: Comma-separated list of job names to enable
-- `--pattern`: (Optional) Pattern to match job names
-- `--dry-run`: (Optional) Simulation mode
+- `jobPattern` - Pattern to match job names (regex supported)
 
 **Example:**
 ```groovy
-./EnableJobs.groovy --jobs job1,job2,job3
+import com.github.thomasvincent.jenkinsscripts.scripts.EnableJobs
+
+def enabler = new EnableJobs()
+enabler.enable(".*-project")
 ```
 
-### JenkinsInstanceHealthCheck.groovy
+### JenkinsInstanceHealthCheck
 
-Performs a comprehensive health check of a Jenkins instance.
+Performs a health check on a Jenkins instance.
 
 **Parameters:**
-- `--checks`: (Optional) Specific health checks to run
-- `--threshold`: (Optional) Alert threshold for issues
-- `--format`: (Optional) Output format (text, json)
+- `checkCategories` - List of categories to check (e.g., "system", "plugins", "security")
+- `outputFormat` - Format for health check results ("text", "json", or "html")
 
 **Example:**
 ```groovy
-./JenkinsInstanceHealthCheck.groovy --checks disk,memory,plugins --format json
+import com.github.thomasvincent.jenkinsscripts.scripts.JenkinsInstanceHealthCheck
+
+def healthCheck = new JenkinsInstanceHealthCheck()
+def results = healthCheck.check(["system", "plugins", "security"], "json")
+println results
 ```
 
-### ListCloudNodes.groovy
+### ListCloudNodes
 
-Lists all cloud-provisioned nodes along with their status.
+Lists Jenkins cloud nodes (agents) with their status.
 
 **Parameters:**
-- `--provider`: (Optional) Cloud provider to filter by (aws, azure, gcp, kubernetes)
-- `--status`: (Optional) Filter by node status
-- `--json`: (Optional) Output in JSON format
+- `cloudType` - Type of cloud provider ("aws", "azure", "kubernetes", etc.)
+- `includeOffline` - Whether to include offline nodes (true/false)
 
 **Example:**
 ```groovy
-./ListCloudNodes.groovy --provider aws --json
+import com.github.thomasvincent.jenkinsscripts.scripts.ListCloudNodes
+
+def lister = new ListCloudNodes()
+def nodes = lister.list("aws", true)
+nodes.each { println it }
 ```
 
-### ListSlaveNodes.groovy
+### ListSlaveNodes
 
-Lists Jenkins slave nodes with detailed status information.
+Lists all Jenkins slave nodes with their status.
 
 **Parameters:**
-- `[slaveName]`: (Optional) Specific slave node to get details for
-- `--json`: (Optional) Output in JSON format
-- `--all`: (Optional) List all slaves (default if no slave name is provided)
+- `showDetails` - Level of detail to show ("basic", "full")
+- `filterStatus` - Filter by status ("online", "offline", "all")
 
 **Example:**
 ```groovy
-./ListSlaveNodes.groovy --json my-slave-node-name
+import com.github.thomasvincent.jenkinsscripts.scripts.ListSlaveNodes
+
+def lister = new ListSlaveNodes()
+def nodes = lister.list("full", "all")
+nodes.each { println it }
 ```
 
-### ManageAzureVMAgents.groovy
+### ManageAzureVMAgents
 
-Manages Azure VM agents for Jenkins, with operations to create, resize, and remove nodes.
+Manages Azure VM agents for Jenkins.
 
 **Parameters:**
-- `--action`: Action to perform (create, delete, resize, list)
-- `--name`: (Optional) Agent name for specific actions
-- `--size`: (Optional) VM size for create or resize actions
-- `--count`: (Optional) Number of agents to create
+- `action` - Action to perform ("create", "start", "stop", "delete")
+- `nodeName` - Name of the node
+- `vmSize` - Size of VM (for "create" action)
 
 **Example:**
 ```groovy
-./ManageAzureVMAgents.groovy --action create --name azure-agent --size Standard_D2s_v3
+import com.github.thomasvincent.jenkinsscripts.scripts.ManageAzureVMAgents
+
+def manager = new ManageAzureVMAgents()
+manager.manage("create", "build-agent", "Standard_D2s_v3")
 ```
 
-### ManageEC2Agents.groovy
+### ManageEC2Agents
 
-Manages EC2 instances used as Jenkins agents.
+Manages EC2 agents for Jenkins.
 
 **Parameters:**
-- `--action`: Action to perform (create, terminate, list)
-- `--instance`: (Optional) EC2 instance ID for specific actions
-- `--type`: (Optional) Instance type for create actions
-- `--label`: (Optional) Node label
+- `action` - Action to perform ("launch", "terminate", "list")
+- `instanceType` - Type of EC2 instance (for "launch" action)
+- `count` - Number of instances to manage
 
 **Example:**
 ```groovy
-./ManageEC2Agents.groovy --action list --label build-agent
+import com.github.thomasvincent.jenkinsscripts.scripts.ManageEC2Agents
+
+def manager = new ManageEC2Agents()
+manager.manage("launch", "t3.medium", 2)
 ```
 
-### ManageJobDependencies.groovy
+### ManageJobDependencies
 
-Manages dependencies between Jenkins jobs, creating upstream/downstream relationships.
+Manages dependencies between Jenkins jobs.
 
 **Parameters:**
-- `--job`: Job to manage dependencies for
-- `--upstream`: (Optional) Comma-separated list of upstream jobs
-- `--downstream`: (Optional) Comma-separated list of downstream jobs
-- `--remove`: (Optional) Remove specified dependencies
+- `jobName` - Name of the job
+- `action` - Action to perform ("add", "remove", "list")
+- `dependencyJobName` - Name of the dependency job (for "add"/"remove" actions)
 
 **Example:**
 ```groovy
-./ManageJobDependencies.groovy --job final-build --upstream prep-job,build-components
+import com.github.thomasvincent.jenkinsscripts.scripts.ManageJobDependencies
+
+def manager = new ManageJobDependencies()
+manager.manage("my-job", "add", "dependency-job")
 ```
 
-### ManageJobParameters.groovy
+### ManageJobParameters
 
-Manages parameters for parameterized Jenkins jobs.
+Manages parameters for Jenkins jobs.
 
 **Parameters:**
-- `--job`: Job to manage parameters for
-- `--add`: (Optional) Add parameter "name:type:defaultValue"
-- `--remove`: (Optional) Remove parameter by name
-- `--update`: (Optional) Update parameter "name:newDefault"
+- `jobName` - Name of the job
+- `action` - Action to perform ("add", "update", "remove", "list")
+- `paramName` - Name of the parameter
+- `paramValue` - Default value for the parameter (for "add"/"update" actions)
 
 **Example:**
 ```groovy
-./ManageJobParameters.groovy --job my-job --add "BRANCH:string:main"
+import com.github.thomasvincent.jenkinsscripts.scripts.ManageJobParameters
+
+def manager = new ManageJobParameters()
+manager.manage("my-job", "add", "ENVIRONMENT", "staging")
 ```
 
-### ManageKubernetesAgents.groovy
+### ManageKubernetesAgents
 
-Manages Kubernetes pod agents for Jenkins.
+Manages Kubernetes agents for Jenkins.
 
 **Parameters:**
-- `--action`: Action to perform (create, delete, list)
-- `--name`: (Optional) Pod name for specific actions
-- `--yaml`: (Optional) YAML file for pod configuration
-- `--namespace`: (Optional) Kubernetes namespace
+- `action` - Action to perform ("create", "delete", "scale")
+- `podName` - Name of the pod template
+- `containerCount` - Number of containers (for "scale" action)
 
 **Example:**
 ```groovy
-./ManageKubernetesAgents.groovy --action create --yaml pod-template.yaml
+import com.github.thomasvincent.jenkinsscripts.scripts.ManageKubernetesAgents
+
+def manager = new ManageKubernetesAgents()
+manager.manage("scale", "build-agent", 5)
 ```
 
-### MigrateJobs.groovy
+### MigrateJobs
 
-Migrates jobs between folders or instances of Jenkins.
+Migrates Jenkins jobs between Jenkins instances or folders.
 
 **Parameters:**
-- `--jobs`: Comma-separated list of job names to migrate
-- `--source`: (Optional) Source folder or Jenkins instance
-- `--target`: Target folder or Jenkins instance
-- `--copy`: (Optional) Keep original job after migration
+- `jobPattern` - Pattern to match job names (regex supported)
+- `targetLocation` - Target location to migrate jobs to
+- `migrationType` - Type of migration ("copy", "move")
 
 **Example:**
 ```groovy
-./MigrateJobs.groovy --jobs job1,job2 --target "Production/Frontend"
+import com.github.thomasvincent.jenkinsscripts.scripts.MigrateJobs
+
+def migrator = new MigrateJobs()
+migrator.migrate(".*-project", "NewFolder", "copy")
 ```
 
-### OptimizeAgentResources.groovy
+### OptimizeAgentResources
 
-Analyzes and optimizes resource allocation for Jenkins agents.
+Optimizes resource usage of Jenkins agents.
 
 **Parameters:**
-- `--agent`: (Optional) Specific agent to optimize
-- `--resources`: (Optional) Resources to optimize (cpu, memory)
-- `--apply`: (Optional) Apply recommended optimizations
+- `strategy` - Optimization strategy ("cost", "performance", "balanced")
+- `agentPattern` - Pattern to match agent names (regex supported)
 
 **Example:**
 ```groovy
-./OptimizeAgentResources.groovy --resources cpu,memory --apply
+import com.github.thomasvincent.jenkinsscripts.scripts.OptimizeAgentResources
+
+def optimizer = new OptimizeAgentResources()
+optimizer.optimize("balanced", ".*-agent")
 ```
 
-### OptimizeJobScheduling.groovy
+### OptimizeJobScheduling
 
-Optimizes scheduling of Jenkins jobs to improve resource utilization.
+Optimizes the scheduling of Jenkins jobs to improve performance.
 
 **Parameters:**
-- `--jobs`: (Optional) Comma-separated list of jobs to optimize
-- `--strategy`: (Optional) Scheduling strategy (balanced, performance, cost)
-- `--apply`: (Optional) Apply recommended optimizations
+- `strategy` - Scheduling strategy ("fairshare", "priority", "time")
+- `jobPattern` - Pattern to match job names (regex supported)
 
 **Example:**
 ```groovy
-./OptimizeJobScheduling.groovy --strategy balanced --apply
+import com.github.thomasvincent.jenkinsscripts.scripts.OptimizeJobScheduling
+
+def optimizer = new OptimizeJobScheduling()
+optimizer.optimize("priority", ".*-build")
 ```
 
-### SecurityVulnerabilityScan.groovy
+### SecurityVulnerabilityScan
 
-Scans Jenkins for security vulnerabilities and provides remediation steps.
+Scans Jenkins for security vulnerabilities.
 
 **Parameters:**
-- `--level`: (Optional) Scan level (basic, advanced, comprehensive)
-- `--plugins`: (Optional) Scan plugins for vulnerabilities
-- `--report`: (Optional) Output file for scan report
+- `scanType` - Type of scan ("basic", "comprehensive")
+- `fixAutomatically` - Whether to fix issues automatically (true/false)
 
 **Example:**
 ```groovy
-./SecurityVulnerabilityScan.groovy --level comprehensive --plugins --report scan-results.json
+import com.github.thomasvincent.jenkinsscripts.scripts.SecurityVulnerabilityScan
+
+def scanner = new SecurityVulnerabilityScan()
+def results = scanner.scan("comprehensive", false)
+println results
 ```
 
-### StartOfflineSlaveNodes.groovy
+### StartOfflineSlaveNodes
 
-Attempts to start offline slave nodes that are temporarily disconnected.
+Starts offline Jenkins slave nodes.
 
 **Parameters:**
-- `--nodes`: (Optional) Comma-separated list of nodes to start
-- `--all`: (Optional) Attempt to start all offline nodes
-- `--retry`: (Optional) Number of retries for connection attempts
+- `nodePattern` - Pattern to match node names (regex supported)
+- `waitForOnline` - Whether to wait for nodes to come online (true/false)
 
 **Example:**
 ```groovy
-./StartOfflineSlaveNodes.groovy --all --retry 3
+import com.github.thomasvincent.jenkinsscripts.scripts.StartOfflineSlaveNodes
+
+def starter = new StartOfflineSlaveNodes()
+starter.start(".*-agent", true)
 ```
 
-### DisableJobTriggers.groovy
+## Development Guidelines
 
-Disables build triggers on Jenkins jobs.
+When developing new scripts or modifying existing ones, follow these guidelines:
 
-**Parameters:**
-- `--jobs`: Comma-separated list of job names
-- `--trigger`: (Optional) Specific trigger type to disable
-- `--all-triggers`: (Optional) Disable all triggers
-- `--dry-run`: (Optional) Simulation mode
+1. Include proper error handling with try/catch blocks
+2. Add logging with appropriate log levels
+3. Document all parameters and return values
+4. Maintain backward compatibility when possible
+5. Write unit tests for all new functionality
+6. Follow the existing code style and formatting
 
-**Example:**
-```groovy
-./DisableJobTriggers.groovy --jobs my-job --all-triggers
-```
-
-### ManageHelmInstallation.groovy
-
-Manages Helm installations for Jenkins.
-
-**Parameters:**
-- `--action`: Action to perform (install, update, remove, list)
-- `--version`: (Optional) Helm version for install or update
-- `--name`: (Optional) Installation name
-
-**Example:**
-```groovy
-./ManageHelmInstallation.groovy --action install --version 3.8.2 --name helm-latest
-```
-
-## Usage Notes
-
-1. These scripts can be executed in the Jenkins Script Console or as standalone Groovy scripts.
-2. For standalone execution, ensure that required Jenkins libraries are in the classpath.
-3. Some scripts require administrative privileges in Jenkins.
-4. Always use the `--help` option to see detailed usage information for each script.
-5. Use the `--dry-run` option (when available) to simulate operations without making actual changes.
-
-## Script Development
-
-To contribute new scripts to this library, please follow the structure of existing scripts and include:
-
-1. Proper documentation with example usage
-2. Command-line argument parsing with helpful options
-3. Error handling and informative output
-4. Unit tests where applicable
-
-For more information on contributing, see the [CONTRIBUTING.md](CONTRIBUTING.md) file.
+For more information about contributing to this library, see [CONTRIBUTING.md](CONTRIBUTING.md).
