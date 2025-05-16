@@ -1,0 +1,30 @@
+name: "Jenkins Script Library CodeQL Config"
+
+queries:
+  - uses: security-and-quality
+
+paths:
+  - src
+
+paths-ignore:
+  - '**/test/**'
+  - '**/integration-test/**'
+  - '**/*.md'
+  - '**/*.yml'
+  - '**/*.yaml'
+  - '**/*.txt'
+  - '.github/**'
+  - 'gradle/**'
+  - 'config/**'
+
+extraction:
+  java:
+    prepare:
+      packages: 
+        - openjdk-11-jdk
+    before_index:
+      - "export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64"
+      - "export PATH=$JAVA_HOME/bin:$PATH"
+    index:
+      java:
+        version: 11

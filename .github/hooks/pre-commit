@@ -1,0 +1,43 @@
+#!/bin/bash
+set -e
+
+echo "Running pre-commit checks..."
+
+# Check for .claude files
+if git diff --cached --name-only | grep -q "\.claude"; then
+  echo "ERROR: Attempting to commit .claude files, which should be in .gitignore"
+  exit 1
+fi
+
+# Check for CLAUDE.md files
+if git diff --cached --name-only | grep -q "CLAUDE.md"; then
+  echo "ERROR: Attempting to commit CLAUDE.md files, which should be in .gitignore"
+  exit 1
+fi
+
+# Check for large files
+git diff --cached --name-only | while read file; do
+  if [ -f "$file" ]; then
+    filesize=$(du -k "$file" | cut -f1)
+    if [ $filesize -gt 1000 ]; then  # 1MB
+      echo "ERROR: $file is too large ($filesize KB). Files larger than 1MB should not be committed."
+      exit 1
+    fi
+  fi
+done
+
+# Check for correct line endings
+if git grep -l $'\r' -- :^vendor/ ':!*.png' ':!*.jpg' ':!*.ico' $(git diff --cached --name-only); then
+  echo "ERROR: Files with Windows-style line endings detected. Please run: git config --global core.autocrlf input"
+  exit 1
+fi
+
+# Validate Groovy files
+groovy_files=$(git diff --cached --name-only --diff-filter=ACM | grep -E "\.groovy$" || true)
+if [ -n "$groovy_files" ] && [ -f "./gradlew" ]; then
+  echo "Validating Groovy syntax..."
+  ./gradlew compileGroovy -q
+fi
+
+echo "Pre-commit checks passed!"
+exit 0
