@@ -347,7 +347,7 @@ configurations.all {
                     if (details.requested.version.startsWith('5.')) {
                         force "org.springframework.security:spring-security-web:6.5.0"
                         force "org.springframework.security:spring-security-core:6.4.5"
-                        force "org.springframework.security:spring-security-crypto:6.4.5"
+                        force "org.springframework.security:spring-security-crypto:6.5.0"
                         logger.info("Upgrading Spring Security 5.x to 6.x for modern Jenkins compatibility")
                     }
                 }
