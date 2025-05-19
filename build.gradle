@@ -3,7 +3,7 @@ plugins {
     id 'codenarc'
     id 'jacoco'
     id 'maven-publish'
-    id 'com.github.ben-manes.versions' version '0.47.0'  // Dependency version checker
+    id 'com.github.ben-manes.versions' version '0.52.0'  // Dependency version checker
 }
 
 group = 'com.github.thomasvincent'
