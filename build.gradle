@@ -161,8 +161,8 @@ dependencies {
     implementation "org.codehaus.groovy:groovy-all:${versions.groovy}"
 
     // Standard dependencies - just the absolute minimum to compile the util package
-    implementation 'org.apache.logging.log4j:log4j-api:2.24.3'
-    implementation 'org.apache.logging.log4j:log4j-core:2.24.3'
+    implementation 'org.apache.logging.log4j:log4j-api:2.25.0'
+    implementation 'org.apache.logging.log4j:log4j-core:2.25.0'
     implementation "commons-io:commons-io:2.19.0" // Common IO utilities
     
     // Unit test dependencies - minimal set
