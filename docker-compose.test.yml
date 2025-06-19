@@ -1,20 +1,68 @@
 version: '3.8'
 
 services:
-  # Java 11 (Legacy Support)
-  java11:
-    build:
-      context: .
-      dockerfile: Dockerfile.java11
-  
-  # Java 17 (Current LTS)
+  # Java 17 (Main Testing Environment)
   java17:
     build:
       context: .
-      dockerfile: Dockerfile.java17
+      dockerfile: Dockerfile.test
+    volumes:
+      # Mount project directory into container
+      - ./:/app
+      # Use named volume for Gradle cache for better performance
+      - gradle-cache:/app/.gradle
+      # Bind mount build directories to persist test results on host
+      - ./build/test-results:/app/build/test-results
+      - ./build/reports:/app/build/reports
+      - ./build/classes:/app/build/classes
+      - ./build/tmp:/app/build/tmp
+    environment:
+      - DOCKER_USER_ID=${DOCKER_USER_ID:-1000}
+      - DOCKER_GROUP_ID=${DOCKER_GROUP_ID:-1000}
+      - GRADLE_OPTS=-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true
+      - CREATE_DIRS=true  # Create directories with proper permissions
+      - SKIP_CLEAN=true   # Skip clean task to avoid permission issues
+    working_dir: /app
+    command: ["./gradlew", "test", "--no-daemon"]
   
   # Java 21 (Future Compatibility)
   java21:
     build:
       context: .
       dockerfile: Dockerfile.java21
+    volumes:
+      # Mount project directory into container
+      - ./:/app
+      # Use named volume for Gradle cache for better performance
+      - gradle-cache:/app/.gradle
+      # Bind mount build directories to persist test results on host
+      - ./build/test-results:/app/build/test-results
+      - ./build/reports:/app/build/reports
+      - ./build/classes:/app/build/classes
+      - ./build/tmp:/app/build/tmp
+    environment:
+      - DOCKER_USER_ID=${DOCKER_USER_ID:-1000}
+      - DOCKER_GROUP_ID=${DOCKER_GROUP_ID:-1000}
+      - GRADLE_OPTS=-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true
+      - CREATE_DIRS=true  # Create directories with proper permissions
+      - SKIP_CLEAN=true   # Skip clean task to avoid permission issues
+    working_dir: /app
+    command: ["./gradlew", "test", "--no-daemon"]
+      
+  # Code Quality Analysis
+  sonarqube:
+    image: sonarqube:lts
+    ports:
+      - "9000:9000"
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_logs:/opt/sonarqube/logs
+      - sonarqube_extensions:/opt/sonarqube/extensions
+
+volumes:
+  # Persistent named volume for Gradle cache to speed up builds
+  gradle-cache:
+  # SonarQube persistent volumes
+  sonarqube_data:
+  sonarqube_logs:
+  sonarqube_extensions:
