@@ -1,0 +1,51 @@
+# Jenkins Script Library Testing Image
+#
+# This Dockerfile creates a dedicated environment for testing the Jenkins Script Library.
+# It's optimized for running tests without needing a full Jenkins instance.
+#
+# Build: docker build -t jenkins-script-library-test:latest -f Dockerfile.test .
+# Run:   docker run --rm jenkins-script-library-test:latest
+
+FROM eclipse-temurin:17-jdk
+
+# Set environment variables
+ENV GRADLE_VERSION=8.7 \
+    GRADLE_HOME=/opt/gradle \
+    JENKINS_CORE_VERSION=2.361.4 \
+    GROOVY_VERSION=3.0.24
+
+# Install required packages
+RUN apt-get update && apt-get install -y \
+    curl \
+    unzip \
+    git \
+    wget \
+    jq \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Gradle
+RUN wget -q https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip -O /tmp/gradle.zip \
+    && unzip /tmp/gradle.zip -d /opt \
+    && ln -s /opt/gradle-${GRADLE_VERSION} /opt/gradle \
+    && rm /tmp/gradle.zip
+
+# Add Gradle to PATH
+ENV PATH="$PATH:/opt/gradle/bin"
+
+# Create app directory
+WORKDIR /app
+
+# Copy only the build files first to leverage Docker cache
+COPY build.gradle settings.gradle ./
+COPY gradle ./gradle
+
+# Download dependencies (will be cached if build files don't change)
+RUN gradle dependencies --no-daemon --refresh-dependencies
+
+# Copy the rest of the project
+COPY . .
+
+# Set default command to run tests
+ENTRYPOINT ["/app/scripts/run-tests.sh"]
+CMD ["test"]
+

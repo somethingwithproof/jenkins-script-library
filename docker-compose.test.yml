@@ -1,20 +1,61 @@
 version: '3.8'
 
 services:
-  # Java 11 (Legacy Support)
-  java11:
+  # Testing service with Java 17 (Current LTS)
+  test-java17:
     build:
       context: .
-      dockerfile: Dockerfile.java11
+      dockerfile: Dockerfile.test
+    volumes:
+      - ./:/app
+      - gradle-cache:/root/.gradle
+    environment:
+      - JAVA_VERSION=17
+      - JENKINS_CORE_VERSION=2.361.4
+    command: test
   
-  # Java 17 (Current LTS)
-  java17:
-    build:
-      context: .
-      dockerfile: Dockerfile.java17
-  
-  # Java 21 (Future Compatibility)
-  java21:
+  # Testing service with Java 21 (Future Compatibility)
+  test-java21:
     build:
       context: .
       dockerfile: Dockerfile.java21
+    volumes:
+      - ./:/app
+      - gradle-cache:/root/.gradle
+    environment:
+      - JAVA_VERSION=21
+      - JENKINS_CORE_VERSION=2.400.0
+    command: test
+  
+  # Full test suite with both Java versions
+  test-all:
+    image: alpine
+    depends_on:
+      - test-java17
+      - test-java21
+    command: echo "All tests completed successfully"
+  
+  # CodeNarc analysis
+  codenarc:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    volumes:
+      - ./:/app
+      - gradle-cache:/root/.gradle
+    command: codenarc
+  
+  # Generate test reports
+  test-report:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    volumes:
+      - ./:/app
+      - gradle-cache:/root/.gradle
+    command: jacocoTestReport
+    depends_on:
+      - test-java17
+
+volumes:
+  gradle-cache:

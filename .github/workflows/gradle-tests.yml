@@ -29,11 +29,15 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
       
-    - name: Run all tests
-      run: ./gradlew test
-
+    - name: Run Docker-based tests
+      run: |
+        docker-compose -f docker-compose.test.yml run --rm test-java17
+        
     - name: Check for Groovy script errors
       run: ./gradlew compileGroovy
+      
+    - name: Run CodeNarc analysis
+      run: docker-compose -f docker-compose.test.yml run --rm codenarc
 
     - name: Publish Test Results
       uses: actions/upload-artifact@v4
