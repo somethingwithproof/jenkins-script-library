@@ -72,6 +72,19 @@ if [ ! -f "settings.gradle" ]; then
   echo "rootProject.name = 'jenkins-script-library'" > settings.gradle
 fi
 
+# Create necessary directories with proper permissions
+if [ "$CREATE_DIRS" = "true" ]; then
+  echo -e "${BLUE}Creating test directories with proper permissions...${NC}"
+  mkdir -p build/reports/tests/test
+  mkdir -p build/test-results/test
+  mkdir -p build/classes/groovy/test
+  mkdir -p build/classes/java/test
+  mkdir -p build/tmp/test
+  
+  # Ensure directories are writable
+  chmod -R 777 build
+fi
+
 # Ensure gradlew is executable
 if [ -f "./gradlew" ]; then
   chmod +x ./gradlew
@@ -94,7 +107,12 @@ case "$COMMAND" in
   test|unit)
     echo -e "${GREEN}Running unit tests...${NC}"
     set +e
-    $GRADLE_CMD clean test $GRADLE_COMMON_OPTS
+    if [ "$SKIP_CLEAN" = "true" ]; then
+      echo -e "${YELLOW}Skipping clean task due to volume permissions...${NC}"
+      $GRADLE_CMD test $GRADLE_COMMON_OPTS
+    else
+      $GRADLE_CMD clean test $GRADLE_COMMON_OPTS
+    fi
     TEST_RESULT=$?
     set -e
     ;;

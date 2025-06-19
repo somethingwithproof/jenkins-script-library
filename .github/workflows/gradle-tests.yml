@@ -26,22 +26,40 @@ jobs:
         distribution: 'temurin'
         cache: gradle
 
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
+    - name: Set up Docker
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Install Docker Compose
+      run: |
+        # Install Docker Compose V2 as a plugin
+        DOCKER_CONFIG=${DOCKER_CONFIG:-$HOME/.docker}
+        mkdir -p $DOCKER_CONFIG/cli-plugins
+        curl -SL https://github.com/docker/compose/releases/download/v2.23.0/docker-compose-linux-x86_64 -o $DOCKER_CONFIG/cli-plugins/docker-compose
+        chmod +x $DOCKER_CONFIG/cli-plugins/docker-compose
+        docker compose version
+        
+    - name: Grant execute permission for gradlew and scripts
+      run: |
+        chmod +x gradlew
+        mkdir -p scripts
+        find scripts -type f -name "*.sh" -exec chmod +x {} \;
       
     - name: Run Docker-based tests
       run: |
-        docker-compose -f docker-compose.test.yml run --rm test-java17
+        docker compose -f docker-compose.test.yml up --build test-java17
+        docker compose -f docker-compose.test.yml logs test-java17
         
     - name: Check for Groovy script errors
       run: ./gradlew compileGroovy
       
     - name: Run CodeNarc analysis
-      run: docker-compose -f docker-compose.test.yml run --rm codenarc
+      run: docker compose -f docker-compose.test.yml run --rm codenarc
 
     - name: Publish Test Results
       uses: actions/upload-artifact@v4
       if: always()
       with:
         name: test-results
-        path: build/reports/tests/
+        path: |
+          build/reports/tests/**
+          build/test-results/**
