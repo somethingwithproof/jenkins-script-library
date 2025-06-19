@@ -1,22 +1,63 @@
 version: 2
 updates:
-  # Check for updates to GitHub Actions
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 10
-    
-  # Check for updates to Gradle dependencies
+  # Enable version updates for Gradle dependencies
   - package-ecosystem: "gradle"
     directory: "/"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
+    reviewers:
+      - "thomasvincent"
+    labels:
+      - "dependencies"
+      - "gradle"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    # Version constraints to ensure Jenkins compatibility
+    ignore:
+      # Keep Groovy 3.x for Jenkins compatibility (not 4.x)
+      - dependency-name: "org.codehaus.groovy:*"
+        versions: [">=4.0.0"]
+      # Keep Spock compatible with Groovy 3.x
+      - dependency-name: "org.spockframework:*"
+        versions: [">=2.4"]
+      # Keep JaCoCo stable for Jenkins
+      - dependency-name: "org.jacoco:*"
+        versions: [">=0.9.0"]
+    # Allow only patch and minor updates for critical dependencies
+    versioning-strategy: "increase-if-necessary"
     
-  # Check for updates to Docker base images
+  # Enable version updates for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "thomasvincent"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    
+  # Enable version updates for Docker
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 3
+    reviewers:
+      - "thomasvincent"
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "build"
+      include: "scope"
+    # Only use LTS Java versions
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]

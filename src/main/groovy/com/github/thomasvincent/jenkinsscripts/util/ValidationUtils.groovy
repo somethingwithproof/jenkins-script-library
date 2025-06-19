@@ -106,8 +106,11 @@ class ValidationUtils {
      * @throws IllegalArgumentException if the directory does not exist
      */
     static String requireDirectoryExists(String dirPath, String paramName) {
+        if (dirPath == null) {
+            throw new IllegalArgumentException("${paramName} cannot be null")
+        }
         File dir = new File(dirPath)
-        if (dirPath == null || !dir.exists() || !dir.isDirectory()) {
+        if (!dir.exists() || !dir.isDirectory()) {
             throw new IllegalArgumentException("${paramName} directory does not exist: ${dirPath}")
         }
         return dirPath
