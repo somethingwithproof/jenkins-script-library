@@ -67,55 +67,15 @@ configurations {
     integrationTestRuntimeOnly.extendsFrom testRuntimeOnly
 }
 
-// Define Jenkins versions for different Java environments
+// Define Jenkins versions for supported environment
 ext {
     // Detect Java version
-    isJava11Plus = JavaVersion.current().isJava11Compatible()
     // Custom check for Java 17+ compatibility since isJava17Compatible() doesn't exist
     isJava17Plus = JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_17)
 
     // NOTE: As of 2025, Jenkins requires Java 17+ for both controller and agents
-    // These versions are for backward compatibility with legacy Jenkins installations only
-    java8Versions = [
-        jenkinsCore: '2.249.3', // Legacy version compatible with Java 8
-        groovy: '3.0.24',     // Update to match main branch with Groovy 3.0.24
-        credentialsPlugin: '2.3.19',
-        matrixAuthPlugin: '2.6.1',
-        workflowApiPlugin: '2.40',
-        workflowStepApiPlugin: '2.22',
-        folderPlugin: '6.14',  // For JobMigrator
-        gitPlugin: '4.5.0',    // For JobConfigAuditor
-        xmlApisPlugin: '1.0.b2', // For XML handling
-        dom4jPlugin: '1.6.1',   // For XML handling
-        xercesPlugin: '2.12.0', // For XML handling with Java 8 compatibility
-        commonsTextPlugin: '1.9', // For JobDependencyManager
-        commonsIoPlugin: '2.7', // Common dependency
-        servletApi: '3.1.0',
-        spockVersion: '2.3-groovy-3.0'
-    ]
-    
-    // Jenkins versions for Java 11+
-    // Note: Jenkins no longer supports versions using Java 11 as of 2025
-    java11Versions = [
-        jenkinsCore: '2.361.1', // Last major version compatible with Java 11
-        groovy: '3.0.24',     // Update to match main branch with Groovy 3.0.24
-        credentialsPlugin: '2.6.1',
-        matrixAuthPlugin: '3.2.6',
-        workflowApiPlugin: '2.46',
-        workflowStepApiPlugin: '615.vb09dac339255', // Using newer version from main
-        folderPlugin: '6.15',  // For JobMigrator
-        gitPlugin: '4.11.0',   // For JobConfigAuditor
-        xmlApisPlugin: '1.0.b2', // For XML handling
-        dom4jPlugin: '1.6.1',   // For XML handling
-        xercesPlugin: '2.12.1', // For XML handling with Java 11 compatibility
-        commonsTextPlugin: '1.9', // For JobDependencyManager
-        commonsIoPlugin: '2.8.0', // Common dependency
-        servletApi: '4.0.1',
-        spockVersion: '2.3-groovy-3.0'
-    ]
-
     // Current supported Jenkins versions for Java 17/21 (2025)
-    java17Versions = [
+    versions = [
         jenkinsCore: '2.361.4', // Using a more stable version than 2.509
         groovy: '3.0.24',     // Update to match main branch with Groovy 3.0.24
         credentialsPlugin: '2.10.0', // Using a stable version with a standard versioning scheme
@@ -133,26 +93,17 @@ ext {
         spockVersion: '2.3-groovy-4.0' // Updated to match newer Groovy version
     ]
 
-    // Select appropriate versions based on detected Java version
-    // NOTE: As of 2025, Jenkins officially requires Java 17+ for both controller and agents
-    // We provide compatibility with older versions but recommend using Java 17+ for development
-    if (isJava17Plus) {
-        // Recommended environment for modern Jenkins (2025+)
-        versions = java17Versions
-        println "Using supported Java 17+ configuration for modern Jenkins"
-    } else if (isJava11Plus) {
-        // Java 11 support was deprecated in Jenkins as of 2025
-        versions = java11Versions
-        println "WARNING: Using deprecated Java 11 configuration (no longer supported in current Jenkins)"
-    } else {
-        // Java 8 support was removed from Jenkins years ago
-        versions = java8Versions
-        println "WARNING: Using legacy Java 8 configuration (not supported in modern Jenkins)"
+    // Verify Java version compatibility
+    if (!isJava17Plus) {
+        // This project requires Java 17+ for compatibility with modern Jenkins
+        println "ERROR: Java 17+ is required for this project to match Jenkins requirements"
+        println "Please upgrade your Java version to at least Java 17"
+        // Fail the build if Java version is too low
+        throw new GradleException("Java 17+ is required for this build")
     }
 
     // Print debug information
     println "Using Jenkins core: ${versions.jenkinsCore}"
-    println "Is Java 11+: ${isJava11Plus}"
     println "Is Java 17+: ${isJava17Plus}"
 }
 
@@ -171,9 +122,9 @@ dependencies {
 }
 
 java {
-    // Target Java 8 for compatibility
-    sourceCompatibility = JavaVersion.VERSION_1_8
-    targetCompatibility = JavaVersion.VERSION_1_8
+    // Target Java 17 for compatibility with modern Jenkins (2025+)
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 // Configure source set exclusions to make testing easier
@@ -287,9 +238,9 @@ check.dependsOn integrationTest
 tasks.withType(GroovyCompile) {
     groovyOptions.optimizationOptions.indy = true
 
-    // Target Java 8 for compatibility
-    sourceCompatibility = JavaVersion.VERSION_1_8
-    targetCompatibility = JavaVersion.VERSION_1_8
+    // Target Java 17 for compatibility with modern Jenkins (2025+)
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 // Create a packaged jar with all the scripts
@@ -317,6 +268,9 @@ configurations.all {
 
         // Cache changing modules for 4 hours
         cacheChangingModulesFor 4, 'hours'
+        
+        // Force spotbugs-annotations version to be compatible with our configuration
+        force 'com.github.spotbugs:spotbugs-annotations:4.9.3'
 
         // Force specific versions of critical dependencies for consistency
         force "org.codehaus.groovy:groovy-all:${versions.groovy}"
@@ -327,30 +281,26 @@ configurations.all {
         
         // Force compatible Spock version based on our Groovy version
         force "org.spockframework:spock-core:${versions.spockVersion}"
+        
+        // Add specific version of spotbugs-annotations that's compatible with our configuration
+        force 'com.github.spotbugs:spotbugs-annotations:4.9.3'
 
-        // Force compatibility with Java version
-        if (!isJava17Plus) {
-            // Exclude Spring Security 6.x which requires Java 17+
-            // Jenkins 2.479.1+ requires Spring Security 6
-            eachDependency { details ->
-                if (details.requested.group == 'org.springframework.security' && details.requested.version.startsWith('6.')) {
-                    details.useVersion('5.8.13')
-                    logger.warn("WARNING: Downgrading Spring Security 6.x to 5.8.x for Java 8/11 compatibility")
-                    logger.warn("This configuration won't work with Jenkins 2.479.1+ which requires Java 17+")
+        // Ensure compatibility with modern Jenkins that requires Java 17+
+        eachDependency { details ->
+            if (details.requested.group == 'org.springframework.security') {
+                // Use the versions that Jenkins 2.479.1+ expect
+                if (details.requested.version.startsWith('5.')) {
+                    force "org.springframework.security:spring-security-web:6.5.1"
+                    force "org.springframework.security:spring-security-core:6.5.1" 
+                    force "org.springframework.security:spring-security-crypto:6.5.1"
+                    logger.info("Upgrading Spring Security 5.x to 6.x for modern Jenkins compatibility")
                 }
             }
-        } else {
-            // Ensure modern Jenkins with Spring Security 6 works properly
-            eachDependency { details ->
-                if (details.requested.group == 'org.springframework.security') {
-                    // Use the versions that Jenkins 2.479.1+ expect
-                    if (details.requested.version.startsWith('5.')) {
-                        force "org.springframework.security:spring-security-web:6.5.1"
-                        force "org.springframework.security:spring-security-core:6.5.1"
-                        force "org.springframework.security:spring-security-crypto:6.5.1"
-                        logger.info("Upgrading Spring Security 5.x to 6.x for modern Jenkins compatibility")
-                    }
-                }
+            
+            // Handle specific versions of critical dependencies
+            if (details.requested.group == 'com.github.spotbugs' && details.requested.name == 'spotbugs-annotations') {
+                details.useVersion('4.9.3')
+                logger.info("Using spotbugs-annotations 4.9.3")
             }
         }
 
