@@ -1,0 +1,10 @@
+rootProject.name = 'jenkins-script-library'
+
+// Enable Gradle build cache for faster builds
+buildCache {
+    local {
+        enabled = true
+        removeUnusedEntriesAfterDays = 7
+    }
+}
+
