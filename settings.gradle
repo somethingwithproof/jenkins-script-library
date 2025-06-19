@@ -1,0 +1,6 @@
+// Jenkins Script Library Settings
+rootProject.name = 'jenkins-script-library'
+
+// Include any potential subprojects here if needed
+// Example: include ':module1', ':module2'
+

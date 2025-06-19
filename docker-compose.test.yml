@@ -9,22 +9,27 @@ services:
     volumes:
       - ./:/app
       - gradle-cache:/root/.gradle
+      - test-results:/app/build/reports
     environment:
       - JAVA_VERSION=17
       - JENKINS_CORE_VERSION=2.361.4
+      - GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true"
+      - TEST_DEBUG=true
     command: test
   
   # Testing service with Java 21 (Future Compatibility)
   test-java21:
     build:
       context: .
-      dockerfile: Dockerfile.java21
+      dockerfile: Dockerfile.test
     volumes:
       - ./:/app
       - gradle-cache:/root/.gradle
+      - test-results:/app/build/reports
     environment:
       - JAVA_VERSION=21
       - JENKINS_CORE_VERSION=2.400.0
+      - GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true"
     command: test
   
   # Full test suite with both Java versions
@@ -43,19 +48,39 @@ services:
     volumes:
       - ./:/app
       - gradle-cache:/root/.gradle
+      - test-results:/app/build/reports
+    environment:
+      - GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true"
     command: codenarc
   
   # Generate test reports
-  test-report:
+  coverage:
     build:
       context: .
       dockerfile: Dockerfile.test
     volumes:
       - ./:/app
       - gradle-cache:/root/.gradle
-    command: jacocoTestReport
-    depends_on:
-      - test-java17
+      - test-results:/app/build/reports
+    environment:
+      - GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true"
+    command: coverage
+  
+  # Integration tests
+  integration:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    volumes:
+      - ./:/app
+      - gradle-cache:/root/.gradle
+      - test-results:/app/build/reports
+    environment:
+      - JAVA_VERSION=17
+      - JENKINS_CORE_VERSION=2.361.4
+      - GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true"
+    command: integration
 
 volumes:
   gradle-cache:
+  test-results:
