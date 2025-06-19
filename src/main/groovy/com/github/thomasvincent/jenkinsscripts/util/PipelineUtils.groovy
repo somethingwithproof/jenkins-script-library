@@ -114,16 +114,17 @@ class PipelineUtils implements Serializable {
      * utils.mapArchitecture("aarch64")  // "arm64"
      * ```
      */
-    private String mapArchitecture(String arch) {
+    String mapArchitecture(String arch) {
         switch (arch) {
             case 'x86_64':
+            case 'x64':
                 return 'amd64'
             case 'aarch64':
                 return 'arm64'
             case ~/^armv.*/:
                 return 'arm'
             case ~/^i[3456]86$/:
-                return 'i386'
+                return '386'
             default:
                 return arch
         }
@@ -141,7 +142,7 @@ class PipelineUtils implements Serializable {
      * utils.mapWindowsArchitecture("12")  // "arm64"
      * ```
      */
-    private String mapWindowsArchitecture(String arch) {
+    String mapWindowsArchitecture(String arch) {
         switch (arch) {
             case '0':
                 return 'i386'
@@ -149,6 +150,11 @@ class PipelineUtils implements Serializable {
                 return 'amd64'
             case '12':
                 return 'arm64'
+            case 'AMD64':
+            case 'EM64T':
+                return 'amd64'
+            case 'x86':
+                return '386'
             default:
                 return 'amd64'
         }

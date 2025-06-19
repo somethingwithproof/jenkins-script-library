@@ -78,9 +78,9 @@ class StringUtils {
             return defaultValue
         }
         
-        return ErrorHandler.withErrorHandling("parsing integer value from '${str}'", {
+        return ErrorHandler.withErrorHandling("parsing integer value from '" + str + "'", {
             return str.trim().toInteger()
-        }, LOGGER, defaultValue, Level.FINE)
+        }, LOGGER, defaultValue)
     }
     
     /**

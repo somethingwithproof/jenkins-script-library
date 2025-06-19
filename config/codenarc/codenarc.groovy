@@ -5,7 +5,7 @@ ruleset {
     EmptyClass
     EmptyMethod
     ReturnFromFinallyBlock
-    StringInstantiation
+    // StringInstantiation - rule moved to unnecessary.xml in newer CodeNarc versions
     UnusedVariable
     UnnecessaryBooleanExpression
     
