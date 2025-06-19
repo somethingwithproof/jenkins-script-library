@@ -6,6 +6,12 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
     
   # Check for updates to Gradle dependencies
   - package-ecosystem: "gradle"
@@ -13,10 +19,48 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
-    
+    labels:
+      - "dependencies"
+      - "java"
+    # Specify which dependency versions to update
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    # Add version constraints based on Jenkins LTS compatibility
+    ignore:
+      # Ignore major updates to Groovy that would break Jenkins LTS compatibility
+      - dependency-name: "org.codehaus.groovy:*"
+        update-types: ["version-update:semver-major"]
+      # Ignore major updates to log4j that might require Java version changes  
+      - dependency-name: "org.apache.logging.log4j:*"
+        update-types: ["version-update:semver-major"]
+      # Ignore Spock versions that require newer Groovy versions
+      - dependency-name: "org.spockframework:spock-core"
+        versions: [">=3.0.0"]
+    # Allow only specific version ranges for Jenkins core-related dependencies
+    allow:
+      - dependency-name: "org.jenkins-ci:*"
+        dependency-type: "direct"
+      - dependency-name: "org.jenkins-ci.plugins:*"
+        dependency-type: "direct"
+        
   # Check for updates to Docker base images
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "chore(docker)"
+      include: "scope"
+    # Only allow Java 17+ base images for compatibility with Jenkins LTS
+    ignore:
+      - dependency-name: "eclipse-temurin"
+        versions: ["<17"]
+      - dependency-name: "openjdk"
+        versions: ["<17"]
+      - dependency-name: "amazoncorretto"
+        versions: ["<17"]
