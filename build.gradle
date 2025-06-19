@@ -90,7 +90,7 @@ ext {
         commonsTextPlugin: '1.10.0',
         commonsIoPlugin: '2.11.0',
         servletApi: '4.0.1',
-        spockVersion: '2.3-groovy-4.0' // Updated to match newer Groovy version
+        spockVersion: '2.3-groovy-3.0' // Downgraded to match Jenkins LTS Groovy version
     ]
 
     // Verify Java version compatibility
@@ -110,6 +110,10 @@ ext {
 dependencies {
     // Use Groovy version that matches Jenkins LTS built-in version
     implementation "org.codehaus.groovy:groovy-all:${versions.groovy}"
+    
+    // Explicitly define Groovy dependencies to ensure consistent versioning
+    implementation "org.codehaus.groovy:groovy:${versions.groovy}"
+    implementation "org.codehaus.groovy:groovy-test:${versions.groovy}"
 
     // Standard dependencies - just the absolute minimum to compile the util package
     implementation 'org.apache.logging.log4j:log4j-api:2.25.0'
@@ -118,7 +122,7 @@ dependencies {
     
     // Unit test dependencies - minimal set
     testImplementation 'junit:junit:4.13.2'
-    testImplementation "org.spockframework:spock-core:2.3-groovy-4.0"
+    testImplementation "org.spockframework:spock-core:${versions.spockVersion}"
 }
 
 java {
@@ -272,8 +276,18 @@ configurations.all {
         // Force spotbugs-annotations version to be compatible with our configuration
         force 'com.github.spotbugs:spotbugs-annotations:4.9.3'
 
-        // Force specific versions of critical dependencies for consistency
+        // Resolve Groovy version conflicts by forcing all modules to the same version
+        force "org.codehaus.groovy:groovy:${versions.groovy}"
         force "org.codehaus.groovy:groovy-all:${versions.groovy}"
+        force "org.codehaus.groovy:groovy-xml:${versions.groovy}"
+        force "org.codehaus.groovy:groovy-json:${versions.groovy}"
+        force "org.codehaus.groovy:groovy-templates:${versions.groovy}"
+        force "org.codehaus.groovy:groovy-test:${versions.groovy}"
+        
+        // Exclude org.apache.groovy modules which conflict with org.codehaus.groovy
+        exclude group: 'org.apache.groovy'
+        
+        // Force specific versions of critical dependencies for consistency
         force "javax.servlet:javax.servlet-api:${versions.servletApi}"
         force "org.jenkins-ci.main:jenkins-core:${versions.jenkinsCore}"
         force "org.jenkins-ci.plugins:credentials:${versions.credentialsPlugin}"
