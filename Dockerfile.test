@@ -35,17 +35,55 @@ ENV PATH="$PATH:/opt/gradle/bin"
 # Create app directory
 WORKDIR /app
 
-# Copy only the build files first to leverage Docker cache
-COPY build.gradle settings.gradle ./
-COPY gradle ./gradle
+# Copy build files first to leverage Docker cache
+COPY build.gradle ./
 
-# Download dependencies (will be cached if build files don't change)
-RUN gradle dependencies --no-daemon --refresh-dependencies
+# Create settings.gradle file regardless if it exists in context
+RUN echo 'rootProject.name = "jenkins-script-library"' > settings.gradle
+
+# Generate Gradle wrapper using Gradle's built-in task
+RUN gradle wrapper --gradle-version ${GRADLE_VERSION} --distribution-type bin
+
+# Ensure the wrapper script is executable
+RUN chmod +x gradlew
+
+# Initialize Gradle and download dependencies
+RUN gradle --version && \
+    gradle dependencies --no-daemon --refresh-dependencies || \
+    echo "Initial dependency download completed with warnings"
+
+# Create build directories with proper permissions
+RUN mkdir -p /app/build/reports/tests/test && \
+    mkdir -p /app/build/test-results/test && \
+    mkdir -p /app/build/classes/groovy/test && \
+    mkdir -p /app/build/classes/java/test && \
+    mkdir -p /app/build/tmp/test
+
+# Create docker-entrypoint.sh script to handle permissions
+RUN echo '#!/bin/bash\n\
+\n\
+# Create directories with proper permissions\n\
+mkdir -p /app/build/reports/tests/test\n\
+mkdir -p /app/build/test-results/test\n\
+mkdir -p /app/build/classes/groovy/test\n\
+mkdir -p /app/build/classes/java/test\n\
+mkdir -p /app/build/tmp/test\n\
+\n\
+# Ensure directories have proper permissions\n\
+chmod -R 777 /app/build\n\
+\n\
+# Run the original entrypoint\n\
+exec /app/scripts/run-tests.sh "$@"\n\
+' > /docker-entrypoint.sh && \
+    chmod +x /docker-entrypoint.sh
 
 # Copy the rest of the project
 COPY . .
 
+# Ensure scripts are executable
+RUN chmod +x /app/scripts/*.sh || true
+
 # Set default command to run tests
-ENTRYPOINT ["/app/scripts/run-tests.sh"]
+ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["test"]
 

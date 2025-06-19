@@ -6,15 +6,25 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.test
+    # Use root to ensure proper permissions, the entrypoint will handle user-level execution
+    # user: "${UID:-1000}:${GID:-1000}"
     volumes:
-      - ./:/app
+      - ./:/app:delegated
       - gradle-cache:/root/.gradle
-      - test-results:/app/build/reports
+    tmpfs:
+      - /app/build/tmp
+      - /app/build/reports
+      - /app/build/test-results
+      - /app/build/classes
     environment:
       - JAVA_VERSION=17
       - JENKINS_CORE_VERSION=2.361.4
-      - GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true"
+      - GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.project.testReport.enabled=true"
       - TEST_DEBUG=true
+      # Skip clean task that causes permission issues
+      - SKIP_CLEAN=true
+      # Create required directories with proper permissions
+      - CREATE_DIRS=true
     command: test
   
   # Testing service with Java 21 (Future Compatibility)
@@ -22,14 +32,24 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.test
+    # Use root to ensure proper permissions, the entrypoint will handle user-level execution
+    # user: "${UID:-1000}:${GID:-1000}"
     volumes:
-      - ./:/app
+      - ./:/app:delegated
       - gradle-cache:/root/.gradle
-      - test-results:/app/build/reports
+    tmpfs:
+      - /app/build/tmp
+      - /app/build/reports
+      - /app/build/test-results
+      - /app/build/classes
     environment:
       - JAVA_VERSION=21
       - JENKINS_CORE_VERSION=2.400.0
-      - GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true"
+      - GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.project.testReport.enabled=true"
+      # Skip clean task that causes permission issues
+      - SKIP_CLEAN=true
+      # Create required directories with proper permissions
+      - CREATE_DIRS=true
     command: test
   
   # Full test suite with both Java versions
@@ -45,12 +65,16 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.test
+    user: "${UID:-1000}:${GID:-1000}"
     volumes:
-      - ./:/app
+      - ./:/app:delegated
       - gradle-cache:/root/.gradle
-      - test-results:/app/build/reports
+    tmpfs:
+      - /app/build/reports:exec
     environment:
       - GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true"
+      - CREATE_DIRS=true
+      - SKIP_CLEAN=true
     command: codenarc
   
   # Generate test reports
@@ -58,12 +82,17 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.test
+    user: "${UID:-1000}:${GID:-1000}"
     volumes:
-      - ./:/app
+      - ./:/app:delegated
       - gradle-cache:/root/.gradle
-      - test-results:/app/build/reports
+    tmpfs:
+      - /app/build/reports:exec
+      - /app/build/test-results:exec
     environment:
       - GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true"
+      - CREATE_DIRS=true
+      - SKIP_CLEAN=true
     command: coverage
   
   # Integration tests
@@ -71,16 +100,23 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.test
+    user: "${UID:-1000}:${GID:-1000}"
     volumes:
-      - ./:/app
+      - ./:/app:delegated
       - gradle-cache:/root/.gradle
-      - test-results:/app/build/reports
+    tmpfs:
+      - /app/build/reports:exec
+      - /app/build/test-results:exec
+      - /app/build/classes:exec
     environment:
       - JAVA_VERSION=17
       - JENKINS_CORE_VERSION=2.361.4
       - GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true"
+      - CREATE_DIRS=true
+      - SKIP_CLEAN=true
     command: integration
 
 volumes:
   gradle-cache:
+  # Named volume for persistent test results if needed
   test-results:
