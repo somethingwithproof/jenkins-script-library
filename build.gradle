@@ -3,7 +3,6 @@ plugins {
     id 'codenarc'
     id 'jacoco'
     id 'maven-publish'
-    id 'com.github.ben-manes.versions' version '0.52.0'  // Dependency version checker
 }
 
 group = 'com.github.thomasvincent'
@@ -38,21 +37,12 @@ repositories {
         }
     }
     
-    // Additional repositories for other dependencies
-    maven { url "https://repo.maven.apache.org/maven2/" }
-    maven { url "https://plugins.gradle.org/m2/" }
-    
-    // For JNR/JFFI dependencies (needed for some Jenkins plugins)
-    maven { url "https://jitpack.io" }
-    maven { url "https://oss.sonatype.org/content/repositories/snapshots" }
-    maven { url "https://oss.sonatype.org/content/repositories/releases" }
 }
 
 sourceSets {
     integrationTest {
         groovy {
             srcDir 'src/integration-test/groovy'
-            exclude '**/*.groovy' // Temporarily exclude all integration tests due to dependency issues
         }
         resources {
             srcDir 'src/integration-test/resources'
@@ -78,7 +68,7 @@ ext {
     versions = [
         jenkinsCore: '2.361.4', // Using a more stable version than 2.509
         groovy: '3.0.24',     // Update to match main branch with Groovy 3.0.24
-        credentialsPlugin: '2.10.0', // Using a stable version with a standard versioning scheme
+        credentialsPlugin: '1252.vcdff1d368fa_f', // Compatible with Jenkins 2.361.4
         matrixAuthPlugin: '3.2.6',
         workflowApiPlugin: '2.46', // Using a stable version with a standard versioning scheme
         workflowStepApiPlugin: '2.27', // Using a stable version with a standard versioning scheme
@@ -118,7 +108,8 @@ dependencies {
     
     // Unit test dependencies - minimal set
     testImplementation 'junit:junit:4.13.2'
-    testImplementation "org.spockframework:spock-core:2.3-groovy-4.0"
+    testImplementation "org.spockframework:spock-core:${versions.spockVersion}"
+    
 }
 
 java {
@@ -204,11 +195,6 @@ test {
     onlyIf { !project.hasProperty('skipTests') }
 
     // Set minimal test configuration by default
-    println "Running MINIMAL test set for faster verification"
-    // Clear existing includes/excludes and add only what we want
-    sourceSets.test.groovy.excludes = []
-    sourceSets.test.groovy.includes = []
-    sourceSets.test.groovy.includes.add('**/SimpleTest.groovy')
 }
 
 task integrationTest(type: Test) {
