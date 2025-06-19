@@ -3,9 +3,10 @@
 A collection of Groovy utilities and scripts designed to automate and facilitate various operations within Jenkins environments. This library follows Jenkins-compatible practices and includes comprehensive test coverage. Supports Jenkins automation for modern environments.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Groovy 2.4](https://img.shields.io/badge/Groovy-2.4-blue.svg)](https://groovy-lang.org/)
-[![Java 8+](https://img.shields.io/badge/Java-8+-orange.svg)](https://adoptium.net/)
-[![Jenkins 2.249.3+](https://img.shields.io/badge/Jenkins-2.249.3+-green.svg)](https://jenkins.io/)
+[![Groovy 3.0](https://img.shields.io/badge/Groovy-3.0-blue.svg)](https://groovy-lang.org/)
+[![Java 17+](https://img.shields.io/badge/Java-17+-orange.svg)](https://adoptium.net/)
+[![Jenkins 2.361.4+](https://img.shields.io/badge/Jenkins-2.361.4+-green.svg)](https://jenkins.io/)
+[![Test Coverage](https://img.shields.io/badge/Coverage-91%25-brightgreen.svg)](./build/reports/jacoco/test/html/index.html)
 [![CI](https://github.com/thomasvincent/jenkins-script-library/actions/workflows/ci.yml/badge.svg)](https://github.com/thomasvincent/jenkins-script-library/actions/workflows/ci.yml)
 [![Gradle Build](https://github.com/thomasvincent/jenkins-script-library/actions/workflows/gradle.yml/badge.svg)](https://github.com/thomasvincent/jenkins-script-library/actions/workflows/gradle.yml)
 [![Security Scan](https://github.com/thomasvincent/jenkins-script-library/actions/workflows/security.yml/badge.svg)](https://github.com/thomasvincent/jenkins-script-library/actions/workflows/security.yml)

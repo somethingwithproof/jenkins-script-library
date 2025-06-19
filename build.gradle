@@ -10,43 +10,69 @@ version = '1.0.0'
 description = 'Jenkins Script Library - A collection of Groovy utilities for Jenkins automation'
 
 repositories {
-    // Order matters for resolution speed
     mavenLocal()
     mavenCentral()
-    
-    // Official Jenkins repositories - preferred source for all Jenkins artifacts
-    // As of 2025, these repositories provide artifacts compatible with Jenkins 2.479.1+
-    maven {
-        url 'https://repo.jenkins-ci.org/releases/'
-        content {
-            // Only access Jenkins repos for Jenkins artifacts
-            includeGroup "org.jenkins-ci"
-            includeGroup "org.jenkins-ci.main"
-            includeGroup "org.jenkins-ci.plugins"
-            includeGroup "org.jenkins-ci.plugins.workflow"
-        }
-    }
-    maven {
-        url 'https://repo.jenkins-ci.org/public/'
-        content {
-            // Only access Jenkins repos for Jenkins artifacts
-            includeGroup "org.jenkins-ci"
-            includeGroup "org.jenkins-ci.main"
-            includeGroup "org.jenkins-ci.plugins"
-            includeGroup "org.jenkins-ci.plugins.workflow"
-        }
-    }
-    
+    maven { url 'https://repo.jenkins-ci.org/releases/' }
+    maven { url 'https://repo.jenkins-ci.org/public/' }
 }
 
+ext {
+    isJava17Plus = JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_17)
+    if (!isJava17Plus) throw new GradleException("Java 17+ is required")
+
+    versions = [
+        jenkinsCore: '2.361.4',
+        groovy: '3.0.24',
+        credentialsPlugin: '2.6.1',
+        matrixAuthPlugin: '3.1.3',
+        workflowApiPlugin: '2.46',
+        workflowStepApiPlugin: '2.27',
+        folderPlugin: '6.17',
+        gitPlugin: '4.11.3',
+        servletApi: '4.0.1',
+        spockVersion: '2.3-groovy-3.0'
+    ]
+    println "Jenkins Core: ${versions.jenkinsCore}, Java 17+: ${isJava17Plus}"
+}
+
+def excludePatterns = [
+    '**/cloud/**',
+    '**/hudson/plugins/ec2/**',
+    '**/scripts/**',
+    '**/jobs/**',
+    '**/config/**',
+    '**/ssh/**',
+    '**/remote/**',
+    '**/docker/**',
+    '**/aws/**',
+    '**/azure/**',
+    '**/jenkins/executor/**',
+    '**/nodes/SlaveInfoManager.groovy'
+]
+
 sourceSets {
+    main {
+        groovy {
+            srcDir 'src/main/groovy'
+            exclude excludePatterns
+        }
+    }
+    test {
+        groovy {
+            // Don't exclude test files
+        }
+    }
     integrationTest {
         groovy {
             srcDir 'src/integration-test/groovy'
+            // Exclude tests for classes we've excluded from main
+            exclude '**/config/JenkinsConfigBackupIntegrationTest.groovy'
+            exclude '**/nodes/SlaveInfoManagerIntegrationTest.groovy'
+            exclude '**/scripts/AnalyzePipelinePerformanceIntegrationTest.groovy'
+            exclude '**/scripts/ListCloudNodesIntegrationTest.groovy'
+            exclude '**/jobs/**'
         }
-        resources {
-            srcDir 'src/integration-test/resources'
-        }
+        resources.srcDir 'src/integration-test/resources'
         compileClasspath += sourceSets.main.output + configurations.testRuntimeClasspath
         runtimeClasspath += output + compileClasspath
     }
@@ -57,115 +83,81 @@ configurations {
     integrationTestRuntimeOnly.extendsFrom testRuntimeOnly
 }
 
-// Define Jenkins versions for supported environment
-ext {
-    // Detect Java version
-    // Custom check for Java 17+ compatibility since isJava17Compatible() doesn't exist
-    isJava17Plus = JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_17)
-
-    // NOTE: As of 2025, Jenkins requires Java 17+ for both controller and agents
-    // Current supported Jenkins versions for Java 17/21 (2025)
-    versions = [
-        jenkinsCore: '2.361.4', // Using a more stable version than 2.509
-        groovy: '3.0.24',     // Update to match main branch with Groovy 3.0.24
-        credentialsPlugin: '1252.vcdff1d368fa_f', // Compatible with Jenkins 2.361.4
-        matrixAuthPlugin: '3.2.6',
-        workflowApiPlugin: '2.46', // Using a stable version with a standard versioning scheme
-        workflowStepApiPlugin: '2.27', // Using a stable version with a standard versioning scheme
-        folderPlugin: '6.720', // Using a stable version with a standard versioning scheme
-        gitPlugin: '4.11.5',
-        xmlApisPlugin: '1.0.b2',
-        dom4jPlugin: '1.6.1',
-        xercesPlugin: '2.12.2',
-        commonsTextPlugin: '1.10.0',
-        commonsIoPlugin: '2.11.0',
-        servletApi: '4.0.1',
-        spockVersion: '2.3-groovy-3.0' // Match Groovy 3.0.24
-    ]
-
-    // Verify Java version compatibility
-    if (!isJava17Plus) {
-        // This project requires Java 17+ for compatibility with modern Jenkins
-        println "ERROR: Java 17+ is required for this project to match Jenkins requirements"
-        println "Please upgrade your Java version to at least Java 17"
-        // Fail the build if Java version is too low
-        throw new GradleException("Java 17+ is required for this build")
-    }
-
-    // Print debug information
-    println "Using Jenkins core: ${versions.jenkinsCore}"
-    println "Is Java 17+: ${isJava17Plus}"
-}
-
 dependencies {
-    // Use Groovy version that matches Jenkins LTS built-in version
     implementation "org.codehaus.groovy:groovy-all:${versions.groovy}"
-
-    // Standard dependencies - just the absolute minimum to compile the util package
+    implementation 'commons-cli:commons-cli:1.5.0'
     implementation 'org.apache.logging.log4j:log4j-api:2.25.0'
     implementation 'org.apache.logging.log4j:log4j-core:2.25.0'
-    implementation "commons-io:commons-io:2.19.0" // Common IO utilities
-    
-    // Unit test dependencies - minimal set
+    implementation "commons-io:commons-io:2.19.0"
+
+    compileOnly "org.jenkins-ci.main:jenkins-core:${versions.jenkinsCore}"
+    compileOnly "javax.servlet:javax.servlet-api:${versions.servletApi}"
+    compileOnly "org.jenkins-ci.plugins:git:${versions.gitPlugin}"
+    compileOnly "org.jenkins-ci.plugins:ssh-slaves:1.33.0"
+    compileOnly "org.jenkins-ci.plugins:groovy:2.4"
+    compileOnly "org.jenkins-ci.plugins:cloudbees-folder:${versions.folderPlugin}"
+    compileOnly "org.jenkins-ci.plugins.workflow:workflow-job:2.42"
+    compileOnly "org.jenkins-ci.plugins:credentials:${versions.credentialsPlugin}"
+    compileOnly "org.jenkins-ci.plugins:plain-credentials:1.7"
+
     testImplementation 'junit:junit:4.13.2'
     testImplementation "org.spockframework:spock-core:${versions.spockVersion}"
-    
+
+    integrationTestImplementation "org.jenkins-ci.main:jenkins-core:${versions.jenkinsCore}"
+    integrationTestImplementation "org.jenkins-ci.main:jenkins-test-harness:2.72"
+    integrationTestImplementation "org.jenkins-ci.main:jenkins-war:${versions.jenkinsCore}@war"
+    integrationTestImplementation "javax.servlet:javax.servlet-api:${versions.servletApi}"
+    integrationTestImplementation "org.jenkins-ci.plugins:credentials:${versions.credentialsPlugin}"
+    integrationTestImplementation "org.jenkins-ci.plugins:matrix-auth:${versions.matrixAuthPlugin}"
+    integrationTestImplementation "org.jenkins-ci.plugins.workflow:workflow-api:${versions.workflowApiPlugin}"
+    integrationTestImplementation "org.jenkins-ci.plugins.workflow:workflow-step-api:${versions.workflowStepApiPlugin}"
+    integrationTestImplementation "org.jenkins-ci.plugins:cloudbees-folder:${versions.folderPlugin}"
+    integrationTestImplementation "org.jenkins-ci.plugins:git:${versions.gitPlugin}"
+    integrationTestRuntimeOnly 'org.slf4j:slf4j-simple:1.7.36'
+    integrationTestRuntimeOnly 'org.jenkins-ci:SECURITY-144-compat:1.0'
 }
 
 java {
-    // Target Java 17 for compatibility with modern Jenkins (2025+)
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
 }
 
-// Configure source set exclusions to make testing easier
-sourceSets {
-    main {
-        groovy {
-            // Exclude almost everything for now to make the build pass in CI
-            // Only include the core utility classes
-            include '**/util/*.groovy'
-            exclude '**/*.groovy'  
-        }
-    }
-
-    test {
-        groovy {
-            exclude '**/cloud/**'  // Exclude cloud provider test classes
-            exclude '**/JobMigratorSpec.groovy'  // Exclude migrator tests
-            exclude '**/JobDependencyManagerSpec.groovy'  // Exclude dependency manager tests
-            exclude '**/JobHealthAnalyzerSpec.groovy'  // Exclude health analyzer tests
-            exclude '**/JobParameterManagerSpec.groovy'  // Exclude parameter manager tests
-            exclude '**/JobTemplateSpec.groovy'  // Exclude template tests
-            exclude '**/JobConfigAuditorSpec.groovy'  // Exclude config auditor tests
-            exclude '**/LocalJenkinsAccessorSpec.groovy'  // Exclude accessor tests
-            exclude '**/CopyJobSpec.groovy'  // Exclude copy job tests
-            exclude '**/EnableJobsSpec.groovy'  // Exclude enable jobs tests
-            exclude '**/OptimizeAgentResourcesTest.groovy'  // Exclude optimize resources tests
-            exclude '**/SecurityVulnerabilityScanTest.groovy'  // Exclude security scan tests
-            // Add exclusions matching the main exclusions
-            exclude '**/ssh/**'  // SSH-related tests
-            exclude '**/remote/**'  // Remote execution tests
-            exclude '**/docker/**'  // Docker integration tests
-            exclude '**/aws/**'  // AWS integration tests
-            exclude '**/azure/**'  // Azure integration tests
-            exclude '**/jenkins/executor/**'  // Executor tests
-            exclude '**/ProcessRunner*Spec.groovy'  // Process execution tests
-        }
-    }
+tasks.withType(GroovyCompile).configureEach {
+    groovyOptions.optimizationOptions.indy = true
+    sourceCompatibility = '17'
+    targetCompatibility = '17'
 }
 
-tasks.withType(CodeNarc) {
+test {
+    useJUnit()
+    testLogging { events "passed", "skipped", "failed" }
+    finalizedBy jacocoTestReport
+    onlyIf { !project.hasProperty('skipTests') }
+}
+
+tasks.register('integrationTest', Test) {
+    description = 'Runs integration tests.'
+    group = 'verification'
+    testClassesDirs = sourceSets.integrationTest.output.classesDirs
+    classpath = sourceSets.integrationTest.runtimeClasspath
+    useJUnitPlatform()
+    mustRunAfter test
+    testLogging {
+        events "passed", "skipped", "failed"
+        showStandardStreams = true
+    }
+    onlyIf { !project.hasProperty('skipTests') }
+}
+
+check.dependsOn integrationTest
+
+tasks.withType(CodeNarc).configureEach {
     enabled = true
     configFile = file('config/codenarc/codenarc.groovy')
-    
-    // Configure reports
     reports {
         html.required = true
         text.required = true
     }
-    
-    // Don't fail the build for violations
     ignoreFailures = true
 }
 
@@ -180,63 +172,40 @@ jacocoTestReport {
     }
 }
 
-test {
-    // We'll use JUnit 4 since we have a JUnit 4 test
-    useJUnit()
-
-    testLogging {
-        events "passed", "skipped", "failed"
+jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            limit { minimum = 0.05 }
+        }
+        rule {
+            element = 'CLASS'
+            excludes = [
+                '*.Test*', '*Test', '*Tests',
+                'com.github.thomasvincent.jenkinsscripts.security.*',
+                'com.github.thomasvincent.jenkinsscripts.helm.*',
+                'com.github.thomasvincent.jenkinsscripts.nodes.*',
+                'com.github.thomasvincent.jenkinsscripts.jobs.*',
+                'com.github.thomasvincent.jenkinsscripts.groovydoc.*',
+                'hudson.*'
+            ]
+            limit {
+                counter = 'LINE'
+                minimum = 0.75
+            }
+        }
     }
-
-    // Run JaCoCo report after tests for coverage analysis
-    finalizedBy jacocoTestReport
-
-    // Skip tests if the system property is set
-    onlyIf { !project.hasProperty('skipTests') }
-
-    // Set minimal test configuration by default
 }
 
-task integrationTest(type: Test) {
-    description = 'Runs integration tests.'
-    group = 'verification'
-    
-    // Use JUnit Platform for JUnit Jupiter
-    useJUnitPlatform()
+check.dependsOn jacocoTestCoverageVerification
+jacocoTestCoverageVerification.dependsOn jacocoTestReport
 
-    testClassesDirs = sourceSets.integrationTest.output.classesDirs
-    classpath = sourceSets.integrationTest.runtimeClasspath
-    
-    mustRunAfter test
-    
-    testLogging {
-        events "passed", "skipped", "failed"
-        showStandardStreams = true
-    }
-    
-    // Skip integration tests if the system property is set
-    onlyIf { !project.hasProperty('skipTests') }
-}
-
-// Enable integration tests in the build process
-check.dependsOn integrationTest
-
-tasks.withType(GroovyCompile) {
-    groovyOptions.optimizationOptions.indy = true
-
-    // Target Java 17 for compatibility with modern Jenkins (2025+)
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
-}
-
-// Create a packaged jar with all the scripts
 task scriptJar(type: Jar) {
     archiveBaseName = 'jenkins-script-library'
     archiveClassifier = 'scripts'
     from sourceSets.main.allSource
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
-// Publish to Maven local
 publishing {
     publications {
         maven(MavenPublication) {
@@ -246,84 +215,41 @@ publishing {
     }
 }
 
-// Dependency resolution configuration
 configurations.all {
     resolutionStrategy {
-        // Cache dynamic versions for 10 minutes only
         cacheDynamicVersionsFor 10, 'minutes'
-
-        // Cache changing modules for 4 hours
         cacheChangingModulesFor 4, 'hours'
-        
-        // Force specific versions of critical dependencies for consistency
         force "org.codehaus.groovy:groovy-all:${versions.groovy}"
         force "javax.servlet:javax.servlet-api:${versions.servletApi}"
         force "org.jenkins-ci.main:jenkins-core:${versions.jenkinsCore}"
         force "org.jenkins-ci.plugins:credentials:${versions.credentialsPlugin}"
         force "org.jenkins-ci.plugins:matrix-auth:${versions.matrixAuthPlugin}"
-        
-        // Force compatible Spock version based on our Groovy version
         force "org.spockframework:spock-core:${versions.spockVersion}"
-        
-        // Force spotbugs-annotations version to be compatible with our configuration
         force 'com.github.spotbugs:spotbugs-annotations:4.9.3'
 
-        // Ensure compatibility with modern Jenkins that requires Java 17+
         eachDependency { details ->
             if (details.requested.group == 'org.springframework.security') {
-                // Use the versions that Jenkins 2.479.1+ expect
-                if (details.requested.version.startsWith('5.')) {
-                    force "org.springframework.security:spring-security-web:6.5.1"
-                    force "org.springframework.security:spring-security-core:6.5.1" 
-                    force "org.springframework.security:spring-security-crypto:6.5.1"
-                    logger.info("Upgrading Spring Security 5.x to 6.x for modern Jenkins compatibility")
-                }
-            }
-            
-            // Handle specific versions of critical dependencies
-            if (details.requested.group == 'com.github.spotbugs' && details.requested.name == 'spotbugs-annotations') {
-                details.useVersion('4.9.3')
-                logger.info("Using spotbugs-annotations 4.9.3")
-            }
-        }
-
-        // Log basic dependency info and handle version constraints
-        eachDependency { DependencyResolveDetails details ->
-            if (details.requested.group == 'org.jenkins-ci' ||
-                details.requested.group == 'org.jenkins-ci.main' ||
-                details.requested.group == 'org.jenkins-ci.plugins') {
-                logger.info("Resolving Jenkins dependency: ${details.requested}")
+                force "org.springframework.security:spring-security-web:6.5.1"
+                force "org.springframework.security:spring-security-core:6.5.1"
+                force "org.springframework.security:spring-security-crypto:6.5.1"
             }
         }
     }
 }
 
-// Special task to download all dependencies
 task downloadDependencies {
-    description = 'Download all dependencies to local Maven cache'
+    description = 'Preloads dependencies to the local Maven cache'
     group = 'build setup'
-
     doLast {
-        configurations.compileClasspath.files
-        configurations.testCompileClasspath.files
-        configurations.runtimeClasspath.files
-        configurations.testRuntimeClasspath.files
-
-        if (project.hasProperty('integrationTest')) {
-            configurations.integrationTestCompileClasspath.files
-            configurations.integrationTestRuntimeClasspath.files
-        }
-
+        configurations.each { it.files }
         println "Downloaded all dependencies to Maven cache"
     }
 }
 
-// Enable parallel execution for faster builds
-tasks.withType(Test) {
+tasks.withType(Test).configureEach {
     maxParallelForks = Math.max(1, (Runtime.runtime.availableProcessors() / 2).intValue())
 }
 
-// Enable build cache for Gradle versions that support it
 try {
     buildCache {
         local {
@@ -331,6 +257,7 @@ try {
             directory = "${rootProject.buildDir}/cache"
         }
     }
-} catch (Exception e) {
-    println "Build cache configuration not supported in this Gradle version"
+} catch (ignored) {
+    println "Build cache not supported in this Gradle version"
 }
+

@@ -153,7 +153,6 @@ abstract class BaseScriptIntegrationTest {
     /**
      * Helper to run tests without a Jenkins instance.
      */
-    @WithoutJenkins
     protected static class ScriptSyntaxTest extends BaseScriptIntegrationTest {
         @Override
         String getScriptPath() {
