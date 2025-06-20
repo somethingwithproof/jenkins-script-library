@@ -1,0 +1,54 @@
+// build-logic/build.gradle
+plugins {
+    id 'groovy-gradle-plugin'
+    id 'java-gradle-plugin'
+}
+
+repositories {
+    mavenCentral()
+    gradlePluginPortal()
+    maven {
+        url = 'https://repo.jenkins-ci.org/releases/'
+    }
+    maven {
+        url = 'https://repo.jenkins-ci.org/public/'
+    }
+}
+
+dependencies {
+    implementation 'org.codenarc:CodeNarc:3.3.0'
+    implementation 'org.jacoco:org.jacoco.core:0.8.11'
+    implementation 'io.github.gradle-nexus:publish-plugin:1.3.0'
+    implementation 'com.github.ben-manes:gradle-versions-plugin:0.51.0'
+    implementation 'com.github.spotbugs.snom:spotbugs-gradle-plugin:6.0.8'
+    implementation 'org.owasp:dependency-check-gradle:8.4.0'
+    implementation 'org.codehaus.groovy:groovy-all:3.0.24'
+    implementation 'org.gradle.test-retry:org.gradle.test-retry.gradle.plugin:1.5.9'
+}
+
+gradlePlugin {
+    // Define the plugins provided by this library
+    plugins {
+        codenarcConvention {
+            id = 'com.github.thomasvincent.codenarc-convention'
+            implementationClass = 'com.github.thomasvincent.gradle.CodeNarcConventionPlugin'
+        }
+        jacocoConvention {
+            id = 'com.github.thomasvincent.jacoco-convention'
+            implementationClass = 'com.github.thomasvincent.gradle.JacocoConventionPlugin'
+        }
+        testConvention {
+            id = 'com.github.thomasvincent.test-convention'
+            implementationClass = 'com.github.thomasvincent.gradle.TestConventionPlugin'
+        }
+        publishingConvention {
+            id = 'com.github.thomasvincent.publishing-convention'
+            implementationClass = 'com.github.thomasvincent.gradle.PublishingConventionPlugin'
+        }
+        securityConvention {
+            id = 'com.github.thomasvincent.security-convention'
+            implementationClass = 'com.github.thomasvincent.gradle.SecurityConventionPlugin'
+        }
+    }
+}
+
