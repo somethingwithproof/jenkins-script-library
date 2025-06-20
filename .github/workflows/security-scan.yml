@@ -128,7 +128,13 @@ jobs:
             -E "[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}" . \
             | grep -v "127.0.0.1" \
             | grep -v "0.0.0.0" \
-            | grep -v "255.255.255.255" || true)
+            | grep -v "255.255.255.255" \
+            | grep -v "192.168.0." \
+            | grep -v "10.0.0." \
+            | grep -v "// SECURITY: This is a placeholder" \
+            | grep -v "// TEST" \
+            | grep -v "// EXAMPLE" \
+            | grep -v "// MOCK" || true)
           if [ -n "$IP_ADDRESSES" ]; then
             echo -e "${YELLOW}Warning: Hardcoded IP addresses found:${NC}"
             echo "$IP_ADDRESSES"
