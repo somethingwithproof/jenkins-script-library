@@ -16,7 +16,8 @@ buildCache {
     local {
         enabled = true
         directory = new File(rootDir, 'build/cache')
-        removeUnusedEntriesAfterDays = 7
+        // Using newer retention API instead of deprecated removeUnusedEntriesAfterDays
+        removeUnusedEntriesAfter = Duration.ofDays(7)
     }
     remote(HttpBuildCache) {
         enabled = System.getenv('CI') == 'true'
@@ -100,13 +101,8 @@ dependencyResolutionManagement {
     }
 }
 
-// Include build profiles for different environments
-includeBuild('build-logic') {
-    dependencySubstitution {
-        substitute(module('com.github.thomasvincent:build-logic'))
-            .using(project(':'))
-    }
-}
+// Build profiles will be added when the build-logic directory is created
+// Removing includeBuild reference to non-existent directory
 
 // Configure Gradle Enterprise
 gradleEnterprise {
@@ -139,14 +135,22 @@ gradleEnterprise {
     }
 }
 
+// Using a non-deprecated approach to execute commands
 String execOutput(String cmd) {
     try {
         def stdout = new ByteArrayOutputStream()
-        exec {
-            commandLine = cmd.split(' ')
-            standardOutput = stdout
+        // Use a workaround for settings script that doesn't have direct access to ExecOperations
+        def result = new ByteArrayOutputStream()
+        def cmdParts = cmd.split(' ')
+        def process = new ProcessBuilder(cmdParts)
+            .redirectErrorStream(true)
+            .start()
+        process.inputStream.eachLine { line ->
+            result << line
+            result << System.lineSeparator()
         }
-        return stdout.toString().trim()
+        process.waitFor()
+        return result.toString().trim()
     } catch (Exception e) {
         return "unknown"
     }
