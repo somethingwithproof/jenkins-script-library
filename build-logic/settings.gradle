@@ -1,0 +1,6 @@
+// build-logic/settings.gradle
+rootProject.name = 'jenkins-script-library-build-logic'
+
+// Enable feature flags for improved build performance
+enableFeaturePreview('TYPESAFE_PROJECT_ACCESSORS')
+
