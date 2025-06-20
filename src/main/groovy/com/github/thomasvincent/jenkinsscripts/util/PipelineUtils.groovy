@@ -25,6 +25,7 @@
 package com.github.thomasvincent.jenkinsscripts.util
 
 import java.io.Serializable
+import java.io.IOException
 
 /**
  * Pipeline utilities for Jenkins scripts.
@@ -38,6 +39,12 @@ import java.io.Serializable
 class PipelineUtils implements Serializable {
 
     private static final long serialVersionUID = 1L
+    
+    // Architecture constants to avoid duplication
+    private static final String ARCH_AMD64 = "amd64"
+    private static final String ARCH_ARM64 = "arm64"
+    private static final String ARCH_386 = "386"
+    private static final String OS_LINUX = "linux"
 
     /** Reference to the pipeline script context */
     private transient def pipeline
@@ -70,9 +77,9 @@ class PipelineUtils implements Serializable {
         if (pipeline.isUnix()) {
             try {
                 def osName = pipeline.sh(script: 'uname', returnStdout: true).trim().toLowerCase()
-                return osName == 'darwin' ? 'darwin' : 'linux'
-            } catch (Exception e) {
-                return 'linux' // Default to Linux if we can't determine
+                return osName == 'darwin' ? 'darwin' : OS_LINUX
+            } catch (IOException | InterruptedException e) {
+                return OS_LINUX // Default to Linux if we can't determine
             }
         } else {
             return 'windows'
@@ -95,11 +102,13 @@ class PipelineUtils implements Serializable {
                 def arch = pipeline.sh(script: 'uname -m', returnStdout: true).trim()
                 return mapArchitecture(arch)
             } else {
-                def arch = pipeline.powershell(script: '(Get-WmiObject Win32_Processor).Architecture', returnStdout: true).trim()
+                def arch = pipeline.powershell(
+                        script: '(Get-WmiObject Win32_Processor).Architecture', 
+                        returnStdout: true).trim()
                 return mapWindowsArchitecture(arch)
             }
-        } catch (Exception e) {
-            return 'amd64' // Default to amd64 if we can't determine
+        } catch (IOException | InterruptedException e) {
+            return ARCH_AMD64 // Default to amd64 if we can't determine
         }
     }
 
@@ -118,13 +127,13 @@ class PipelineUtils implements Serializable {
         switch (arch) {
             case 'x86_64':
             case 'x64':
-                return 'amd64'
+                return ARCH_AMD64
             case 'aarch64':
-                return 'arm64'
+                return ARCH_ARM64
             case ~/^armv.*/:
                 return 'arm'
             case ~/^i[3456]86$/:
-                return '386'
+                return ARCH_386
             default:
                 return arch
         }
@@ -147,16 +156,16 @@ class PipelineUtils implements Serializable {
             case '0':
                 return 'i386'
             case '9':
-                return 'amd64'
+                return ARCH_AMD64
             case '12':
-                return 'arm64'
+                return ARCH_ARM64
             case 'AMD64':
             case 'EM64T':
-                return 'amd64'
+                return ARCH_AMD64
             case 'x86':
-                return '386'
+                return ARCH_386
             default:
-                return 'amd64'
+                return ARCH_AMD64
         }
     }
 }

@@ -110,7 +110,7 @@ class PipelineUtilsTest {
         pipeline = new MockPipeline() {
             @Override
             def sh(Map args) {
-                throw new RuntimeException("Command failed")
+                throw new IOException("Command failed")
             }
         }
         utils = new PipelineUtils(pipeline)
@@ -123,12 +123,12 @@ class PipelineUtilsTest {
         pipeline = new MockPipeline() {
             @Override
             def sh(Map args) {
-                throw new RuntimeException("Command failed")
+                throw new IOException("Command failed")
             }
             
             @Override
             def powershell(Map args) {
-                throw new RuntimeException("Command failed")
+                throw new IOException("Command failed")
             }
         }
         utils = new PipelineUtils(pipeline)

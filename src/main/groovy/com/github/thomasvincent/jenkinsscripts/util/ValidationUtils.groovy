@@ -75,6 +75,7 @@ class ValidationUtils {
      * @param defaultValue Default value to return if the provided value is not positive
      * @return The validated value or default value
      */
+    @SuppressWarnings('UnusedMethodParameter')
     static int requirePositive(int value, String paramName, int defaultValue) {
         if (value <= 0) {
             return defaultValue
