@@ -32,6 +32,7 @@ import hudson.security.AuthorizationStrategy
 //import hudson.plugins.warnings.PluginsUtils
 
 import java.util.logging.Logger
+import java.io.IOException
 
 /**
  * Audits Jenkins security settings and identifies vulnerabilities.
@@ -300,7 +301,7 @@ class JenkinsSecurityAuditor {
                     )
                 }
             }
-        } catch (Exception e) {
+        } catch (IOException | RuntimeException e) {
             LOGGER.warning("Failed to check plugin updates: ${e.message}")
         }
     }
@@ -329,7 +330,8 @@ class JenkinsSecurityAuditor {
         
         // Check if Groovy Script approval is in place (requires Script Security Plugin)
         try {
-            def scriptApproval = Class.forName("org.jenkinsci.plugins.scriptsecurity.scripts.ScriptApproval").getInstance()
+            def scriptApproval = Class.forName(
+                    "org.jenkinsci.plugins.scriptsecurity.scripts.ScriptApproval").getInstance()
             def approvedSignatures = scriptApproval.getApprovedSignatures()
             
             // Check for potentially dangerous approvals
@@ -362,7 +364,7 @@ class JenkinsSecurityAuditor {
                     "${approvedSignatures.size()} script signatures approved. Consider reviewing the list."
                 )
             }
-        } catch (Exception e) {
+        } catch (ClassNotFoundException | IllegalAccessException | NoSuchMethodException e) {
             // Script Security plugin not installed or not accessible
             LOGGER.fine("Could not check script approvals: ${e.message}")
         }

@@ -24,7 +24,6 @@
 
 package com.github.thomasvincent.jenkinsscripts.util
 
-import java.util.logging.Level
 import java.util.logging.Logger
 
 /**
@@ -38,6 +37,12 @@ import java.util.logging.Logger
  */
 class StringUtils {
     private static final Logger LOGGER = Logger.getLogger(StringUtils.class.getName())
+    
+    // String constants to avoid duplication
+    private static final String EMPTY_STRING = ""
+    private static final String UNDERSCORE = "_"
+    private static final String DOT = "."
+    private static final String CAMEL_TO_KEBAB_PATTERN1 = '$1-$2'
 
     /**
      * Sanitizes a string for use as a Jenkins job name.
@@ -51,14 +56,14 @@ class StringUtils {
      */
     static String sanitizeJobName(String input) {
         if (input == null) {
-            return ""
+            return EMPTY_STRING
         }
         
         // Replace characters that are not allowed in Jenkins job names
         return input
-            .replaceAll('[\\\\/?%*:|"<>]', '_') // Replace illegal chars with underscore
-            .replaceAll('\\s+', '_')            // Replace whitespace with underscore
-            .replaceAll('__+', '_')             // Replace multiple underscores with a single one
+            .replaceAll('[\\\\/?%*:|"<>]', UNDERSCORE) // Replace illegal chars with underscore
+            .replaceAll('\\s+', UNDERSCORE)            // Replace whitespace with underscore
+            .replaceAll('__+', UNDERSCORE)             // Replace multiple underscores with a single one
             .trim()
     }
     
@@ -123,7 +128,7 @@ class StringUtils {
      */
     static String truncate(String str, int maxLength, String ellipsis = "...") {
         if (str == null) {
-            return ""
+            return EMPTY_STRING
         }
         
         if (str.length() <= maxLength) {
@@ -150,10 +155,10 @@ class StringUtils {
      */
     static String formatParameter(String paramName, String paramValue, boolean sensitive = false) {
         if (paramName == null) {
-            return ""
+            return EMPTY_STRING
         }
         
-        String displayValue = sensitive ? "*****" : (paramValue ?: "")
+        String displayValue = sensitive ? "*****" : (paramValue ?: EMPTY_STRING)
         return "${paramName}=${displayValue}"
     }
     
@@ -169,17 +174,17 @@ class StringUtils {
      */
     static String camelToKebab(String camelCase) {
         if (camelCase == null) {
-            return ""
+            return EMPTY_STRING
         }
         
         // Special case for all-caps acronyms like "ABC"
         if (camelCase.matches("[A-Z]+")) {
-            return camelCase.split("").join("-").toLowerCase()
+            return camelCase.split(EMPTY_STRING).join("-").toLowerCase()
         }
         
         return camelCase
-            .replaceAll(/([a-z0-9])([A-Z])/, '$1-$2')
-            .replaceAll(/([A-Z])([A-Z][a-z])/, '$1-$2')
+            .replaceAll(/([a-z0-9])([A-Z])/, CAMEL_TO_KEBAB_PATTERN1)
+            .replaceAll(/([A-Z])([A-Z][a-z])/, CAMEL_TO_KEBAB_PATTERN1)
             .toLowerCase()
     }
     
@@ -195,7 +200,7 @@ class StringUtils {
      */
     static String kebabToCamel(String kebabCase) {
         if (kebabCase == null) {
-            return ""
+            return EMPTY_STRING
         }
         
         return kebabCase.replaceAll(/-([a-z])/, { match, group -> group.toUpperCase() })
@@ -213,11 +218,11 @@ class StringUtils {
      */
     static String randomAlphanumeric(int length) {
         if (length <= 0) {
-            return ""
+            return EMPTY_STRING
         }
         
         def chars = ('a'..'z') + ('A'..'Z') + ('0'..'9')
-        def random = new Random()
+        def random = new java.security.SecureRandom()
         def result = new StringBuilder()
         
         length.times { 
@@ -271,8 +276,8 @@ class StringUtils {
             return 1
         }
         
-        def v1Parts = version1.tokenize('.')
-        def v2Parts = version2.tokenize('.')
+        def v1Parts = version1.tokenize(DOT)
+        def v2Parts = version2.tokenize(DOT)
         
         for (int i = 0; i < Math.min(v1Parts.size(), v2Parts.size()); i++) {
             def v1Part = parseVersionPart(v1Parts[i])

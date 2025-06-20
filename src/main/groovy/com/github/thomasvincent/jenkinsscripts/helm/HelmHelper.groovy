@@ -33,6 +33,7 @@ import jenkins.model.Jenkins
 import com.github.thomasvincent.jenkinsscripts.util.PipelineUtils
 
 import java.io.Serializable
+import java.io.IOException
 
 /**
  * Helm tool installer for Jenkins pipelines.
@@ -162,7 +163,8 @@ class HelmHelper implements Serializable {
      * // Creates installer for https://get.helm.sh/helm-v3.10.0-darwin-amd64.tar.gz
      * ```
      */
-    private List<ZipExtractionInstaller> createInstaller(String version, String os, String arch, String extension, String installPath) {
+    private List<ZipExtractionInstaller> createInstaller(
+            String version, String os, String arch, String extension, String installPath) {
         return [
             new ZipExtractionInstaller(
                 null, 
@@ -185,8 +187,10 @@ class HelmHelper implements Serializable {
      * )
      * ```
      */
-    private HelmInstallation createToolInstallation(String version, String installPath, List<ZipExtractionInstaller> installers) {
-        return new HelmInstallation("helm-$version", installPath, [new InstallSourceProperty(installers)])
+    private HelmInstallation createToolInstallation(
+            String version, String installPath, List<ZipExtractionInstaller> installers) {
+        return new HelmInstallation(
+                "helm-$version", installPath, [new InstallSourceProperty(installers)])
     }
     
     /**
@@ -207,7 +211,7 @@ class HelmHelper implements Serializable {
             String helmHome = helmTool.forNode(currentNode, listener).home
             pipeline.env.PATH = "$helmHome:${pipeline.env.PATH}"
             pipeline.echo "Using Helm $version installed at $helmHome"
-        } catch (Exception e) {
+        } catch (IOException | InterruptedException e) {
             pipeline.error("Failed to set up Helm $version: ${e.message}")
         }
     }
