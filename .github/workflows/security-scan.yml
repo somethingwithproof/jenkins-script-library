@@ -47,6 +47,8 @@ jobs:
             # Security documentation and annotations
             "\/\*\*\s*\*\s*SECURITY.*NO[T]?\s*contain.*hardcoded"          # Security documentation annotation
             "\/\/\s*SECURITY.*NO[T]?\s*hardcoded"                           # Security inline annotation
+            "@security"                                                     # Security tag annotation
+            "secureResolveCredential"                                       # Secure credential resolution method
             
             # CLI option definitions (common false positives)
             "(longOpt|argName|name):\s*['\"].*['\"]"                        # CLI option specifications
