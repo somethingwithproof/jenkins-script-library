@@ -1,7 +1,6 @@
 package com.github.thomasvincent.jenkinsscripts.util
 
 import org.junit.Test
-import org.junit.BeforeClass
 import static org.junit.Assert.*
 
 class StringUtilsTest {

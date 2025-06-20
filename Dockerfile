@@ -5,26 +5,28 @@
 #
 # Build: docker build -t jenkins-script-library:latest .
 # Run:   docker run -d -p 8080:8080 -p 50000:50000 --name jenkins-script-library jenkins-script-library:latest
+# Dockerfile
 
 FROM jenkins/jenkins:lts-jdk17
 
+LABEL maintainer="you@example.com"
+LABEL description="Jenkins Script Library Dev Environment"
+
 USER root
 
-# Set environment variables
+# Set env vars
 ENV GRADLE_VERSION=8.7 \
-    JENKINS_HOME=/var/jenkins_home
+    JENKINS_HOME=/var/jenkins_home \
+    GRADLE_HOME=/opt/gradle
 
-# Install required packages
+# Install tools
 RUN apt-get update && apt-get install -y \
-    curl \
-    unzip \
-    git \
-    wget \
-    jq \
+        curl \
+        unzip \
+        git \
+        wget \
+        jq \
     && rm -rf /var/lib/apt/lists/*
-
-# Use Jenkins' built-in Groovy version instead of installing a separate one
-# This ensures compatibility with the version Jenkins uses internally
 
 # Install Gradle
 RUN wget -q https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip -O /tmp/gradle.zip \
@@ -32,35 +34,33 @@ RUN wget -q https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-b
     && ln -s /opt/gradle-${GRADLE_VERSION} /opt/gradle \
     && rm /tmp/gradle.zip
 
-# Add to PATH
-ENV PATH="$PATH:/opt/gradle/bin"
+ENV PATH="${PATH}:${GRADLE_HOME}/bin"
 
-# Copy library scripts
+# Copy source library
 COPY --chown=jenkins:jenkins . /var/jenkins_library
 
-# Script to install recommended plugins, setup library, and configure Jenkins
+# Entrypoint script
 COPY --chown=jenkins:jenkins docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-USER jenkins
-
-# Install recommended plugins
-RUN jenkins-plugin-cli --plugins \
-    credentials \
-    git \
-    workflow-aggregator \
-    pipeline-groovy-lib \
-    groovy \
-    script-security \
-    matrix-auth \
-    cloudbees-folder
-
-# Add version support
+# Version script
 COPY --chown=jenkins:jenkins version.sh /usr/local/bin/version.sh
 RUN chmod +x /usr/local/bin/version.sh
 
-# Define an entrypoint that adds our library to Jenkins
+USER jenkins
+
+# Install essential Jenkins plugins
+RUN jenkins-plugin-cli --plugins \
+        credentials \
+        git \
+        workflow-aggregator \
+        pipeline-groovy-lib \
+        groovy \
+        script-security \
+        matrix-auth \
+        cloudbees-folder
+
+# Entrypoint
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
-# Default command
 CMD ["jenkins"]

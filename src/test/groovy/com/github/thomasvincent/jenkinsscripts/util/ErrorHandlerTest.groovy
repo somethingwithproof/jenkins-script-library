@@ -37,7 +37,8 @@ class ErrorHandlerTest {
     @Test
     void testHandleErrorWithDefault() {
         Exception ex = new RuntimeException("Test error")
-        Object result = ErrorHandler.handleErrorWithDefault("Test operation failed", ex, testLogger, "default", Level.WARNING)
+        Object result = ErrorHandler.handleErrorWithDefault(
+                "Test operation failed", ex, testLogger, "default", Level.WARNING)
         
         assertEquals("default", result)
         assertEquals(1, logHandler.records.size())

@@ -1,18 +1,16 @@
+# Dockerfile for building a Gradle project using JDK 21
 FROM eclipse-temurin:21-jdk
 
 WORKDIR /app
 
-# Copy build files
-COPY gradlew ./
-COPY gradle ./gradle
-COPY build.gradle ./
-COPY gradle.properties ./
+# Copy build tool and configuration
+COPY gradlew gradle build.gradle gradle.properties ./
 
-# Copy source code
+# Copy source files
 COPY src ./src
 
-# Make gradlew executable
+# Ensure gradlew is executable
 RUN chmod +x ./gradlew
 
-# Run build with Java 21
-RUN ./gradlew clean build --info
+# Build the project (disable daemon for CI/CD builds)
+RUN ./gradlew clean build --no-daemon --info

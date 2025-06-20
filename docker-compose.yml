@@ -6,15 +6,16 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: jenkins-script-library
+    restart: unless-stopped
     ports:
-      - "8080:8080"
-      - "50000:50000"
+      - "8080:8080"   # Jenkins Web UI
+      - "50000:50000" # JNLP agent port
     volumes:
       - jenkins_home:/var/jenkins_home
-      - ./:/var/jenkins_library
+      - ./jenkins_library:/var/jenkins_library:ro
     environment:
-      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
-      - JENKINS_OPTS=--prefix=/jenkins
+      JAVA_OPTS: "-Djenkins.install.runSetupWizard=false"
+      JENKINS_OPTS: "--prefix=/jenkins"
 
 volumes:
   jenkins_home:

@@ -3,91 +3,353 @@ plugins {
     id 'codenarc'
     id 'jacoco'
     id 'maven-publish'
+    id 'org.owasp.dependencycheck' version '8.4.0'
+    id 'com.github.ben-manes.versions' version '0.51.0'
+// Add comprehensive build health check
+tasks.register('buildHealth') {
+    description = 'Checks overall build health'
+    group = 'Verification'
+    
+    dependsOn 'test'
+    dependsOn 'integrationTest'
+    dependsOn 'checkCoverage'
+    dependsOn 'dependencyCheckAnalyze'
+    dependsOn 'dependencyUpdates'
+    dependsOn 'dependencyAnalysis'
+    
+    doLast {
+        println "===== Build Health Report ====="
+        println "Version: ${version}"
+        println "Java Version: ${System.getProperty('java.version')}"
+        println "Gradle Version: ${gradle.gradleVersion}"
+        
+        // Report on test results
+        def testResultsDir = file("${buildDir}/test-results/test")
+        if (testResultsDir.exists()) {
+            def testCount = 0
+            def failureCount = 0
+            testResultsDir.listFiles().each { file ->
+                if (file.name.endsWith('.xml')) {
+                    def testsuite = new XmlSlurper().parse(file)
+                    testCount += testsuite.@tests.toInteger()
+                    failureCount += testsuite.@failures.toInteger()
+                }
+            }
+            println "Unit Tests: ${testCount} tests, ${failureCount} failures"
+        }
+        
+        // Report on coverage
+        def coverageReport = file("${buildDir}/reports/jacoco/test/html/index.html")
+        if (coverageReport.exists()) {
+            println "Coverage Report: ${coverageReport.absolutePath}"
+        }
+        
+        // Report on dependency issues
+        def owaspReport = file("${buildDir}/reports/dependency-check-report.html")
+        if (owaspReport.exists()) {
+            println "Security Report: ${owaspReport.absolutePath}"
+        }
+        
+        println "===== End of Build Health Report ====="
+    }
 }
 
+// Add task to create a build profile report
+tasks.register('buildProfile') {
+    description = 'Generate detailed build profiling report'
+    group = 'Build'
+    
+    doLast {
+        def profileReport = file("${buildDir}/reports/profile")
+        profileReport.mkdirs()
+        def reportFile = new File(profileReport, "profile-${new Date().format('yyyyMMdd-HHmmss')}.txt")
+        
+        reportFile.withWriter { writer ->
+            writer.writeLine("Build Profile Report - ${new Date()}")
+            writer.writeLine("====================================")
+            writer.writeLine("System Info:")
+            writer.writeLine("  Java Version: ${System.getProperty('java.version')}")
+            writer.writeLine("  OS: ${System.getProperty('os.name')} ${System.getProperty('os.version')}")
+            writer.writeLine("  Available Processors: ${Runtime.runtime.availableProcessors()}")
+            writer.writeLine("  Max Memory: ${Runtime.runtime.maxMemory() / (1024 * 1024)} MB")
+            writer.writeLine("  Free Memory: ${Runtime.runtime.freeMemory() / (1024 * 1024)} MB")
+            writer.writeLine("")
+            writer.writeLine("Gradle Info:")
+            writer.writeLine("  Gradle Version: ${gradle.gradleVersion}")
+            writer.writeLine("  Gradle Home: ${gradle.gradleHomeDir}")
+            writer.writeLine("  Project: ${project.name}")
+            writer.writeLine("  Version: ${project.version}")
+            writer.writeLine("")
+            writer.writeLine("Build Cache:")
+            writer.writeLine("  Local: ${gradle.startParameter.buildCacheEnabled}")
+            writer.writeLine("")
+            writer.writeLine("Configuration:")
+            project.configurations.forEach { config ->
+                writer.writeLine("  ${config.name}: ${config.files.size()} files")
+            }
+        }
+        
+        println "Build profile report generated: ${reportFile.absolutePath}"
+    }
+}
+
+// Add CI-specific tasks
+if (System.getenv("CI") == "true") {
+    tasks.register('ciPipeline') {
+        description = 'Runs the complete CI pipeline'
+        group = 'CI/CD'
+        
+        // Basic pipeline steps
+        dependsOn 'clean'
+        dependsOn 'build'
+        dependsOn 'test'
+        dependsOn 'integrationTest'
+        dependsOn 'checkCoverage'
+        dependsOn 'dependencyCheckAnalyze'
+        
+        // Additional CI steps for branches
+        if (System.getenv("BRANCH_NAME") == "main" || System.getenv("BRANCH_NAME") == "master") {
+            dependsOn 'generateChangelog'
+            dependsOn 'publish'
+        }
+        
+        doFirst {
+            println "===== CI Pipeline Started ====="
+            println "Branch: ${System.getenv('BRANCH_NAME') ?: 'unknown'}"
+            println "Commit: ${System.getenv('GIT_COMMIT') ?: 'unknown'}"
+        }
+        
+        doLast {
+            println "===== CI Pipeline Completed ====="
+            println "Build Result: SUCCESS"
+        }
+    }
+}
+}
+  id 'io.spring.dependency-management' version '1.1.5'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
+    id 'com.autonomousapps.dependency-analysis' version '1.30.0'
+    id 'io.github.gradle-nexus.publish-plugin' version '1.3.0'
+    id 'org.barfuin.gradle.taskinfo' version '2.1.0'
+    id 'org.jlleitschuh.gradle.ktlint' version '12.1.0' apply false
+    id 'net.researchgate.release' version '3.0.2'
+    id 'org.ajoberstar.grgit' version '5.2.2'
+    id 'org.gradle.test-retry' version '1.5.9'
+    id 'org.unbroken-dome.test-sets' version '4.1.0'
+    id 'com.gorylenko.gradle-git-properties' version '2.4.1'
+    id 'com.gradle.enterprise' version '3.16.2'
+    id 'com.gradle.build-scan' version '3.16.2'
+    id 'me.champeau.jmh' version '0.7.2'
+    id 'de.undercouch.download' version '5.6.0'
+}
+
+// Load version properties for semantic versioning
+def versionProps = new Properties()
+file('version.properties').withInputStream { versionProps.load(it) }
+
+def versionMajor = versionProps['version.major'] as Integer
+def versionMinor = versionProps['version.minor'] as Integer
+def versionPatch = versionProps['version.patch'] as Integer
+def versionPrerelease = versionProps['version.prerelease']
+
 group = 'com.github.thomasvincent'
-version = '1.0.0'
+version = "${versionMajor}.${versionMinor}.${versionPatch}${versionPrerelease ? '-' + versionPrerelease : ''}"
 description = 'Jenkins Script Library - A collection of Groovy utilities for Jenkins automation'
+
+// Configure Gradle Enterprise and Build Scan
+gradleEnterprise {
+    buildScan {
+        termsOfServiceUrl = "https://gradle.com/terms-of-service"
+        termsOfServiceAgree = "yes"
+        tag 'CI'
+        
+        // Add custom build scan info
+        background {
+            def branchName = 'unknown'
+            try {
+                branchName = 'git rev-parse --abbrev-ref HEAD'.execute().text.trim()
+            } catch (Exception ignored) {}
+            value 'Git branch', branchName
+        }
+        
+        // Add link to build scans in your CI system
+        if (System.getenv('CI') == 'true') {
+            link 'CI Job', System.getenv('CI_JOB_URL')
+        }
+    }
+}
+
+// Configure dependency locking
+dependencyLocking {
+    lockAllConfigurations()
+}
+
+// Configure Git Properties Plugin
+gitProperties {
+    keys = ['git.branch', 'git.commit.id', 'git.commit.time', 'git.commit.message.short']
+    dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
+    customProperty 'buildVersion', version
+}
+
+// Task to bump version
+tasks.register('bumpMajor') {
+    doLast {
+        versionProps['version.major'] = (versionMajor + 1).toString()
+        versionProps['version.minor'] = '0'
+        versionProps['version.patch'] = '0'
+        file('version.properties').withWriter { versionProps.store(it, null) }
+        println "Version bumped to ${versionMajor + 1}.0.0"
+    }
+}
+
+tasks.register('bumpMinor') {
+    doLast {
+        versionProps['version.minor'] = (versionMinor + 1).toString()
+        versionProps['version.patch'] = '0'
+        file('version.properties').withWriter { versionProps.store(it, null) }
+        println "Version bumped to ${versionMajor}.${versionMinor + 1}.0"
+    }
+}
+
+tasks.register('bumpPatch') {
+    doLast {
+        versionProps['version.patch'] = (versionPatch + 1).toString()
+        file('version.properties').withWriter { versionProps.store(it, null) }
+        println "Version bumped to ${versionMajor}.${versionMinor}.${versionPatch + 1}"
+    }
+}
+
+tasks.register('release') {
+    doLast {
+        versionProps['version.prerelease'] = ''
+        file('version.properties').withWriter { versionProps.store(it, null) }
+        println "Released version ${versionMajor}.${versionMinor}.${versionPatch}"
+    }
+}
 
 repositories {
     mavenLocal()
     mavenCentral()
-    maven { url 'https://repo.jenkins-ci.org/releases/' }
-    maven { url 'https://repo.jenkins-ci.org/public/' }
+    maven {
+        url = 'https://repo.jenkins-ci.org/releases/'
+    }
+    maven {
+        url = 'https://repo.jenkins-ci.org/public/'
+    }
 }
 
 ext {
-    isJava17Plus = JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_17)
-    if (!isJava17Plus) throw new GradleException("Java 17+ is required")
-
     versions = [
-        jenkinsCore: '2.361.4',
-        groovy: '3.0.24',
-        credentialsPlugin: '2.6.1',
-        matrixAuthPlugin: '3.1.3',
-        workflowApiPlugin: '2.46',
+        jenkinsCore          : '2.361.4',
+        groovy               : '3.0.24',
+        credentialsPlugin    : '2.6.1',
+        matrixAuthPlugin     : '3.1.3',
+        workflowApiPlugin    : '2.46',
         workflowStepApiPlugin: '2.27',
-        folderPlugin: '6.17',
-        gitPlugin: '4.11.3',
-        servletApi: '4.0.1',
-        spockVersion: '2.3-groovy-3.0'
+        folderPlugin         : '6.17',
+        gitPlugin            : '4.11.3',
+        servletApi           : '4.0.1',
+        spockVersion         : '2.3-groovy-3.0',
+        log4jVersion         : '2.25.0',
+        junitVersion         : '4.13.2',
+        archUnitVersion      : '1.3.0',
+        jmhVersion           : '1.37'
     ]
-    println "Jenkins Core: ${versions.jenkinsCore}, Java 17+: ${isJava17Plus}"
+    
+    // Define environments for deployment
+    environments = [
+        dev: [
+            url: 'https://dev-jenkins-server.example.com',
+            credentials: 'dev-jenkins-credentials',
+            requiresApproval: false
+        ],
+        staging: [
+            url: 'https://staging-jenkins-server.example.com',
+            credentials: 'staging-jenkins-credentials',
+            requiresApproval: true
+        ],
+        production: [
+            url: 'https://jenkins-server.example.com',
+            credentials: 'production-jenkins-credentials',
+            requiresApproval: true
+        ]
+    ]
 }
 
-def excludePatterns = [
-    '**/cloud/**',
-    '**/hudson/plugins/ec2/**',
-    '**/scripts/**',
-    '**/jobs/**',
-    '**/config/**',
-    '**/ssh/**',
-    '**/remote/**',
-    '**/docker/**',
-    '**/aws/**',
-    '**/azure/**',
-    '**/jenkins/executor/**',
-    '**/nodes/SlaveInfoManager.groovy'
-]
+// Use test-sets plugin for advanced test configuration
+testSets {
+    integrationTest
+    performanceTest
+    architectureTest
+    endToEndTest
+}
 
 sourceSets {
     main {
         groovy {
             srcDir 'src/main/groovy'
-            exclude excludePatterns
+            exclude '**/cloud/**', '**/hudson/plugins/ec2/**', '**/scripts/**', '**/jobs/**', '**/config/**', '**/ssh/**', '**/remote/**', '**/docker/**', '**/aws/**', '**/azure/**', '**/jenkins/executor/**', '**/nodes/SlaveInfoManager.groovy'
         }
     }
     test {
-        groovy {
-            // Don't exclude test files
-        }
+        groovy {}
     }
+    // Override integrationTest configuration from test-sets plugin
     integrationTest {
         groovy {
             srcDir 'src/integration-test/groovy'
-            // Exclude tests for classes we've excluded from main
-            exclude '**/config/JenkinsConfigBackupIntegrationTest.groovy'
-            exclude '**/nodes/SlaveInfoManagerIntegrationTest.groovy'
-            exclude '**/scripts/AnalyzePipelinePerformanceIntegrationTest.groovy'
-            exclude '**/scripts/ListCloudNodesIntegrationTest.groovy'
-            exclude '**/jobs/**'
+            exclude '**/config/JenkinsConfigBackupIntegrationTest.groovy', '**/nodes/SlaveInfoManagerIntegrationTest.groovy', '**/scripts/AnalyzePipelinePerformanceIntegrationTest.groovy', '**/scripts/ListCloudNodesIntegrationTest.groovy', '**/jobs/**'
         }
         resources.srcDir 'src/integration-test/resources'
-        compileClasspath += sourceSets.main.output + configurations.testRuntimeClasspath
-        runtimeClasspath += output + compileClasspath
+    }
+    performanceTest {
+        groovy {
+            srcDir 'src/performance-test/groovy'
+        }
+        resources.srcDir 'src/performance-test/resources'
+    }
+    architectureTest {
+        groovy {
+            srcDir 'src/architecture-test/groovy'
+        }
+        resources.srcDir 'src/architecture-test/resources'
+    }
+    endToEndTest {
+        groovy {
+            srcDir 'src/end-to-end-test/groovy'
+        }
+        resources.srcDir 'src/end-to-end-test/resources'
     }
 }
 
 configurations {
-    integrationTestImplementation.extendsFrom testImplementation
-    integrationTestRuntimeOnly.extendsFrom testRuntimeOnly
+    // Configure dependency resolution strategy
+    all {
+        resolutionStrategy {
+            // Fail eagerly on version conflicts
+            failOnVersionConflict()
+            
+            // Cache dynamic versions for 10 minutes
+            cacheDynamicVersionsFor 10*60, 'seconds'
+            
+            // Cache changing modules for 4 hours
+            cacheChangingModulesFor 4*60*60, 'seconds'
+        }
+    }
+    
+    // Apply test-specific configurations
+    testImplementation {
+        canBeResolved = true
+    }
 }
 
 dependencies {
+    implementation platform('org.apache.logging.log4j:log4j-bom:2.25.0')
+    
     implementation "org.codehaus.groovy:groovy-all:${versions.groovy}"
     implementation 'commons-cli:commons-cli:1.5.0'
-    implementation 'org.apache.logging.log4j:log4j-api:2.25.0'
-    implementation 'org.apache.logging.log4j:log4j-core:2.25.0'
+    implementation 'org.apache.logging.log4j:log4j-api'
+    implementation 'org.apache.logging.log4j:log4j-core'
     implementation "commons-io:commons-io:2.19.0"
 
     compileOnly "org.jenkins-ci.main:jenkins-core:${versions.jenkinsCore}"
@@ -100,12 +362,17 @@ dependencies {
     compileOnly "org.jenkins-ci.plugins:credentials:${versions.credentialsPlugin}"
     compileOnly "org.jenkins-ci.plugins:plain-credentials:1.7"
 
-    testImplementation 'junit:junit:4.13.2'
+    testImplementation "junit:junit:${versions.junitVersion}"
     testImplementation "org.spockframework:spock-core:${versions.spockVersion}"
-
+    testImplementation 'org.mockito:mockito-core:5.11.0'
+    testImplementation 'com.github.tomakehurst:wiremock:3.0.1'
+    
+    // Integration test dependencies
     integrationTestImplementation "org.jenkins-ci.main:jenkins-core:${versions.jenkinsCore}"
-    integrationTestImplementation "org.jenkins-ci.main:jenkins-test-harness:2.72"
-    integrationTestImplementation "org.jenkins-ci.main:jenkins-war:${versions.jenkinsCore}@war"
+    integrationTestImplementation("org.jenkins-ci.main:jenkins-test-harness:2.72") {
+        exclude group: 'org.jenkins-ci.main', module: 'jenkins-war'
+    }
+    integrationTestRuntimeOnly "org.jenkins-ci.main:jenkins-war:${versions.jenkinsCore}@war"
     integrationTestImplementation "javax.servlet:javax.servlet-api:${versions.servletApi}"
     integrationTestImplementation "org.jenkins-ci.plugins:credentials:${versions.credentialsPlugin}"
     integrationTestImplementation "org.jenkins-ci.plugins:matrix-auth:${versions.matrixAuthPlugin}"
@@ -115,149 +382,631 @@ dependencies {
     integrationTestImplementation "org.jenkins-ci.plugins:git:${versions.gitPlugin}"
     integrationTestRuntimeOnly 'org.slf4j:slf4j-simple:1.7.36'
     integrationTestRuntimeOnly 'org.jenkins-ci:SECURITY-144-compat:1.0'
+    
+    // Architecture test dependencies
+    architectureTestImplementation "com.tngtech.archunit:archunit:${versions.archUnitVersion}"
+    architectureTestImplementation "com.tngtech.archunit:archunit-junit4:${versions.archUnitVersion}"
+    
+    // Performance test dependencies
+    performanceTestImplementation "org.openjdk.jmh:jmh-core:${versions.jmhVersion}"
+    performanceTestAnnotationProcessor "org.openjdk.jmh:jmh-generator-annprocess:${versions.jmhVersion}"
+    
+    // End-to-end test dependencies
+    endToEndTestImplementation 'org.seleniumhq.selenium:selenium-java:4.20.0'
+    endToEndTestImplementation 'io.github.bonigarcia:webdrivermanager:5.8.0'
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
-}
-
-tasks.withType(GroovyCompile).configureEach {
-    groovyOptions.optimizationOptions.indy = true
-    sourceCompatibility = '17'
-    targetCompatibility = '17'
-}
-
-test {
-    useJUnit()
-    testLogging { events "passed", "skipped", "failed" }
-    finalizedBy jacocoTestReport
-    onlyIf { !project.hasProperty('skipTests') }
-}
-
-tasks.register('integrationTest', Test) {
-    description = 'Runs integration tests.'
-    group = 'verification'
-    testClassesDirs = sourceSets.integrationTest.output.classesDirs
-    classpath = sourceSets.integrationTest.runtimeClasspath
-    useJUnitPlatform()
-    mustRunAfter test
-    testLogging {
-        events "passed", "skipped", "failed"
-        showStandardStreams = true
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
     }
-    onlyIf { !project.hasProperty('skipTests') }
 }
 
-check.dependsOn integrationTest
-
-tasks.withType(CodeNarc).configureEach {
-    enabled = true
-    configFile = file('config/codenarc/codenarc.groovy')
+// Configure test retry for all test tasks
+tasks.withType(Test).configureEach {
+    // Enable retry for flaky tests
+    retry {
+        maxRetries = 3
+        maxFailures = 10
+        failOnPassedAfterRetry = false
+    }
+    
+    // Enable parallel test execution
+    maxParallelForks = Runtime.runtime.availableProcessors().intdiv(2) ?: 1
+    
+    // Fork a new JVM for each test class
+    forkEvery = 1
+    
+    // Set JVM memory
+    minHeapSize = "256m"
+    maxHeapSize = "1g"
+    
+    // Set standard behavior
+    useJUnit() // Using JUnit 4
+    
+    // Fail on test failures
+    ignoreFailures = false
+    
+    // Set test execution timeouts
+    timeout = Duration.ofMinutes(5)
+    
+    // Skip tests if requested
+    onlyIf { !project.hasProperty('skipTests') }
+    
+    // Improved test outputs
+    testLogging {
+        events "passed", "skipped", "failed", "standardOut", "standardError"
+        exceptionFormat = 'full'
+        showExceptions = true
+        showCauses = true
+        showStackTraces = true
+        
+        // Display standard streams
+        showStandardStreams = true
+        
+        // Log info about tests that are running
+        info {
+            events = ["started", "passed", "skipped", "failed", "standard_out", "standard_error"]
+            displayGranularity = 2
+        }
+    }
+    
+    // Generate reports
     reports {
         html.required = true
-        text.required = true
+        junitXml.required = true
     }
+}
+
+// Configure the integrationTest task
+integrationTest {
+    description = 'Runs integration tests.'
+    group = 'verification'
+    mustRunAfter test
+    
+    // Set system property for Jenkins test harness to find the WAR
+    doFirst {
+        def warFile = configurations.integrationTestRuntimeClasspath.find { it.name.contains('jenkins-war') && it.name.endsWith('.war') }
+        if (warFile) {
+            systemProperty 'jenkins.war', warFile.absolutePath
+        }
+    }
+}
+
+// Configure the performanceTest task
+performanceTest {
+    description = 'Runs performance tests.'
+    group = 'verification'
+    mustRunAfter test, integrationTest
+    
+    // Performance tests may need more time
+    timeout = Duration.ofMinutes(15)
+}
+
+// Configure the architectureTest task
+architectureTest {
+    description = 'Runs architecture tests.'
+    group = 'verification'
+    mustRunAfter test
+    
+    // Architecture tests usually run quickly
+    timeout = Duration.ofMinutes(2)
+}
+
+// Configure the endToEndTest task
+endToEndTest {
+    description = 'Runs end-to-end tests.'
+    group = 'verification'
+    mustRunAfter test, integrationTest
+    
+    // E2E tests typically need more time
+    timeout = Duration.ofMinutes(20)
+}
+
+tasks.register('testWithJava21', Test) {
+    description = 'Run unit tests with Java 21 toolchain'
+    group = 'verification'
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnit() // Using JUnit 4 for consistency
+    onlyIf { !project.hasProperty('skipTests') }
+}
+
+tasks.register('integrationTestWithJava21', Test) {
+    description = 'Runs integration tests with Java 21.'
+    group = 'verification'
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+    testClassesDirs = sourceSets.integrationTest.output.classesDirs
+    classpath = sourceSets.integrationTest.runtimeClasspath
+    useJUnit() // Using JUnit 4 for consistency
+    mustRunAfter testWithJava21
+    onlyIf { !project.hasProperty('skipTests') }
+}
+
+tasks.register('fullTestMatrix') {
+    group = 'verification'
+    description = 'Runs all unit/integration tests across Java 17 and 21'
+    dependsOn 'test', 'integrationTest', 'testWithJava21', 'integrationTestWithJava21'
+}
+
+afterEvaluate {
+    check.dependsOn 'integrationTest', 'integrationTestWithJava21'
+}
+
+codenarc {
+    toolVersion = "3.3.0"
+    configFile = file("config/codenarc/codenarc.groovy")
+    ignoreFailures = false
+}
+
+codenarcTest {
+    configFile = file("config/codenarc/codenarcTest.groovy")
     ignoreFailures = true
 }
 
-jacoco {
-    toolVersion = "0.8.8"
+codenarcIntegrationTest {
+    configFile = file("config/codenarc/codenarcTest.groovy")
+    ignoreFailures = true
 }
 
-jacocoTestReport {
-    reports {
-        xml.required = true
-        html.required = true
+// Create a custom task that runs all CodeNarc tasks
+tasks.register('codenarc') {
+    description = 'Runs all CodeNarc tasks'
+    group = 'verification'
+    dependsOn codenarcMain, codenarcTest, codenarcIntegrationTest
+}
+
+// Configure JaCoCo for all test tasks
+tasks.withType(Test) {
+    jacoco {
+        destinationFile = file("${buildDir}/jacoco/${name}.exec")
     }
 }
 
+// Generate merged JaCoCo report from all test executions
+tasks.register('jacocoMergedReport', JacocoReport) {
+    description = 'Generates merged JaCoCo report from all test executions'
+    group = 'Verification'
+    
+    executionData fileTree(project.buildDir).include("/jacoco/*.exec")
+    
+    sourceDirectories.from = files(sourceSets.main.allSource.srcDirs)
+    classDirectories.from = files(sourceSets.main.output)
+    
+    reports {
+        xml.required = true
+        csv.required = true
+        html.required = true
+        html.outputLocation = file("${buildDir}/reports/jacoco/html")
+    }
+}
+
+// Configure JaCoCo verification with more detailed rules
 jacocoTestCoverageVerification {
     violationRules {
+        // Overall code coverage minimum
         rule {
-            limit { minimum = 0.05 }
-        }
-        rule {
-            element = 'CLASS'
-            excludes = [
-                '*.Test*', '*Test', '*Tests',
-                'com.github.thomasvincent.jenkinsscripts.security.*',
-                'com.github.thomasvincent.jenkinsscripts.helm.*',
-                'com.github.thomasvincent.jenkinsscripts.nodes.*',
-                'com.github.thomasvincent.jenkinsscripts.jobs.*',
-                'com.github.thomasvincent.jenkinsscripts.groovydoc.*',
-                'hudson.*'
-            ]
+            element = 'BUNDLE'
             limit {
                 counter = 'LINE'
+                value = 'COVEREDRATIO'
                 minimum = 0.75
+            }
+        }
+        
+        // Core utility classes should have high coverage
+        rule {
+            element = 'CLASS'
+            includes = ['com.github.thomasvincent.jenkinsscripts.util.*']
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = 0.85
+            }
+        }
+        
+        // Ensure all branches have some coverage
+        rule {
+            element = 'CLASS'
+            limit {
+                counter = 'BRANCH'
+                value = 'COVEREDRATIO'
+                minimum = 0.60
+            }
+        }
+        
+        // Ensure all methods have some coverage
+        rule {
+            element = 'METHOD'
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = 0.80
             }
         }
     }
 }
 
-check.dependsOn jacocoTestCoverageVerification
-jacocoTestCoverageVerification.dependsOn jacocoTestReport
+tasks.register('checkCoverage') {
+    description = 'Runs tests and verifies coverage'
+    group = 'Verification'
+    dependsOn test, jacocoTestReport, jacocoTestCoverageVerification
+}
 
-task scriptJar(type: Jar) {
-    archiveBaseName = 'jenkins-script-library'
-    archiveClassifier = 'scripts'
-    from sourceSets.main.allSource
+// Enable coverage verification as part of the check task
+check.dependsOn jacocoTestCoverageVerification
+
+// Task to print versions
+tasks.register('printVersions') {
+    description = 'Print project dependency versions'
+    group = 'help'
+    doLast {
+        println "Jenkins Core: ${versions.jenkinsCore}"
+        println "Groovy: ${versions.groovy}"
+        println "Spock: ${versions.spockVersion}"
+    }
+}
+
+// Add Javadoc and Sources JARs
+java {
+    withJavadocJar()
+    withSourcesJar()
+}
+
+// Configure reproducible builds
+tasks.withType(AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
+// Enable incremental compilation
+tasks.withType(GroovyCompile).configureEach {
+    groovyOptions.optimizationOptions.indy = true
+    options.incremental = true
+}
+
+// Improve test reporting
+tasks.withType(Test).configureEach {
+    reports {
+        html.required = true
+        junitXml.required = true
+    }
+    
+    testLogging {
+        events "passed", "skipped", "failed", "standardOut", "standardError"
+        exceptionFormat = 'full'
+        showExceptions = true
+        showCauses = true
+        showStackTraces = true
+    }
+}
+
+// Dependency vulnerability scanning configuration with stricter rules
+dependencyCheck {
+    analyzers {
+        assemblyEnabled = false
+        nugetconfEnabled = false
+        nodeEnabled = false
+        centralEnabled = true
+        retirejs.enabled = true
+        ossIndex.enabled = true
+        
+        // Enable experimental analyzers for more thorough checks
+        experimentalEnabled = true
+        
+        // More comprehensive jar scanning
+        jarEnabled = true
+        centralAnalyzerEnabled = true
+    }
+    
+    // Multiple report formats for different use cases
+    formats = ['HTML', 'XML', 'CSV', 'JSON']
+    
+    // Lower threshold for failing builds (7 is HIGH, 4 is MEDIUM)
+    failBuildOnCVSS = 7
+    
+    // Optional suppression file for known false positives
+    suppressionFile = file("config/owasp/suppressions.xml")
+    
+    // Cache NVD data locally to speed up future scans
+    nvd {
+        dataDirectory = "${buildDir}/nvd-data"
+    }
+    
+    // Set scan depth for transitive dependencies
+    scanConfigurations = [
+        'runtimeClasspath',
+        'testRuntimeClasspath'
+    ]
+}
+
+// Add task to generate dependency reports
+tasks.register('generateDependencyReports') {
+    description = 'Generate detailed dependency reports'
+    group = 'Help'
+    
+    doLast {
+        // Print dependency insight
+        project.configurations.compileClasspath.incoming.resolutionResult.allDependencies.each {
+            println "Dependency: ${it}"
+        }
+        
+        // Print dependency tree
+        println "Dependency Tree:"
+        project.configurations.compileClasspath.resolvedConfiguration.firstLevelModuleDependencies.each {
+            printDependency(it, 1)
+        }
+    }
+}
+
+def printDependency(dep, level) {
+    println "${' ' * level * 2}${dep.module.id}"
+    dep.children.each { child ->
+        printDependency(child, level + 1)
+    }
+}
+
+// Configure dependency analysis
+dependencyAnalysis {
+    issues {
+        all {
+            // Ensure dependencies are properly declared
+            onAny {
+                severity('fail')
+            }
+            
+            // Exempt certain issues
+            onUnusedDependencies {
+                exclude('org.codehaus.groovy:groovy-all')
+            }
+        }
+    }
+}
+
+// Enhanced version management system
+tasks.named('dependencyUpdates').configure {
+    checkConstraints = true
+    outputFormatter = 'json,xml,html'
+    outputDir = "${buildDir}/reports/dependencies"
+    reportfileName = 'dependency-updates'
+    
+    rejectVersionIf {
+        isNonStable(it.candidate.version) && !isNonStable(it.currentVersion)
+    }
+}
+
+def isNonStable = { String version ->
+    def stableKeyword = ['RELEASE', 'FINAL', 'GA'].any { it -> version.toUpperCase().contains(it) }
+    def regex = /^[0-9,.v-]+(-r)?$/
+    return !stableKeyword && !(version ==~ regex)
+}
+
+// Configure Release Plugin for Automated Versioning
+release {
+    tagTemplate = 'v${version}'
+    git {
+        requireBranch.set('main')
+        pushToRemote.set('origin')
+    }
+}
+
+// Auto-generate changelog based on Git commit history
+tasks.register('generateChangelog') {
+    description = 'Generate a changelog from Git commit history'
+    group = 'Documentation'
+    
+    doLast {
+        def changelogFile = file('CHANGELOG.md')
+        def latestTag = 'git describe --tags --abbrev=0'.execute().text.trim()
+        def previousTag = 'git describe --tags --abbrev=0 ${latestTag}^'.execute().text.trim()
+        
+        def commits = []
+        if (previousTag) {
+            commits = "git log ${previousTag}..${latestTag} --pretty=format:%s".execute().text.split('\n')
+        } else {
+            commits = "git log ${latestTag} --pretty=format:%s".execute().text.split('\n')
+        }
+        
+        def version = latestTag.startsWith('v') ? latestTag.substring(1) : latestTag
+        def date = new Date().format('yyyy-MM-dd')
+        
+        def features = []
+        def fixes = []
+        def other = []
+        
+        commits.each { commit ->
+            if (commit.toLowerCase().startsWith('feat') || commit.toLowerCase().contains('feature')) {
+                features.add("- ${commit}")
+            } else if (commit.toLowerCase().startsWith('fix') || commit.toLowerCase().contains('bug')) {
+                fixes.add("- ${commit}")
+            } else {
+                other.add("- ${commit}")
+            }
+        }
+        
+        def changelog = """# ${version} (${date})
+
+## Features
+${features.join('\n')}
+
+## Bug Fixes
+${fixes.join('\n')}
+
+## Other Changes
+${other.join('\n')}
+
+"""
+        
+        if (changelogFile.exists()) {
+            def existingChangelog = changelogFile.text
+            changelogFile.text = changelog + existingChangelog
+        } else {
+            changelogFile.text = changelog
+        }
+        
+        println "Changelog generated for version ${version}"
+    }
+}
+
+// Build health monitoring task
+tasks.register('buildHealth') {
+    dependsOn 'dependencyUpdates', 'dependencyCheckAnalyze'
+    description = 'Performs dependency updates and security checks'
+    group = 'verification'
+}
+
+// Enhanced publishing configuration for multiple environments
 publishing {
     publications {
         maven(MavenPublication) {
             from components.java
-            artifact scriptJar
+            
+            // Add additional artifacts
+            artifact sourcesJar
+            artifact javadocJar
+            
+            // Add all runtime dependencies to the POM
+            pom.withXml {
+                def dependenciesNode = asNode().appendNode('dependencies')
+                configurations.implementation.allDependencies.each {
+                    if (it.group != null && it.name != null) {
+                        def dependencyNode = dependenciesNode.appendNode('dependency')
+                        dependencyNode.appendNode('groupId', it.group)
+                        dependencyNode.appendNode('artifactId', it.name)
+                        dependencyNode.appendNode('version', it.version)
+                        dependencyNode.appendNode('scope', 'runtime')
+                    }
+                }
+            }
+            
+            pom {
+                name = 'Jenkins Script Library'
+                description = project.description
+                url = 'https://github.com/thomasvincent/jenkins-script-library'
+                
+                licenses {
+                    license {
+                        name = 'Apache License 2.0'
+                        url = 'https://www.apache.org/licenses/LICENSE-2.0'
+                    }
+                }
+                
+                developers {
+                    developer {
+                        id = 'thomasvincent'
+                        name = 'Thomas Vincent'
+                    }
+                }
+                
+                scm {
+                    url = 'https://github.com/thomasvincent/jenkins-script-library'
+                    connection = 'scm:git:git://github.com/thomasvincent/jenkins-script-library.git'
+                    developerConnection = 'scm:git:ssh://github.com/thomasvincent/jenkins-script-library.git'
+                }
+            }
         }
     }
-}
-
-configurations.all {
-    resolutionStrategy {
-        cacheDynamicVersionsFor 10, 'minutes'
-        cacheChangingModulesFor 4, 'hours'
-        force "org.codehaus.groovy:groovy-all:${versions.groovy}"
-        force "javax.servlet:javax.servlet-api:${versions.servletApi}"
-        force "org.jenkins-ci.main:jenkins-core:${versions.jenkinsCore}"
-        force "org.jenkins-ci.plugins:credentials:${versions.credentialsPlugin}"
-        force "org.jenkins-ci.plugins:matrix-auth:${versions.matrixAuthPlugin}"
-        force "org.spockframework:spock-core:${versions.spockVersion}"
-        force 'com.github.spotbugs:spotbugs-annotations:4.9.3'
-
-        eachDependency { details ->
-            if (details.requested.group == 'org.springframework.security') {
-                force "org.springframework.security:spring-security-web:6.5.1"
-                force "org.springframework.security:spring-security-core:6.5.1"
-                force "org.springframework.security:spring-security-crypto:6.5.1"
+    
+    repositories {
+        // GitHub Packages repository
+        maven {
+            name = 'GitHubPackages'
+            url = uri('https://maven.pkg.github.com/thomasvincent/jenkins-script-library')
+            credentials {
+                username = project.findProperty('gpr.user') ?: System.getenv('GITHUB_ACTOR')
+                password = project.findProperty('gpr.key') ?: System.getenv('GITHUB_TOKEN')
+            }
+        }
+        
+        // Maven Central via Sonatype OSSRH
+        maven {
+            name = 'OSSRH'
+            def releasesRepoUrl = 'https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/'
+            def snapshotsRepoUrl = 'https://s01.oss.sonatype.org/content/repositories/snapshots/'
+            url = version.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
+            
+            credentials {
+                username = project.findProperty('ossrh.user') ?: System.getenv('OSSRH_USERNAME')
+                password = project.findProperty('ossrh.password') ?: System.getenv('OSSRH_PASSWORD')
+            }
+        }
+        
+        // Enterprise internal repository for staging
+        maven {
+            name = 'InternalStaging'
+            url = project.findProperty('internal.repo.staging') ?: 'https://repo.internal.example.com/staging'
+            
+            credentials {
+                username = project.findProperty('internal.repo.user') ?: System.getenv('REPO_USER')
+                password = project.findProperty('internal.repo.password') ?: System.getenv('REPO_PASSWORD')
+            }
+        }
+        
+        // Enterprise internal repository for production
+        maven {
+            name = 'InternalProduction'
+            url = project.findProperty('internal.repo.production') ?: 'https://repo.internal.example.com/releases'
+            
+            credentials {
+                username = project.findProperty('internal.repo.user') ?: System.getenv('REPO_USER')
+                password = project.findProperty('internal.repo.password') ?: System.getenv('REPO_PASSWORD')
             }
         }
     }
 }
 
-task downloadDependencies {
-    description = 'Preloads dependencies to the local Maven cache'
-    group = 'build setup'
-    doLast {
-        configurations.each { it.files }
-        println "Downloaded all dependencies to Maven cache"
-    }
-}
-
-tasks.withType(Test).configureEach {
-    maxParallelForks = Math.max(1, (Runtime.runtime.availableProcessors() / 2).intValue())
-}
-
-try {
-    buildCache {
-        local {
-            enabled = true
-            directory = "${rootProject.buildDir}/cache"
+// Configure Nexus Publish Plugin
+nexusPublishing {
+    repositories {
+        sonatype {
+            nexusUrl.set(uri('https://s01.oss.sonatype.org/service/local/'))
+            snapshotRepositoryUrl.set(uri('https://s01.oss.sonatype.org/content/repositories/snapshots/'))
+            
+            username.set(project.findProperty('ossrh.user') ?: System.getenv('OSSRH_USERNAME'))
+            password.set(project.findProperty('ossrh.password') ?: System.getenv('OSSRH_PASSWORD'))
         }
     }
-} catch (ignored) {
-    println "Build cache not supported in this Gradle version"
 }
 
+// Tasks for deploying to different environments
+environments.each { envName, envConfig ->
+    tasks.register("deployTo${envName.capitalize()}") {
+        description = "Deploy to ${envName} environment"
+        group = 'Publishing'
+        
+        // Prerequisites
+        dependsOn build
+        
+        // Require approval for certain environments
+        if (envConfig.requiresApproval) {
+            doFirst {
+                def confirmation = System.console()?.readLine("Are you sure you want to deploy to ${envName}? (y/n): ")
+                if (confirmation != 'y') {
+                    throw new StopExecutionException("Deployment to ${envName} was cancelled.")
+                }
+            }
+        }
+        
+        doLast {
+            println "Deploying version ${version} to ${envName} at ${envConfig.url}"
+            // Add environment-specific deployment logic here
+        }
+    }
+}
+
+// Master task to deploy to all environments
+tasks.register('deployToAll') {
+    description = 'Deploy to all environments in sequence'
+    group = 'Publishing'
+    
+    // Add environment deployments in the correct order
+    dependsOn tasks.findByName('deployToDev')
+    dependsOn tasks.findByName('deployToStaging')
+    dependsOn tasks.findByName('deployToProduction')
+}
