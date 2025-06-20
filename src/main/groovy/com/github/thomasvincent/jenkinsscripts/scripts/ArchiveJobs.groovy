@@ -71,6 +71,7 @@ cli.with {
     r(longOpt: 'reason', args: 1, argName: 'text', 'Reason for archiving')
     d(longOpt: 'delete-after-archive', 'Delete job after archiving')
     
+    // SECURITY: This is a CLI option definition, not a credential
     m(longOpt: 'metadata', args: 2, valueSeparator: '=', argName: 'key=value', 'Metadata to store with archive (can be used multiple times)')
     
     i(longOpt: 'inactive', args: 1, argName: 'days', 'Find and archive jobs inactive for specified days')

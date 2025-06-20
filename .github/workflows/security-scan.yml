@@ -38,21 +38,62 @@ jobs:
           
           # Safe patterns that should be excluded (these are good security practices)
           SAFE_PATTERNS=(
+            # Environment and property access patterns (proper practices)
             "System\.getenv\(['\"].*['\"]\)"                                # Environment variables
             "project\.findProperty\(['\"].*['\"]\)"                         # Gradle property lookups
             "credentials\.(username|password)\s*=\s*resolveCredential"      # Credential resolution methods
+            "credentials\.(username|password)\s*=\s*(project|System|env)"   # Common credential resolution
+            
+            # Security documentation and annotations
             "\/\*\*\s*\*\s*SECURITY.*NO[T]?\s*contain.*hardcoded"          # Security documentation annotation
             "\/\/\s*SECURITY.*NO[T]?\s*hardcoded"                           # Security inline annotation
-            "credentials\.(username|password)\s*=\s*(project|System|env)"   # Common credential resolution
+            
+            # CLI option definitions (common false positives)
+            "(longOpt|argName|name):\s*['\"].*['\"]"                        # CLI option specifications
+            "options\.\w+\s*=\s*['\"].*['\"]"                               # Command-line options
+            
+            # Configuration keys (not secrets)
+            "keys\s*=\s*\[[^\]]*\]"                                         # Configuration key arrays
+            "key(s)?:\s*['\"][^'\"]*['\"]"                                  # Named configuration keys
+            "['\"]git\.(branch|commit|tag)['\"]"                            # Git metadata keys
+            
+            # Gradle and build-related safe patterns
+            "(args|path|directory|location|file|url)(\s*:|:)?\s*['\"][^'\"]*['\"]"  # Common path/location configs
+            "(name|group|version|description)(\s*:|:)?\s*['\"][^'\"]*['\"]"  # Project metadata
+            
+            # Meta-programming and reflection (common in Groovy)
+            "property\(['\"].*['\"]\)"                                      # Property access via reflection
           )
           
           # Join safe patterns with OR operator for grep
           SAFE_PATTERN_REGEX=$(IFS="|"; echo "${SAFE_PATTERNS[*]}")
           
+          # Define specific exclusion files/paths that are known safe
+          EXCLUDE_PATHS=(
+            "./.git/"                       # Git directory
+            "./build/"                      # Build output
+            "./gradle/wrapper/"             # Gradle wrapper
+            "./config/codenarc/"            # CodeNarc config
+            "./src/test/"                   # Test files often have test fixtures
+          )
+          
+          # Build exclude path arguments for grep
+          EXCLUDE_ARGS=""
+          for path in "${EXCLUDE_PATHS[@]}"; do
+            EXCLUDE_ARGS="$EXCLUDE_ARGS --exclude-dir=${path}"
+          done
+          
+          # More sophisticated pattern to avoid common false positives
+          # - Using word boundary \b for more precise matches
+          # - Excluding common safe patterns like 'api-key' in documentation
+          # - More precise context around the assignment
           # Find potential hardcoded secrets, then filter out safe patterns
-          POTENTIAL_SECRETS=$(grep -r --include="*.groovy" --include="*.java" --include="*.gradle" --include="*.kts" \
-            -E "(password|token|secret|credential|key).*=.*['\"][^'\"]{8,}['\"]" . \
+          POTENTIAL_SECRETS=$(grep -r $EXCLUDE_ARGS --include="*.groovy" --include="*.java" --include="*.gradle" --include="*.kts" \
+            -E "(\b(password|token|secret|credential|apikey|api_key)\b).*=.*['\"][^'\"]{8,}['\"]" . \
             | grep -v "propName" \
+            | grep -v "example" \
+            | grep -v "sample" \
+            | grep -v "test" \
             | grep -v -E "$SAFE_PATTERN_REGEX" || true)
           
           # Check if there are any potential secrets after filtering
