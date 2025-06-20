@@ -101,8 +101,8 @@ dependencyResolutionManagement {
     }
 }
 
-// Build profiles will be added when the build-logic directory is created
-// Removing includeBuild reference to non-existent directory
+// Include build-logic for shared build configuration
+includeBuild('build-logic')
 
 // Configure Gradle Enterprise
 gradleEnterprise {

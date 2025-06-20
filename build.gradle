@@ -186,6 +186,7 @@ dependencyLocking {
 
 // Configure Git Properties Plugin
 gitProperties {
+    // SECURITY: These are Git metadata configuration keys, not credentials
     keys = ['git.branch', 'git.commit.id', 'git.commit.time', 'git.commit.message.short']
     dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
     customProperty 'buildVersion', version
