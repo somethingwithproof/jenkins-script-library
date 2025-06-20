@@ -16,9 +16,8 @@ buildCache {
     local {
         enabled = true
         directory = new File(rootDir, 'build/cache')
-        // Note: removeUnusedEntriesAfter is not available in this Gradle version
-        // Using existing property that will be removed in Gradle 9.0
-        removeUnusedEntriesAfterDays = 7
+        // Use Gradle's built-in cleanup mechanism
+        removeUnusedEntriesAfter = Duration.ofDays(7)
     }
     remote(HttpBuildCache) {
         enabled = System.getenv('CI') == 'true'
@@ -103,7 +102,8 @@ dependencyResolutionManagement {
 }
 
 // Include build-logic for shared build configuration
-includeBuild('build-logic')
+// Commented out until build-logic directory is properly set up
+// includeBuild('build-logic')
 
 // Configure Gradle Enterprise
 gradleEnterprise {
