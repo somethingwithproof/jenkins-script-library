@@ -16,8 +16,8 @@ buildCache {
     local {
         enabled = true
         directory = new File(rootDir, 'build/cache')
-        // Use Gradle's built-in cleanup mechanism
-        removeUnusedEntriesAfter = Duration.ofDays(7)
+        // Use the correct property for cache cleanup
+        removeUnusedEntriesAfterDays = 7
     }
     remote(HttpBuildCache) {
         enabled = System.getenv('CI') == 'true'
