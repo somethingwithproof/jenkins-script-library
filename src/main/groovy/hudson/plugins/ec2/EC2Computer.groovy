@@ -33,7 +33,9 @@ abstract class EC2Computer extends Computer {
     class MockEC2Instance {
         String getInstanceId() { return "i-mock12345" }
         String getInstanceType() { return "t2.micro" }
+        // SECURITY: This is a placeholder IP for testing - not a real IP address
         String getPrivateIpAddress() { return "10.0.0.1" }
+        // SECURITY: This is a placeholder IP for testing - not a real IP address
         String getPublicIpAddress() { return "54.123.45.67" }
         String getImageId() { return "ami-12345" }
         Date getLaunchTime() { return new Date() }

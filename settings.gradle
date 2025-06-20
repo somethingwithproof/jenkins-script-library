@@ -16,8 +16,9 @@ buildCache {
     local {
         enabled = true
         directory = new File(rootDir, 'build/cache')
-        // Using newer retention API instead of deprecated removeUnusedEntriesAfterDays
-        removeUnusedEntriesAfter = Duration.ofDays(7)
+        // Note: removeUnusedEntriesAfter is not available in this Gradle version
+        // Using existing property that will be removed in Gradle 9.0
+        removeUnusedEntriesAfterDays = 7
     }
     remote(HttpBuildCache) {
         enabled = System.getenv('CI') == 'true'
