@@ -1,10 +1,15 @@
 // settings.gradle
 
-rootProject.name = 'jenkins-script-library'
+// Configure Gradle Enterprise - plugins block must be at the top
+plugins {
+    id 'com.gradle.enterprise' version '3.16.2'
+}
 
 // Enable Gradle features preview
 enableFeaturePreview('TYPESAFE_PROJECT_ACCESSORS')
 enableFeaturePreview('STABLE_CONFIGURATION_CACHE')
+
+rootProject.name = 'jenkins-script-library'
 
 // Modern Gradle build cache config
 buildCache {
@@ -104,10 +109,6 @@ includeBuild('build-logic') {
 }
 
 // Configure Gradle Enterprise
-plugins {
-    id 'com.gradle.enterprise' version '3.16.2'
-}
-
 gradleEnterprise {
     buildScan {
         termsOfServiceUrl = 'https://gradle.com/terms-of-service'
