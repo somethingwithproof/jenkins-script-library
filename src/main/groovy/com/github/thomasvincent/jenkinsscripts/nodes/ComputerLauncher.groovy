@@ -27,7 +27,6 @@ package com.github.thomasvincent.jenkinsscripts.nodes
 import hudson.model.Computer
 import jenkins.model.Jenkins
 import java.util.concurrent.Future
-import java.util.logging.Level
 import java.util.logging.Logger
 
 import com.github.thomasvincent.jenkinsscripts.util.ValidationUtils

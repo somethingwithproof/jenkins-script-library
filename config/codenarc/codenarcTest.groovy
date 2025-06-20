@@ -1,0 +1,71 @@
+ruleset {
+    description 'CodeNarc RuleSet for Jenkins Script Library Tests'
+
+    // Basic Rules
+    EmptyClass
+    EmptyMethod
+    ReturnFromFinallyBlock
+    // StringInstantiation - rule moved to unnecessary.xml in newer CodeNarc versions
+    UnusedVariable
+    UnnecessaryBooleanExpression
+    
+    // Braces
+    IfStatementBraces
+    WhileStatementBraces
+    ForStatementBraces
+    
+    // Exceptions
+    CatchException
+    ThrowException
+    ExceptionExtendsError
+    CatchIllegalMonitorStateException
+    
+    // Concurrency
+    BusyWait
+    DoubleCheckedLocking
+    InconsistentPropertyLocking
+    
+    // Security
+    FileCreateTempFile
+    InsecureRandom
+    SystemExit
+    
+    // Unused
+    UnusedImport
+    UnusedMethodParameter
+    UnusedPrivateField
+    UnusedPrivateMethod
+    
+    // Size
+    CyclomaticComplexity {
+        maxMethodComplexity = 15
+    }
+    MethodCount {
+        maxMethods = 30
+    }
+    MethodSize {
+        maxLines = 100
+    }
+    NestedBlockDepth {
+        maxNestedBlockDepth = 5
+    }
+    
+    // Code Smells
+    DuplicateImport
+    DuplicateStringLiteral {
+        ignoreStrings = ['', '\'\'', '""', '\\n', '\\t', ' ']
+    }
+    
+    // Grails
+    GrailsPublicControllerMethod
+    GrailsServletContextReference
+    
+    // Formatting
+    // ClassJavadoc - Excluded for test files
+    LineLength {
+        length = 120
+    }
+    
+    // Miscellaneous
+    GrailsStatelessService
+}

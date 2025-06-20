@@ -25,25 +25,22 @@ jobs:
         distribution: 'temurin'
         cache: gradle
     
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v4
+      with:
+        gradle-version: 8.14.2
     
-    - name: Build with Gradle (compile only)
-      run: ./gradlew assemble -PskipTests
-      env:
-        JAVA_OPTS: "-Djenkins.version.support=java17" # Explicitly request Java 17+ compatible dependencies
+    - name: Build with Gradle
+      run: ./gradlew build --no-daemon --warning-mode all
       
-    - name: Run minimal tests
-      run: |
-        echo "Running minimal tests with Java 17 compatibility mode"
-        echo "NOTE: build.gradle now auto-detects Java version and uses compatible Jenkins dependencies"
-        ./gradlew test -PskipTests || true
-      continue-on-error: true
+    - name: Run tests
+      run: ./gradlew test --no-daemon
       
-    - name: Disable CodeNarc for now
-      run: |
-        echo "CodeNarc temporarily disabled in build.gradle"
-        grep -A3 "CodeNarc" build.gradle
+    - name: Run CodeNarc
+      run: ./gradlew codenarc --no-daemon
+      
+    - name: Check dependencies
+      run: ./gradlew dependencyUpdates --no-daemon
     
     - name: Publish Test Report
       uses: mikepenz/action-junit-report@v5

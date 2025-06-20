@@ -35,6 +35,11 @@ package com.github.thomasvincent.jenkinsscripts.util
  */
 class GroovyVersionCheck {
     
+    // String constants to avoid duplication
+    private static final String JAVA_VERSION_PROPERTY = "java.version"
+    private static final String JOHN_NAME = "John"
+    private static final String ADULT_CATEGORY = "adult"
+    
     // Simple class compatible with Jenkins' Groovy version
     static class Person {
         String name
@@ -79,10 +84,10 @@ class GroovyVersionCheck {
     static boolean testGroovy40Features() {
         try {
             // Test record pattern matching from Groovy 4.0
-            def person = new Person("John", 30)
+            def person = new Person(JOHN_NAME, 30)
             
             // Using standard Groovy 2.4 property access
-            assert person.name == "John"
+            assert person.name == JOHN_NAME
             assert person.age == 30
             
             // Using traditional switch statement (Groovy 2.4 compatible)
@@ -92,16 +97,16 @@ class GroovyVersionCheck {
                     result = "minor"
                     break
                 case 18..64:
-                    result = "adult"
+                    result = ADULT_CATEGORY
                     break
                 default:
                     result = "senior"
             }
             
-            assert result == "adult"
+            assert result == ADULT_CATEGORY
             
             return true
-        } catch (Exception e) {
+        } catch (ClassCastException | NullPointerException | AssertionError e) {
             println "Error testing Groovy 4.0 features: ${e.message}"
             return false
         }
@@ -121,7 +126,7 @@ class GroovyVersionCheck {
     static Map<String, Object> getEnvironmentDetails() {
         return [
             'groovyVersion': GroovySystem.version,
-            'javaVersion': System.getProperty("java.version"),
+            'javaVersion': System.getProperty(JAVA_VERSION_PROPERTY),
             'javaVendor': System.getProperty("java.vendor"),
             'osName': System.getProperty("os.name"),
             'timestamp': new Date().toString()

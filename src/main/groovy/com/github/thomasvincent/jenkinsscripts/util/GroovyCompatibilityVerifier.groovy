@@ -40,6 +40,14 @@ class GroovyCompatibilityVerifier {
     static final String MINIMUM_GROOVY_VERSION = "2.4.0"
     static final String MINIMUM_JAVA_VERSION = "11.0.0"
     
+    // String constants to avoid duplication
+    private static final String JAVA_VERSION_PROPERTY = "java.version"
+    private static final String NON_DIGIT_REGEX = "\\D"
+    private static final String TEST_NAME = "Test"
+    private static final String ADULT_CATEGORY = "adult"
+    private static final String EMPTY_STRING = ""
+    private static final String DOT = "."
+    
     /**
      * Main method to run the verifier.
      * 
@@ -52,7 +60,7 @@ class GroovyCompatibilityVerifier {
     static void main(String[] args) {
         println "Jenkins Script Library Compatibility Verifier"
         println "=============================================="
-        println ""
+        println EMPTY_STRING
         
         def details = getEnvironmentDetails()
         
@@ -61,7 +69,7 @@ class GroovyCompatibilityVerifier {
         println "  Java version:   ${details.javaVersion}"
         println "  Java vendor:    ${details.javaVendor}"
         println "  OS:             ${details.osName}"
-        println ""
+        println EMPTY_STRING
         
         // Check Groovy version compatibility
         if (isCompatibleGroovyVersion()) {
@@ -78,7 +86,7 @@ class GroovyCompatibilityVerifier {
         }
         
         // Test Groovy 4.0 features
-        println ""
+        println EMPTY_STRING
         println "Testing Groovy 4.0 features..."
         if (testGroovy40Features()) {
             println "✅ All Groovy 4.0 features are working correctly"
@@ -86,7 +94,7 @@ class GroovyCompatibilityVerifier {
             println "❌ Some Groovy 4.0 features are not working"
         }
         
-        println ""
+        println EMPTY_STRING
         println "Overall result:"
         if (isCompatibleGroovyVersion() && isCompatibleJavaVersion() && testGroovy40Features()) {
             println "✅ Your environment is fully compatible with Jenkins Script Library"
@@ -119,7 +127,7 @@ class GroovyCompatibilityVerifier {
      * ```
      */
     static boolean isCompatibleJavaVersion() {
-        def currentVersion = System.getProperty("java.version")
+        def currentVersion = System.getProperty(JAVA_VERSION_PROPERTY)
         return compareVersions(currentVersion, MINIMUM_JAVA_VERSION) >= 0
     }
     
@@ -134,12 +142,12 @@ class GroovyCompatibilityVerifier {
      * ```
      */
     static int compareVersions(String version1, String version2) {
-        def v1Parts = version1.tokenize('.')
-        def v2Parts = version2.tokenize('.')
+        def v1Parts = version1.tokenize(DOT)
+        def v2Parts = version2.tokenize(DOT)
         
         for (int i = 0; i < Math.min(v1Parts.size(), v2Parts.size()); i++) {
-            def v1Part = v1Parts[i].replaceAll("\\D", "").toInteger()
-            def v2Part = v2Parts[i].replaceAll("\\D", "").toInteger()
+            def v1Part = v1Parts[i].replaceAll(NON_DIGIT_REGEX, EMPTY_STRING).toInteger()
+            def v2Part = v2Parts[i].replaceAll(NON_DIGIT_REGEX, EMPTY_STRING).toInteger()
             
             if (v1Part != v2Part) {
                 return v1Part <=> v2Part
@@ -176,10 +184,10 @@ class GroovyCompatibilityVerifier {
     static boolean testGroovy40Features() {
         try {
             // Create a record
-            def person = new GroovyCompatibilityVerifier.Person("Test", 42)
+            def person = new GroovyCompatibilityVerifier.Person(TEST_NAME, 42)
             
             // Test property accessors
-            if (person.name != "Test" || person.age != 42) {
+            if (person.name != TEST_NAME || person.age != 42) {
                 return false
             }
             
@@ -190,19 +198,19 @@ class GroovyCompatibilityVerifier {
                     result = "child"
                     break
                 case 18..64:
-                    result = "adult"
+                    result = ADULT_CATEGORY
                     break
                 default:
                     result = "senior"
             }
             
-            if (result != "adult") {
+            if (result != ADULT_CATEGORY) {
                 return false
             }
             
             // Test pattern matching with instanceof
             def value = "test"
-            def typeResult = ""
+            def typeResult = EMPTY_STRING
             
             if (value instanceof String) {
                 typeResult = "string of length ${value.length()}"
@@ -217,7 +225,7 @@ class GroovyCompatibilityVerifier {
             }
             
             return true
-        } catch (Exception e) {
+        } catch (ClassCastException | NullPointerException | AssertionError e) {
             println "Error testing Groovy 4.0 features: ${e.message}"
             return false
         }
@@ -236,7 +244,7 @@ class GroovyCompatibilityVerifier {
     static Map<String, String> getEnvironmentDetails() {
         return [
             'groovyVersion': GroovySystem.version,
-            'javaVersion': System.getProperty("java.version"),
+            'javaVersion': System.getProperty(JAVA_VERSION_PROPERTY),
             'javaVendor': System.getProperty("java.vendor"),
             'osName': System.getProperty("os.name"),
         ]

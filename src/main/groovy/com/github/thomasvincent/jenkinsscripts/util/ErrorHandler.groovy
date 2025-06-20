@@ -66,7 +66,8 @@ class ErrorHandler {
      * @param level Optional log level (defaults to WARNING)
      * @return The default value
      */
-    static <T> T handleErrorWithDefault(String operation, Exception e, Logger logger, T defaultValue, Level level = Level.WARNING) {
+    static <T> T handleErrorWithDefault(
+            String operation, Exception e, Logger logger, T defaultValue, Level level = Level.WARNING) {
         String errorMessage = formatErrorMessage(operation, e)
         logger.log(level, errorMessage, e)
         return defaultValue
@@ -81,10 +82,11 @@ class ErrorHandler {
      * @param defaultValue The default value to return on error (if null, rethrows the exception)
      * @return The result of the action or defaultValue on error
      */
+    @SuppressWarnings('CatchException')
     static <T> T withErrorHandling(String operation, Closure<T> action, Logger logger, T defaultValue = null) {
         try {
             return action()
-        } catch (Exception e) {
+        } catch (Exception e) { // NOSONAR - Generic error handler needs to catch all exceptions
             if (defaultValue == null) {
                 handleError(operation, e, logger)
                 throw e
