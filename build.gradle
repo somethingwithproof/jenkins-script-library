@@ -394,7 +394,7 @@ dependencies {
     
     // End-to-end test dependencies
     endToEndTestImplementation 'org.seleniumhq.selenium:selenium-java:4.20.0'
-    endToEndTestImplementation 'io.github.bonigarcia:webdrivermanager:5.8.0'
+    endToEndTestImplementation 'io.github.bonigarcia:webdrivermanager:6.1.0'
 }
 
 java {
