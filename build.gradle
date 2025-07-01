@@ -361,7 +361,7 @@ dependencies {
     compileOnly "org.jenkins-ci.plugins:cloudbees-folder:${versions.folderPlugin}"
     compileOnly "org.jenkins-ci.plugins.workflow:workflow-job:2.42"
     compileOnly "org.jenkins-ci.plugins:credentials:${versions.credentialsPlugin}"
-    compileOnly "org.jenkins-ci.plugins:plain-credentials:1.7"
+    compileOnly "org.jenkins-ci.plugins:plain-credentials:199.v9f8e1f741799"
 
     testImplementation "junit:junit:${versions.junitVersion}"
     testImplementation "org.spockframework:spock-core:${versions.spockVersion}"
