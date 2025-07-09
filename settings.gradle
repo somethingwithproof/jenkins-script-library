@@ -1,159 +1,38 @@
-// settings.gradle
+// Jenkins Script Library Settings
+rootProject.name = 'jenkins-script-library'
 
-// Configure Gradle Enterprise - plugins block must be at the top
-plugins {
-    id 'com.gradle.enterprise' version '3.19.2'
-}
-
-// Enable Gradle features preview
+// Enable Gradle features for better performance
 enableFeaturePreview('TYPESAFE_PROJECT_ACCESSORS')
 enableFeaturePreview('STABLE_CONFIGURATION_CACHE')
 
-rootProject.name = 'jenkins-script-library'
-
-// Modern Gradle build cache config
+// Build cache configuration for faster builds
 buildCache {
     local {
         enabled = true
         directory = new File(rootDir, 'build/cache')
-        // Use the correct property for cache cleanup
-        removeUnusedEntriesAfterDays = 7
-    }
-    remote(HttpBuildCache) {
-        enabled = System.getenv('CI') == 'true'
-        url = 'https://gradle-cache.example.com/'
-        push = System.getenv('CI') == 'true'
-        credentials {
-            username = System.getenv('CACHE_USERNAME')
-            password = System.getenv('CACHE_PASSWORD')
-        }
     }
 }
 
-// Define shared dependency versions in the version catalog
+// Dependency resolution management
 dependencyResolutionManagement {
-    repositories {
-        mavenCentral()
-        maven {
-            url = 'https://repo.jenkins-ci.org/releases/'
-        }
-        maven {
-            url = 'https://repo.jenkins-ci.org/public/'
-        }
-        gradlePluginPortal()
-    }
+    // Use repository definitions from build.gradle
+    repositoriesMode.set(RepositoriesMode.PREFER_PROJECT)
     
+    // Version catalog for centralized dependency management
     versionCatalogs {
         libs {
-            // Jenkins
-            version('jenkins-core', '2.361.4')
-            version('jenkins-test-harness', '2.72')
-            version('groovy', '3.0.24')
-            
-            // Jenkins plugins
-            version('credentials-plugin', '2.6.1')
-            version('matrix-auth-plugin', '3.1.3')
-            version('workflow-api-plugin', '2.46')
-            version('workflow-step-api-plugin', '2.27')
-            version('folder-plugin', '6.17')
-            version('git-plugin', '4.11.3')
-            
-            // Libraries
-            version('log4j', '2.25.0')
-            version('commons-io', '2.19.0')
-            version('commons-cli', '1.5.0')
+            // Core versions
+            version('jenkins', '2.361.4')
+            version('groovy', '3.0.25')
             version('spock', '2.3-groovy-3.0')
+            version('log4j', '2.25.0')
             
-            // Testing
-            version('junit', '4.13.2')
-            version('mockito', '5.11.0')
-            version('wiremock', '3.0.1')
-            version('archunit', '1.3.0')
-            
-            // Define library bundles
-            library('log4j', 'org.apache.logging.log4j', 'log4j-api').versionRef('log4j')
-            library('log4j-core', 'org.apache.logging.log4j', 'log4j-core').versionRef('log4j')
-            bundle('log4j', ['log4j', 'log4j-core'])
-            
-            library('jenkins-core', 'org.jenkins-ci.main', 'jenkins-core').versionRef('jenkins-core')
-            library('jenkins-war', 'org.jenkins-ci.main', 'jenkins-war').versionRef('jenkins-core')
-            library('jenkins-test-harness', 'org.jenkins-ci.main', 'jenkins-test-harness').versionRef('jenkins-test-harness')
-            
+            // Define libraries
             library('groovy-all', 'org.codehaus.groovy', 'groovy-all').versionRef('groovy')
-            library('commons-io', 'commons-io', 'commons-io').versionRef('commons-io')
-            library('commons-cli', 'commons-cli', 'commons-cli').versionRef('commons-cli')
-            
-            library('junit', 'junit', 'junit').versionRef('junit')
             library('spock-core', 'org.spockframework', 'spock-core').versionRef('spock')
-            library('mockito-core', 'org.mockito', 'mockito-core').versionRef('mockito')
-            library('wiremock', 'com.github.tomakehurst', 'wiremock').versionRef('wiremock')
-            
-            bundle('test-implementation', ['junit', 'spock-core', 'mockito-core'])
-            
-            // Define plugins
-            plugin('dependency-check', 'org.owasp.dependencycheck').version('8.4.0')
-            plugin('versions', 'com.github.ben-manes.versions').version('0.51.0')
-            plugin('shadow', 'com.github.johnrengelman.shadow').version('8.1.1')
-            plugin('test-retry', 'org.gradle.test-retry').version('1.5.9')
-            plugin('nexus-publish', 'io.github.gradle-nexus.publish-plugin').version('1.3.0')
-            plugin('build-scan', 'com.gradle.enterprise').version('3.16.2')
+            library('jenkins-core', 'org.jenkins-ci.main', 'jenkins-core').versionRef('jenkins')
+            library('log4j-api', 'org.apache.logging.log4j', 'log4j-api').versionRef('log4j')
+            library('log4j-core', 'org.apache.logging.log4j', 'log4j-core').versionRef('log4j')
         }
     }
 }
-
-// Include build-logic for shared build configuration
-// Commented out until build-logic directory is properly set up
-// includeBuild('build-logic')
-
-// Configure Gradle Enterprise
-gradleEnterprise {
-    buildScan {
-        termsOfServiceUrl = 'https://gradle.com/terms-of-service'
-        termsOfServiceAgree = 'yes'
-        
-        // Link to CI build
-        background {
-            def buildUrl = System.getenv('BUILD_URL')
-            if (buildUrl) {
-                link 'CI Build', buildUrl
-            }
-        }
-        
-        // Record git branch and commit information
-        background {
-            value 'Git Branch', execOutput('git rev-parse --abbrev-ref HEAD')
-            value 'Git Commit', execOutput('git rev-parse --short HEAD')
-        }
-        
-        // Record system info
-        background {
-            value 'Operating System', "${System.getProperty('os.name')} ${System.getProperty('os.version')}"
-            value 'JDK Version', System.getProperty('java.version')
-        }
-        
-        // Upload on CI builds
-        publishAlways()
-    }
-}
-
-// Using a non-deprecated approach to execute commands
-String execOutput(String cmd) {
-    try {
-        def stdout = new ByteArrayOutputStream()
-        // Use a workaround for settings script that doesn't have direct access to ExecOperations
-        def result = new ByteArrayOutputStream()
-        def cmdParts = cmd.split(' ')
-        def process = new ProcessBuilder(cmdParts)
-            .redirectErrorStream(true)
-            .start()
-        process.inputStream.eachLine { line ->
-            result << line
-            result << System.lineSeparator()
-        }
-        process.waitFor()
-        return result.toString().trim()
-    } catch (Exception e) {
-        return "unknown"
-    }
-}
-
