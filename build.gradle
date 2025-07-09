@@ -406,7 +406,7 @@ dependencies {
     performanceTestAnnotationProcessor "org.openjdk.jmh:jmh-generator-annprocess:${versions.jmhVersion}"
     
     // End-to-end test dependencies
-    endToEndTestImplementation 'org.seleniumhq.selenium:selenium-java:4.20.0'
+    endToEndTestImplementation 'org.seleniumhq.selenium:selenium-java:4.34.0'
     endToEndTestImplementation 'io.github.bonigarcia:webdrivermanager:6.1.0'
 }
 
