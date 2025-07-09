@@ -1,173 +1,49 @@
-// Simplified, idiomatic Groovy build file for Jenkins Script Library
 plugins {
     id 'groovy'
     id 'maven-publish'
-    id 'jacoco'
-    id 'codenarc'
-    id 'org.owasp.dependencycheck' version '8.4.0'
-    id 'com.github.ben-manes.versions' version '0.51.0'
 }
 
-// Project metadata
 group = 'com.github.thomasvincent'
 version = '1.0.0'
-description = 'Jenkins Script Library - A collection of Groovy utilities for Jenkins automation'
 
-// Version constants
-ext {
-    jenkinsVersion = '2.361.4'
-    groovyVersion = '3.0.25'
-    spockVersion = '2.3-groovy-3.0'
-    log4jVersion = '2.25.0'
-}
-
-// Repositories
 repositories {
     mavenCentral()
-    maven { url 'https://repo.jenkins-ci.org/releases/' }
-    maven { url 'https://repo.jenkins-ci.org/public/' }
+    maven { url = 'https://repo.jenkins-ci.org/releases/' }
 }
 
-// Java compatibility
+dependencies {
+    implementation 'org.codehaus.groovy:groovy-all:3.0.25'
+    implementation 'org.apache.logging.log4j:log4j-api:2.25.0'
+    implementation 'org.apache.logging.log4j:log4j-core:2.25.0'
+    implementation 'commons-io:commons-io:2.19.0'
+    
+    testImplementation 'org.spockframework:spock-core:2.3-groovy-3.0'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(17)
     }
-    withJavadocJar()
-    withSourcesJar()
 }
 
-// Source sets configuration
 sourceSets {
     main {
         groovy {
             srcDirs = ['src/main/groovy']
-            // Only include utility packages that don't depend on Jenkins runtime
             include '**/util/**'
         }
     }
 }
 
-// Dependencies
-dependencies {
-    // Groovy
-    implementation "org.codehaus.groovy:groovy-all:${groovyVersion}"
-    
-    // Logging
-    implementation "org.apache.logging.log4j:log4j-api:${log4jVersion}"
-    implementation "org.apache.logging.log4j:log4j-core:${log4jVersion}"
-    
-    // Utilities
-    implementation 'commons-io:commons-io:2.19.0'
-    implementation 'commons-cli:commons-cli:1.9.0'
-    
-    // Jenkins (compile-time only)
-    compileOnly "org.jenkins-ci.main:jenkins-core:${jenkinsVersion}"
-    compileOnly 'javax.servlet:javax.servlet-api:4.0.1'
-    
-    // Testing with Spock
-    testImplementation "org.spockframework:spock-core:${spockVersion}"
-    testImplementation 'org.mockito:mockito-core:5.11.0'
-    testRuntimeOnly 'net.bytebuddy:byte-buddy:1.14.11'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-    
-    // JUnit for legacy tests (to be migrated)
-    testImplementation 'junit:junit:4.13.2'
-    testRuntimeOnly 'org.junit.vintage:junit-vintage-engine:5.10.1'
-}
-
-// Testing configuration
 test {
-    // Use JUnit Platform for Spock 2.x
-    useJUnitPlatform {
-        // Include both Spock and JUnit tests during migration
-        includeEngines 'spock', 'junit-vintage'
-    }
-    
-    testLogging {
-        events 'passed', 'skipped', 'failed'
-        showStandardStreams = false
-    }
+    useJUnitPlatform()
 }
 
-// Groovy compilation
-tasks.withType(GroovyCompile) {
-    groovyOptions.optimizationOptions.indy = true
-}
-
-// Code quality
-codenarc {
-    toolVersion = '3.3.0'
-    configFile = file('config/codenarc/codenarc.groovy')
-    ignoreFailures = true
-}
-
-// Test coverage
-jacoco {
-    toolVersion = '0.8.8'
-}
-
-jacocoTestReport {
-    reports {
-        xml.required = true
-        html.required = true
-    }
-}
-
-// Publishing
 publishing {
     publications {
         maven(MavenPublication) {
             from components.java
-            
-            pom {
-                name = project.name
-                description = project.description
-                url = 'https://github.com/thomasvincent/jenkins-script-library'
-                
-                licenses {
-                    license {
-                        name = 'Apache License 2.0'
-                        url = 'https://www.apache.org/licenses/LICENSE-2.0'
-                    }
-                }
-                
-                developers {
-                    developer {
-                        id = 'thomasvincent'
-                        name = 'Thomas Vincent'
-                    }
-                }
-            }
-        }
-    }
-}
-
-// Dependency vulnerability scanning
-dependencyCheck {
-    analyzers {
-        assemblyEnabled = false
-        nodeEnabled = false
-    }
-    formats = ['HTML', 'XML']
-    failBuildOnCVSS = 7
-}
-
-// Task to run only Spock tests
-task spockTest(type: Test) {
-    useJUnitPlatform {
-        includeEngines 'spock'
-    }
-}
-
-// Task to show outdated dependencies
-tasks.named('dependencyUpdates') {
-    checkConstraints = true
-    outputFormatter = 'html'
-    
-    rejectVersionIf {
-        ['alpha', 'beta', 'rc', 'cr', 'm', 'preview', 'b', 'ea'].any { qualifier ->
-            it.candidate.version ==~ /(?i).*[.-]$qualifier[.\d-+]*/
         }
     }
 }
