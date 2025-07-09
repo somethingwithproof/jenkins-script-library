@@ -2,7 +2,7 @@
 
 // Configure Gradle Enterprise - plugins block must be at the top
 plugins {
-    id 'com.gradle.enterprise' version '3.16.2'
+    id 'com.gradle.enterprise' version '3.19.2'
 }
 
 // Enable Gradle features preview
