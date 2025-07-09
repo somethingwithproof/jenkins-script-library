@@ -1,0 +1,116 @@
+version: '3.8'
+
+services:
+  jenkins:
+    build:
+      context: .
+      dockerfile: Dockerfile.integration
+    container_name: jenkins-integration
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    environment:
+      - DOCKER_HOST=tcp://docker:2376
+      - DOCKER_CERT_PATH=/certs/client
+      - DOCKER_TLS_VERIFY=1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=us-east-1
+      - AZURE_STORAGE_CONNECTION_STRING=DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - docker_certs:/certs/client:ro
+      - ./:/workspace
+    networks:
+      - jenkins-net
+    depends_on:
+      - docker
+      - localstack
+      - azurite
+      - postgres
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/login"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  docker:
+    image: docker:dind
+    container_name: jenkins-docker
+    privileged: true
+    environment:
+      - DOCKER_TLS_CERTDIR=/certs
+    volumes:
+      - docker_certs:/certs/client
+      - docker_data:/var/lib/docker
+    networks:
+      - jenkins-net
+    ports:
+      - "2376:2376"
+
+  localstack:
+    image: localstack/localstack:latest
+    container_name: jenkins-localstack
+    environment:
+      - SERVICES=ec2,s3,iam,sts
+      - DEBUG=1
+      - DATA_DIR=/tmp/localstack/data
+      - LAMBDA_EXECUTOR=docker
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    volumes:
+      - localstack_data:/tmp/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - jenkins-net
+    ports:
+      - "4566:4566"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:latest
+    container_name: jenkins-azurite
+    ports:
+      - "10000:10000"
+      - "10001:10001"
+      - "10002:10002"
+    networks:
+      - jenkins-net
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "10000"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  postgres:
+    image: postgres:14
+    container_name: jenkins-postgres
+    environment:
+      - POSTGRES_DB=jenkins
+      - POSTGRES_USER=jenkins
+      - POSTGRES_PASSWORD=jenkins
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - jenkins-net
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jenkins"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  jenkins_home:
+  docker_certs:
+  docker_data:
+  localstack_data:
+  postgres_data:
+
+networks:
+  jenkins-net:
+    driver: bridge
