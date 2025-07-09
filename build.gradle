@@ -359,7 +359,7 @@ dependencies {
     compileOnly "org.jenkins-ci.plugins:ssh-slaves:1.33.0"
     compileOnly "org.jenkins-ci.plugins:groovy:2.4"
     compileOnly "org.jenkins-ci.plugins:cloudbees-folder:${versions.folderPlugin}"
-    compileOnly "org.jenkins-ci.plugins.workflow:workflow-job:2.42"
+    compileOnly "org.jenkins-ci.plugins.workflow:workflow-job:1540.v295eccc9778f"
     compileOnly "org.jenkins-ci.plugins:credentials:${versions.credentialsPlugin}"
     compileOnly "org.jenkins-ci.plugins:plain-credentials:1.7"
 
