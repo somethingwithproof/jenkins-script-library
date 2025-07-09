@@ -288,7 +288,7 @@ sourceSets {
     main {
         groovy {
             srcDir 'src/main/groovy'
-            exclude '**/cloud/**', '**/hudson/plugins/ec2/**', '**/scripts/**', '**/jobs/**', '**/config/**', '**/ssh/**', '**/remote/**', '**/docker/**', '**/aws/**', '**/azure/**', '**/jenkins/executor/**', '**/nodes/SlaveInfoManager.groovy'
+            exclude '**/cloud/**', '**/hudson/plugins/ec2/**', '**/scripts/**', '**/jobs/**', '**/config/**', '**/ssh/**', '**/remote/**', '**/docker/**', '**/aws/**', '**/azure/**', '**/jenkins/executor/**', '**/nodes/SlaveInfoManager.groovy', '**/analytics/**', '**/credentials/**', '**/cost/**'
         }
     }
     test {
