@@ -1,31 +1,41 @@
 ---
 name: Bug report
-about: Create a report to help us improve
-title: '[BUG] '
+about: Create a report to help us improve the Jenkins Script Library
+title: ''
 labels: bug
 assignees: ''
 ---
 
-## Describe the bug
+**Describe the bug**
 A clear and concise description of what the bug is.
 
-## To Reproduce
-Steps to reproduce the behavior:
-1. Run script '...'
-2. With parameters '....'
-3. See error
+**Jenkins Environment**
+- Jenkins Version: [e.g., 2.361.4]
+- Java Version: [e.g., OpenJDK 17]
+- Groovy Version: [e.g., 3.0.25]
+- Plugin versions (if relevant):
 
-## Expected behavior
+**To Reproduce**
+Steps to reproduce the behavior:
+1. Pipeline code or script that triggers the issue
+2. Parameters or configuration used
+3. Error message or unexpected behavior
+
+**Expected behavior**
 A clear and concise description of what you expected to happen.
 
-## Screenshots
-If applicable, add screenshots to help explain your problem.
+**Pipeline Code**
+```groovy
+// Paste your pipeline code here
+```
 
-## Environment
- - Jenkins version: [e.g. 2.426.3]
- - Relevant plugin versions: [e.g. Groovy 2.5.19]
- - Script version: [e.g. 1.0.0]
- - OS: [e.g. Ubuntu 22.04]
+**Stack Trace**
+```
+// Paste the full stack trace here
+```
 
-## Additional context
-Add any other context about the problem here.
+**Additional context**
+Add any other context about the problem here, such as:
+- Running in Docker/Kubernetes?
+- Using Jenkins shared library?
+- Any custom configurations?
