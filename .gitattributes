@@ -1,0 +1,41 @@
+# Groovy language detection
+*.groovy linguist-language=Groovy
+*.gradle linguist-language=Groovy
+Jenkinsfile linguist-language=Groovy
+
+# Jenkins pipeline files
+vars/* linguist-language=Groovy
+src/**/*.groovy linguist-language=Groovy
+
+# Documentation
+*.md linguist-documentation
+docs/* linguist-documentation
+
+# Vendored files (if any)
+gradle/wrapper/* linguist-vendored
+
+# Binary files
+*.jar binary
+*.war binary
+*.hpi binary
+*.jpi binary
+
+# Line endings
+*.groovy text eol=lf
+*.gradle text eol=lf
+*.properties text eol=lf
+*.xml text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.sh text eol=lf
+Jenkinsfile text eol=lf
+
+# Windows scripts
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Archives
+*.zip binary
+*.tar binary
+*.gz binary
+*.tgz binary
