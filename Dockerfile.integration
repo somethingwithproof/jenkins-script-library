@@ -1,0 +1,47 @@
+FROM jenkins/jenkins:2.361.4-lts
+
+USER root
+
+# Install Docker CLI for Docker-in-Docker capability
+RUN apt-get update && apt-get install -y \
+    apt-transport-https \
+    ca-certificates \
+    curl \
+    gnupg \
+    lsb-release \
+    python3 \
+    python3-pip \
+    jq \
+    && curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null \
+    && apt-get update \
+    && apt-get install -y docker-ce-cli \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install kubectl for Kubernetes testing
+RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
+    && install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+
+# Install AWS CLI for AWS testing
+RUN pip3 install awscli
+
+# Install Azure CLI for Azure testing
+RUN curl -sL https://aka.ms/InstallAzureCLIDeb | bash
+
+USER jenkins
+
+# Skip initial setup
+ENV JAVA_OPTS="-Djenkins.install.runSetupWizard=false"
+
+# Install plugins
+COPY --chown=jenkins:jenkins config/plugins.txt /usr/share/jenkins/ref/plugins.txt
+RUN jenkins-plugin-cli -f /usr/share/jenkins/ref/plugins.txt
+
+# Copy init scripts
+COPY --chown=jenkins:jenkins config/init.groovy.d/ /usr/share/jenkins/ref/init.groovy.d/
+
+# Copy the script library
+COPY --chown=jenkins:jenkins . /var/jenkins_home/script-library/
+
+# Create test job configurations
+COPY --chown=jenkins:jenkins config/jobs/ /usr/share/jenkins/ref/jobs/

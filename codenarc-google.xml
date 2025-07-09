@@ -1,0 +1,134 @@
+<?xml version="1.0"?>
+<ruleset xmlns="http://codenarc.org/ruleset/1.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://codenarc.org/ruleset/1.0 http://codenarc.org/ruleset-schema.xsd"
+         xsi:noNamespaceSchemaLocation="http://codenarc.org/ruleset-schema.xsd">
+
+    <description>Google Style Guide compliant CodeNarc rules for Jenkins Script Library</description>
+
+    <!-- Basic rules -->
+    <ruleset-ref path='rulesets/basic.xml'>
+        <exclude name='EmptyCatchBlock'/>
+        <exclude name='EmptyClass'/>
+    </ruleset-ref>
+    
+    <!-- Braces -->
+    <ruleset-ref path='rulesets/braces.xml'/>
+    
+    <!-- Concurrency -->
+    <ruleset-ref path='rulesets/concurrency.xml'/>
+    
+    <!-- Convention -->
+    <ruleset-ref path='rulesets/convention.xml'>
+        <exclude name='NoDef'/>
+        <exclude name='VariableTypeRequired'/>
+        <exclude name='MethodReturnTypeRequired'/>
+        <exclude name='StaticFieldsBeforeInstanceFields'/>
+        <exclude name='StaticMethodsBeforeInstanceMethods'/>
+        <exclude name='PublicMethodsBeforeNonPublicMethods'/>
+    </ruleset-ref>
+    
+    <!-- Design -->
+    <ruleset-ref path='rulesets/design.xml'>
+        <exclude name='BuilderMethodWithSideEffects'/>
+        <exclude name='Instanceof'/>
+    </ruleset-ref>
+    
+    <!-- DRY -->
+    <ruleset-ref path='rulesets/dry.xml'>
+        <rule-config name='DuplicateStringLiteral'>
+            <property name='doNotApplyToClassNames' value='*Test'/>
+        </rule-config>
+    </ruleset-ref>
+    
+    <!-- Enhanced -->
+    <ruleset-ref path='rulesets/enhanced.xml'/>
+    
+    <!-- Exceptions -->
+    <ruleset-ref path='rulesets/exceptions.xml'>
+        <exclude name='CatchException'/>
+        <exclude name='CatchThrowable'/>
+    </ruleset-ref>
+    
+    <!-- Formatting - Google Style Guide -->
+    <ruleset-ref path='rulesets/formatting.xml'>
+        <rule-config name='SpaceAroundMapEntryColon'>
+            <property name='characterBeforeColonRegex' value='\s'/>
+            <property name='characterAfterColonRegex' value='\s'/>
+        </rule-config>
+        <rule-config name='LineLength'>
+            <property name='length' value='100'/>
+        </rule-config>
+        <rule-config name='Indentation'>
+            <property name='spacesPerIndentLevel' value='4'/>
+        </rule-config>
+    </ruleset-ref>
+    
+    <!-- General -->
+    <ruleset-ref path='rulesets/generic.xml'/>
+    
+    <!-- Groovy -->
+    <ruleset-ref path='rulesets/groovyism.xml'/>
+    
+    <!-- Imports -->
+    <ruleset-ref path='rulesets/imports.xml'/>
+    
+    <!-- JUnit -->
+    <ruleset-ref path='rulesets/junit.xml'/>
+    
+    <!-- Logging -->
+    <ruleset-ref path='rulesets/logging.xml'>
+        <exclude name='SystemOutPrint'/>
+        <exclude name='PrintStackTrace'/>
+    </ruleset-ref>
+    
+    <!-- Naming - Google Style Guide -->
+    <ruleset-ref path='rulesets/naming.xml'>
+        <rule-config name='ClassName'>
+            <property name='regex' value='^[A-Z][a-zA-Z0-9]*$'/>
+        </rule-config>
+        <rule-config name='FieldName'>
+            <property name='regex' value='^[a-z][a-zA-Z0-9]*$'/>
+            <property name='finalRegex' value='^[a-z][a-zA-Z0-9]*$'/>
+            <property name='staticFinalRegex' value='^[A-Z][A-Z_0-9]*$'/>
+        </rule-config>
+        <rule-config name='MethodName'>
+            <property name='regex' value='^[a-z][a-zA-Z0-9]*$'/>
+        </rule-config>
+        <rule-config name='VariableName'>
+            <property name='regex' value='^[a-z][a-zA-Z0-9]*$'/>
+            <property name='finalRegex' value='^[a-z][a-zA-Z0-9]*$'/>
+        </rule-config>
+    </ruleset-ref>
+    
+    <!-- Security -->
+    <ruleset-ref path='rulesets/security.xml'>
+        <exclude name='JavaIoPackageAccess'/>
+    </ruleset-ref>
+    
+    <!-- Serialization -->
+    <ruleset-ref path='rulesets/serialization.xml'/>
+    
+    <!-- Size -->
+    <ruleset-ref path='rulesets/size.xml'>
+        <exclude name='AbcMetric'/>
+        <exclude name='CyclomaticComplexity'/>
+    </ruleset-ref>
+    
+    <!-- Unnecessary -->
+    <ruleset-ref path='rulesets/unnecessary.xml'/>
+    
+    <!-- Unused -->
+    <ruleset-ref path='rulesets/unused.xml'>
+        <exclude name='UnusedObject'/>
+        <exclude name='UnusedPrivateMethod'/>
+    </ruleset-ref>
+    
+    <!-- Size rule configurations -->
+    <rule class='org.codenarc.rule.size.MethodSizeRule'>
+        <property name='maxLines' value='40'/>
+    </rule>
+    <rule class='org.codenarc.rule.size.ClassSizeRule'>
+        <property name='maxLines' value='500'/>
+    </rule>
+</ruleset>
