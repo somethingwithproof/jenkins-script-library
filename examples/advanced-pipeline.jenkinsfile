@@ -1,0 +1,320 @@
+@Library('jenkins-script-library') _
+
+pipeline {
+    agent any
+    
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        timeout(time: 1, unit: 'HOURS')
+        timestamps()
+    }
+    
+    triggers {
+        // Run cost analysis daily at 9 AM
+        cron('0 9 * * *')
+    }
+    
+    environment {
+        // Budget thresholds
+        TOTAL_BUDGET = '5000'
+        TEAM_PLATFORM_BUDGET = '2000'
+        TEAM_APPS_BUDGET = '3000'
+        
+        // Credential rotation policy (days)
+        PASSWORD_ROTATION = '60'
+        API_KEY_ROTATION = '90'
+    }
+    
+    stages {
+        stage('Pipeline Health Check') {
+            steps {
+                script {
+                    echo "=== Analyzing Pipeline Performance ==="
+                    
+                    // Analyze current pipeline performance
+                    def metrics = analyzePipelineMetrics()
+                    
+                    echo "Pipeline Health Status:"
+                    echo "  Success Rate: ${metrics.summary.successRate}%"
+                    echo "  Average Duration: ${metrics.summary.avgDuration / 60000} minutes"
+                    
+                    // Check if pipeline is healthy
+                    if (!metrics.isHealthy()) {
+                        // Get recommendations
+                        def recommendations = metrics.getTopRecommendations(3)
+                        
+                        recommendations.each { rec ->
+                            echo "  [${rec.priority}] ${rec.type}: ${rec.message}"
+                        }
+                        
+                        // Send alert if critical issues
+                        if (metrics.summary.successRate < 50) {
+                            emailext(
+                                to: 'devops@company.com',
+                                subject: "CRITICAL: Pipeline ${env.JOB_NAME} Health Alert",
+                                body: """
+                                    Pipeline ${env.JOB_NAME} has a success rate of only ${metrics.summary.successRate}%.
+                                    
+                                    Top Issues:
+                                    ${recommendations.collect { "- ${it.message}" }.join('\n')}
+                                    
+                                    Please investigate immediately.
+                                """
+                            )
+                        }
+                    }
+                    
+                    // Check for anomalies
+                    if (metrics.hasAnomalies()) {
+                        def highSeverityAnomalies = metrics.anomalies.findAll { it.severity == 'HIGH' }
+                        if (highSeverityAnomalies) {
+                            echo "WARNING: ${highSeverityAnomalies.size()} high severity anomalies detected"
+                            currentBuild.result = 'UNSTABLE'
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Security & Compliance') {
+            when {
+                anyOf {
+                    triggeredBy 'TimerTrigger'  // Daily runs
+                    changeset 'src/main/groovy/**/*.groovy'  // Code changes
+                }
+            }
+            steps {
+                script {
+                    echo "=== Credential Security Analysis ==="
+                    
+                    // Analyze credential health
+                    def credAnalysis = rotateCredentials.analyze()
+                    
+                    echo "Credential Status:"
+                    echo "  Total Credentials: ${credAnalysis.summary.totalCredentials}"
+                    echo "  Needing Rotation: ${credAnalysis.summary.needingRotation}"
+                    echo "  Compliance: ${credAnalysis.compliance.overall}"
+                    
+                    // Check compliance
+                    if (!credAnalysis.isCompliant()) {
+                        def violations = credAnalysis.getViolations()
+                        echo "COMPLIANCE VIOLATIONS FOUND:"
+                        violations.each { violation ->
+                            echo "  - ${violation}"
+                        }
+                        
+                        // Send compliance alert
+                        emailext(
+                            to: 'security@company.com',
+                            subject: 'Jenkins Credential Compliance Violation',
+                            body: """
+                                Credential compliance check failed.
+                                
+                                Violations:
+                                ${violations.join('\n')}
+                                
+                                Please review and remediate immediately.
+                            """
+                        )
+                        
+                        currentBuild.result = 'UNSTABLE'
+                    }
+                    
+                    // Rotate old credentials if this is a scheduled run
+                    if (currentBuild.getBuildCauses('hudson.triggers.TimerTrigger$TimerTriggerCause')) {
+                        echo "Performing scheduled credential rotation..."
+                        
+                        def rotationPolicy = [
+                            PASSWORD: env.PASSWORD_ROTATION as Integer,
+                            API_KEY: env.API_KEY_ROTATION as Integer
+                        ]
+                        
+                        // First do a dry run
+                        def dryRunResults = rotateCredentials.rotate(
+                            policy: rotationPolicy,
+                            dryRun: true
+                        )
+                        
+                        if (dryRunResults.rotated.size() > 0) {
+                            echo "Would rotate ${dryRunResults.rotated.size()} credentials"
+                            
+                            // In production, you might want manual approval here
+                            // input message: "Approve credential rotation?", ok: "Rotate"
+                            
+                            // Perform actual rotation
+                            def results = rotateCredentials.rotate(
+                                policy: rotationPolicy,
+                                dryRun: false
+                            )
+                            
+                            echo "Rotated ${results.rotated.size()} credentials successfully"
+                            
+                            if (results.failed.size() > 0) {
+                                error "Failed to rotate ${results.failed.size()} credentials"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Cloud Cost Optimization') {
+            when {
+                anyOf {
+                    triggeredBy 'TimerTrigger'  // Daily runs
+                    expression { params.CHECK_COSTS == true }
+                }
+            }
+            steps {
+                script {
+                    echo "=== Cloud Cost Analysis ==="
+                    
+                    // Analyze current costs
+                    def costAnalysis = optimizeCloudCosts.analyze(includeAllocations: true)
+                    
+                    echo "Cloud Cost Summary:"
+                    echo "  Total Monthly Cost: \$${costAnalysis.totalCost.monthly}"
+                    echo "  Potential Savings: \$${costAnalysis.savings.monthlyTotal}/month"
+                    
+                    // Show provider breakdown
+                    costAnalysis.providers.each { name, provider ->
+                        echo "  ${name}: \$${provider.monthlyCost}/month (${provider.activeAgents} agents)"
+                    }
+                    
+                    // Check for significant savings opportunities
+                    if (costAnalysis.hasSavingsOpportunity(500)) {
+                        echo "SIGNIFICANT SAVINGS OPPORTUNITY DETECTED!"
+                        
+                        // Get optimization actions
+                        def optimizations = optimizeCloudCosts.optimize(dryRun: true)
+                        
+                        echo "Potential optimizations:"
+                        optimizations.actions.each { action ->
+                            echo "  - ${action.type}: ${action.agent} (save \$${action.savingsPerHour}/hour)"
+                        }
+                        
+                        // Apply optimizations if this is a scheduled run
+                        if (currentBuild.getBuildCauses('hudson.triggers.TimerTrigger$TimerTriggerCause')) {
+                            echo "Applying cost optimizations..."
+                            
+                            def applied = optimizeCloudCosts.optimize(dryRun: false)
+                            echo "Applied ${applied.actions.size()} optimizations"
+                            echo "Estimated savings: \$${applied.estimatedMonthlySavings}/month"
+                            
+                            currentBuild.description = "Saved \$${applied.estimatedMonthlySavings}/month"
+                        }
+                    }
+                    
+                    // Check budgets
+                    def budgets = [
+                        'total': env.TOTAL_BUDGET as Double,
+                        'team:platform': env.TEAM_PLATFORM_BUDGET as Double,
+                        'team:apps': env.TEAM_APPS_BUDGET as Double
+                    ]
+                    
+                    def budgetStatus = optimizeCloudCosts.checkBudgets(budgets)
+                    
+                    // Handle budget alerts
+                    budgetStatus.alerts.each { alert ->
+                        echo "[${alert.severity}] ${alert.message}"
+                        
+                        if (alert.severity == 'HIGH') {
+                            // Critical budget alert
+                            emailext(
+                                to: 'finance@company.com,devops@company.com',
+                                subject: 'CRITICAL: Cloud Budget Alert',
+                                body: alert.message + "\n\nImmediate action required to reduce cloud costs."
+                            )
+                            
+                            // Could trigger automatic cost reduction here
+                            // e.g., terminate non-critical environments
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Generate Reports') {
+            when {
+                triggeredBy 'TimerTrigger'  // Only on scheduled runs
+            }
+            steps {
+                script {
+                    echo "=== Generating Management Reports ==="
+                    
+                    // Generate comprehensive cost report
+                    def costReport = optimizeCloudCosts.generateReport()
+                    
+                    // Generate cost allocation report
+                    def allocations = optimizeCloudCosts.getAllocations()
+                    def allocationReport = new StringBuilder()
+                    
+                    allocationReport << "\nCost Allocations:\n"
+                    allocationReport << "=================\n\n"
+                    
+                    allocationReport << "By Team:\n"
+                    allocations.byTeam.each { team, cost ->
+                        allocationReport << "  ${team}: \$${cost * 24 * 30}/month\n"
+                    }
+                    
+                    allocationReport << "\nBy Project:\n"
+                    allocations.byProject.each { project, cost ->
+                        allocationReport << "  ${project}: \$${cost * 24 * 30}/month\n"
+                    }
+                    
+                    // Combine reports
+                    def fullReport = costReport + allocationReport.toString()
+                    
+                    // Save report as artifact
+                    writeFile file: "cloud-cost-report-${env.BUILD_NUMBER}.txt", text: fullReport
+                    archiveArtifacts artifacts: "cloud-cost-report-${env.BUILD_NUMBER}.txt"
+                    
+                    // Email report to management
+                    emailext(
+                        to: 'management@company.com',
+                        subject: 'Jenkins Infrastructure Cost Report',
+                        body: fullReport,
+                        attachmentsPattern: "cloud-cost-report-${env.BUILD_NUMBER}.txt"
+                    )
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            echo "Pipeline completed with status: ${currentBuild.result ?: 'SUCCESS'}"
+        }
+        
+        unstable {
+            emailext(
+                to: 'devops@company.com',
+                subject: "Jenkins Pipeline ${env.JOB_NAME} - Unstable",
+                body: """
+                    Pipeline ${env.JOB_NAME} #${env.BUILD_NUMBER} completed with warnings.
+                    
+                    Please check:
+                    - Pipeline performance metrics
+                    - Credential compliance status
+                    - Cloud cost alerts
+                    
+                    Build URL: ${env.BUILD_URL}
+                """
+            )
+        }
+        
+        failure {
+            emailext(
+                to: 'devops@company.com',
+                subject: "Jenkins Pipeline ${env.JOB_NAME} - Failed",
+                body: """
+                    Pipeline ${env.JOB_NAME} #${env.BUILD_NUMBER} failed.
+                    
+                    Build URL: ${env.BUILD_URL}
+                    
+                    Please investigate immediately.
+                """
+            )
+        }
+    }
+}
