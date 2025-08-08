@@ -34,9 +34,8 @@ class PipelineGenerator {
         return result.toString()
     }
 
-    boolean writeToFile(File destination, Map params = [:]) {
+    void writeToFile(File destination, Map params = [:]) {
         ValidationUtils.requireNonNull(destination, 'Destination file')
         destination.setText(generate(params), 'UTF-8')
-        return true
     }
 }
