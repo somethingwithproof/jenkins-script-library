@@ -18,6 +18,7 @@ A collection of Groovy utilities and scripts designed to automate and facilitate
 - **Security**: Audit and secure Jenkins instances
 - **Performance Optimization**: Monitor and improve Jenkins performance
 - **Configuration Management**: Backup and restore Jenkins configurations
+- **Pipeline Generation**: Create Jenkins pipelines from reusable templates
 
 ## Project Structure
 
@@ -30,9 +31,9 @@ jenkins-script-library/
 │   │   └── com/github/thomasvincent/jenkinsscripts/
 │   │       ├── cloud/          # Cloud provider integrations
 │   │       ├── config/         # Configuration management
-│   │       ├── helm/           # Helm management 
-│   │       ├── jobs/           # Job management 
-│   │       ├── nodes/          # Node management 
+│   │       ├── helm/           # Helm management
+│   │       ├── jobs/           # Job management
+│   │       ├── nodes/          # Node management
 │   │       ├── scripts/        # Command-line script entry points
 │   │       ├── security/       # Security utilities
 │   │       └── util/           # Common utilities
@@ -53,7 +54,7 @@ jenkins-script-library/
 This library can be used in two ways:
 
 1. **As a dependency in your Gradle/Maven project**:
-   
+
    ```groovy
    // In your build.gradle
    dependencies {
@@ -62,7 +63,7 @@ This library can be used in two ways:
    ```
 
 2. **As individual scripts to run directly in Jenkins**:
-   
+
    The scripts in `src/main/groovy/com/github/thomasvincent/jenkinsscripts/scripts/` can be executed directly in Jenkins Script Console or through the Jenkins CLI.
 
 ## Usage
@@ -108,6 +109,16 @@ groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin 
 # Create a job from a template
 groovy CreateJobFromTemplate.groovy --template-job template-job --target-job new-job --params-file params.json
 ```
+##### Pipeline Generation
+```groovy
+// Generate a Jenkinsfile from template
+generatePipeline(
+    template: 'templates/basic-pipeline.jenkinsfile',
+    parameters: [project: 'my-app'],
+    destination: 'Jenkinsfile'
+)
+```
+
 
 ##### Job Analysis
 ```bash
