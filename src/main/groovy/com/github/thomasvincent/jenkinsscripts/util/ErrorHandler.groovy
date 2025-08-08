@@ -29,21 +29,21 @@ import java.util.logging.Logger
 
 /**
  * Provides standardized error handling for Jenkins scripts.
- * 
+ *
  * This utility centralizes error handling logic to ensure:
  * - Consistent error reporting
  * - Proper logging with appropriate log levels
  * - Helpful user-facing error messages
- * 
+ *
  * @author Thomas Vincent
  * @since 1.1.0
  */
 class ErrorHandler {
-    
+
     /**
      * Handles an exception consistently, logging it with the appropriate level.
-     * 
-     * @param operation Description of the operation that failed 
+     *
+     * @param operation Description of the operation that failed
      * @param e The exception to handle
      * @param logger The logger to use
      * @param level Optional log level (defaults to SEVERE)
@@ -52,13 +52,13 @@ class ErrorHandler {
         String errorMessage = formatErrorMessage(operation, e)
         logger.log(level, errorMessage, e)
     }
-    
+
     /**
      * Handles an exception and returns a default value.
-     * 
+     *
      * Use this method in cases where the operation should continue despite the error,
      * but with a fallback value.
-     * 
+     *
      * @param operation Description of the operation that failed
      * @param e The exception to handle
      * @param logger The logger to use
@@ -72,10 +72,10 @@ class ErrorHandler {
         logger.log(level, errorMessage, e)
         return defaultValue
     }
-    
+
     /**
      * Wraps an operation with standard error handling.
-     * 
+     *
      * @param operation Description of the operation
      * @param action The closure to execute
      * @param logger The logger to use
@@ -95,24 +95,31 @@ class ErrorHandler {
             }
         }
     }
-    
+
     /**
      * Formats an error message for consistent presentation.
-     * 
+     *
      * @param operation Description of the operation that failed
      * @param e The exception that occurred
      * @return Formatted error message
      */
-    private static String formatErrorMessage(String operation, Exception e) {
+    static String formatErrorMessage(String operation, Exception e) {
         StringBuilder errorMessage = new StringBuilder()
-        errorMessage.append("Error during ${operation}: ${e.message}")
-        
+        if (operation) {
+            errorMessage.append("Error during ${operation}")
+        } else {
+            errorMessage.append("Error")
+        }
+        if (e?.message) {
+            errorMessage.append(": ${e.message}")
+        }
+
         // Add root cause if available
-        Throwable cause = e.cause
+        Throwable cause = e?.cause
         if (cause && cause != e) {
             errorMessage.append(" (Caused by: ${cause.class.simpleName}: ${cause.message})")
         }
-        
+
         return errorMessage.toString()
     }
 }
