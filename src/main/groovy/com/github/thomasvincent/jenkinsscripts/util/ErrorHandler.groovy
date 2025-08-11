@@ -98,12 +98,13 @@ class ErrorHandler {
     
     /**
      * Formats an error message for consistent presentation.
-     * 
+     *
      * @param operation Description of the operation that failed
      * @param e The exception that occurred
      * @return Formatted error message
      */
-    private static String formatErrorMessage(String operation, Exception e) {
+    // Made public to allow reuse and testing from external classes
+    static String formatErrorMessage(String operation, Exception e) {
         StringBuilder errorMessage = new StringBuilder()
         errorMessage.append("Error during ${operation}: ${e.message}")
         
