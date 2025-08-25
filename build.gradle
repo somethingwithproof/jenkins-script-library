@@ -7,7 +7,7 @@ group = 'com.github.thomasvincent'
 version = '1.0.0'
 
 // Align dependency versions with the current Jenkins LTS release
-def jenkinsLtsVersion = '2.516.1'
+def jenkinsLtsVersion = '2.524'
 
 repositories {
     mavenCentral()
