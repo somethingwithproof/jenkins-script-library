@@ -1,5 +1,5 @@
 [versions]
-groovy = "3.0.22"
+groovy = "3.0.25"
 spock = "2.3-groovy-3.0"
 junit = "4.13.2"
 codenarc = "3.4.0"
