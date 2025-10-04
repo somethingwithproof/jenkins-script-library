@@ -6,6 +6,9 @@ plugins {
 group = 'com.github.thomasvincent'
 version = '1.0.0'
 
+// Align dependency versions with the current Jenkins LTS release
+def jenkinsLtsVersion = '2.529'
+
 repositories {
     mavenCentral()
     maven { url = 'https://repo.jenkins-ci.org/releases/' }
@@ -13,19 +16,18 @@ repositories {
 
 dependencies {
     implementation 'org.codehaus.groovy:groovy-all:3.0.25'
-    implementation 'org.apache.logging.log4j:log4j-api:2.25.0'
-    implementation 'org.apache.logging.log4j:log4j-core:2.25.0'
-    implementation 'commons-io:commons-io:2.19.0'
-    
+    implementation 'org.apache.logging.log4j:log4j-api:2.25.2'
+    implementation 'org.apache.logging.log4j:log4j-core:2.25.2'
+    implementation 'commons-io:commons-io:2.20.0'
+
+    // Jenkins core APIs scoped to compile time only; version tracks latest LTS
+    compileOnly "org.jenkins-ci.main:jenkins-core:${jenkinsLtsVersion}"
+
     testImplementation 'org.spockframework:spock-core:2.3-groovy-3.0'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
-    }
-}
+// Use the JDK provided by the build environment
 
 sourceSets {
     main {

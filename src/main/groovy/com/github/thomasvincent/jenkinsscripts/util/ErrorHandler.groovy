@@ -103,6 +103,7 @@ class ErrorHandler {
      * @param e The exception that occurred
      * @return Formatted error message
      */
+    // Made public to allow reuse and testing from external classes
     static String formatErrorMessage(String operation, Exception e) {
         StringBuilder errorMessage = new StringBuilder()
         if (operation) {
