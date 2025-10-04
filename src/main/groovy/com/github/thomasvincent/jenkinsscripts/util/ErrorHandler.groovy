@@ -117,7 +117,7 @@ class ErrorHandler {
         // Add root cause if available
         Throwable cause = e?.cause
         if (cause && cause != e) {
-            errorMessage.append(" (Caused by: ${cause.class.simpleName}: ${cause.message})")
+            errorMessage.append(" (Caused by: ${cause.class.simpleName}: ${cause.message ?: 'No message'})")
         }
 
         return errorMessage.toString()
