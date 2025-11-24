@@ -9,10 +9,17 @@ on:
     - cron: '30 1 * * 0'
   workflow_dispatch:
 
+# Cancel previous runs on the same PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+
 jobs:
   codeql-status:
     name: CodeQL Compatibility Status
     runs-on: ubuntu-latest
+    timeout-minutes: 15  # Prevent hung jobs
     permissions:
       actions: read
       contents: read

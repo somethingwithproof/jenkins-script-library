@@ -7,9 +7,16 @@ on:
     branches: [ main ]
   workflow_dispatch: # Allow manual execution
 
+# Cancel previous runs on the same PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15  # Prevent hung jobs
     permissions:
       contents: read
       checks: write
