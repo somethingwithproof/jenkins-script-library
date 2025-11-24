@@ -34,6 +34,12 @@ sourceSets {
         groovy {
             srcDirs = ['src/main/groovy']
             include '**/util/**'
+            include '**/pipeline/**'
+        }
+    }
+    test {
+        groovy {
+            srcDirs = ['src/test/groovy']
         }
     }
 }
