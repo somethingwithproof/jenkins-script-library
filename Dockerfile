@@ -7,7 +7,7 @@
 # Run:   docker run -d -p 8080:8080 -p 50000:50000 --name jenkins-script-library jenkins-script-library:latest
 # Dockerfile
 
-FROM jenkins/jenkins:lts-jdk17
+FROM jenkins/jenkins:2.528.2-lts-jdk17
 
 LABEL maintainer="you@example.com"
 LABEL description="Jenkins Script Library Dev Environment"
@@ -15,7 +15,7 @@ LABEL description="Jenkins Script Library Dev Environment"
 USER root
 
 # Set env vars
-ENV GRADLE_VERSION=8.7 \
+ENV GRADLE_VERSION=8.14.2 \
     JENKINS_HOME=/var/jenkins_home \
     GRADLE_HOME=/opt/gradle
 
