@@ -8,7 +8,7 @@ class PipelineGeneratorSpec extends Specification {
 
     def "generates pipeline with parameters"() {
         given:
-        String template = "pipeline { stages { stage('Build'){ steps { echo \"${project}\" } } } }"
+        String template = 'pipeline { stages { stage(\'Build\'){ steps { echo "${project}" } } } }'
         def generator = new PipelineGenerator(template)
 
         when:
