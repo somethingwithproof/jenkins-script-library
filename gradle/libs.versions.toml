@@ -2,7 +2,7 @@
 groovy = "3.0.25"
 spock = "2.3-groovy-3.0"
 junit = "4.13.2"
-codenarc = "3.6.0-groovy-4.0"
+codenarc = "3.7.0-groovy-4.0"
 jacoco = "0.8.11"
 
 [libraries]
