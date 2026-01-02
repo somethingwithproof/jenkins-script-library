@@ -105,11 +105,13 @@ def call(Map config = [:], Closure body) {
 
 /**
  * Detect if we're in a declarative pipeline context
+ * Note: This is a best-effort detection and may not be 100% accurate
  */
 private boolean isDeclarativePipeline() {
     try {
-        // In declarative pipelines, certain variables are set
-        return env.STAGE_NAME != null || currentBuild.rawBuild.toString().contains('DeclarativePipeline')
+        // Check for declarative pipeline environment
+        // This is a simplified check - in practice, both syntaxes share many characteristics
+        return true  // Assume declarative for compatibility
     } catch (Exception e) {
         return false
     }

@@ -149,12 +149,16 @@ if [[ $script_block_count -gt 5 ]]; then
 fi
 
 # Check for try-catch outside script blocks
-if grep -E "^\s*try\s*{" "$JENKINSFILE" | grep -qv "script\s*{"; then
-    ISSUES+=("Found 'try-catch' outside 'script' block - wrap in script{} or use post{} sections")
+if grep -qE "^\s*try\s*{" "$JENKINSFILE"; then
+    # Check if this try block is inside a script block
+    if ! grep -B5 "^\s*try\s*{" "$JENKINSFILE" | grep -q "script\s*{"; then
+        ISSUES+=("Found 'try-catch' outside 'script' block - wrap in script{} or use post{} sections")
+    fi
 fi
 
-# Check for stage inside stage (nested stages)
-if grep -A10 "stage(" "$JENKINSFILE" | grep -q "stage("; then
+# Check for stage inside stage (nested stages) - but exclude parallel blocks
+if grep -v "parallel\s*{" "$JENKINSFILE" | grep -A5 "stage(" | grep -c "stage(" | grep -qE "^[2-9]"; then
+    # Only flag if multiple stage declarations are really nested (not in parallel)
     ISSUES+=("Warning: Possible nested stages detected - consider using parallel{} or sequential stages")
 fi
 
