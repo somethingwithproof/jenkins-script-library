@@ -157,10 +157,14 @@ if grep -qE "^\s*try\s*{" "$JENKINSFILE"; then
 fi
 
 # Check for stage inside stage (nested stages) - but exclude parallel blocks
-if grep -v "parallel\s*{" "$JENKINSFILE" | grep -A5 "stage(" | grep -c "stage(" | grep -qE "^[2-9]"; then
+# This checks if there are multiple stage declarations that might be nested
+TEMP_FILE="/tmp/jenkinsfile_check_$$"
+grep -v "parallel\s*{" "$JENKINSFILE" > "$TEMP_FILE" 2>/dev/null || true
+if grep -A5 "stage(" "$TEMP_FILE" | grep -c "stage(" | grep -qE "^[2-9]"; then
     # Only flag if multiple stage declarations are really nested (not in parallel)
     ISSUES+=("Warning: Possible nested stages detected - consider using parallel{} or sequential stages")
 fi
+rm -f "$TEMP_FILE"
 
 # Report local issues
 if [[ ${#ISSUES[@]} -gt 0 ]]; then
@@ -184,7 +188,7 @@ if [[ "$LOCAL_ONLY" == "false" ]]; then
     # Prepare authentication
     AUTH_ARGS=""
     if [[ -n "$JENKINS_USER" ]] && [[ -n "$JENKINS_TOKEN" ]]; then
-        AUTH_ARGS="-u $JENKINS_USER:$JENKINS_TOKEN"
+        AUTH_ARGS="-u ${JENKINS_USER}:${JENKINS_TOKEN}"
     fi
     
     # Try to validate
@@ -194,9 +198,16 @@ if [[ "$LOCAL_ONLY" == "false" ]]; then
         log_info "Validation URL: $VALIDATION_URL"
     fi
     
-    RESPONSE=$(curl -s -w "\n%{http_code}" $AUTH_ARGS -X POST \
-        -F "jenkinsfile=<$JENKINSFILE" \
-        "$VALIDATION_URL" 2>&1 || true)
+    # Use proper quoting for AUTH_ARGS
+    if [[ -n "$AUTH_ARGS" ]]; then
+        RESPONSE=$(curl -s -w "\n%{http_code}" $AUTH_ARGS -X POST \
+            -F "jenkinsfile=<$JENKINSFILE" \
+            "$VALIDATION_URL" 2>&1 || true)
+    else
+        RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            -F "jenkinsfile=<$JENKINSFILE" \
+            "$VALIDATION_URL" 2>&1 || true)
+    fi
     
     HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
     BODY=$(echo "$RESPONSE" | head -n-1)

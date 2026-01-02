@@ -93,29 +93,12 @@ pipeline {
         }
         
         stage('Build Matrix') {
-            // Build for multiple platforms and versions
+            // Build for multiple Java versions
             matrix {
                 axes {
                     axis {
-                        name 'PLATFORM'
-                        values 'linux/amd64', 'linux/arm64'
-                    }
-                    axis {
                         name 'JAVA_VERSION'
                         values '11', '17', '21'
-                    }
-                }
-                excludes {
-                    exclude {
-                        // ARM builds only for Java 17+
-                        axis {
-                            name 'PLATFORM'
-                            values 'linux/arm64'
-                        }
-                        axis {
-                            name 'JAVA_VERSION'
-                            values '11'
-                        }
                     }
                 }
                 stages {
@@ -123,13 +106,14 @@ pipeline {
                         agent {
                             docker {
                                 image "eclipse-temurin:${JAVA_VERSION}-jdk"
-                                // Note: Platform specification requires Docker Buildx
-                                // Remove or modify args if not using multi-platform builds
+                                // Multi-platform builds require Docker Buildx and are complex
+                                // This example focuses on Java version matrix
+                                // For platform-specific builds, use different agents with labels
                             }
                         }
                         steps {
                             unstash 'source'
-                            echo "Building on ${PLATFORM} with Java ${JAVA_VERSION}"
+                            echo "Building with Java ${JAVA_VERSION}"
                             sh './gradlew clean build -PjavaVersion=${JAVA_VERSION}'
                         }
                     }
