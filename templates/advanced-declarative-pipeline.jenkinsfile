@@ -1,0 +1,420 @@
+// Advanced Declarative Pipeline Template with Shared Library Integration
+// Demonstrates advanced features: matrix builds, shared library usage, parallel stages
+
+@Library('jenkins-script-library') _
+
+pipeline {
+    agent none  // Define agents per stage
+    
+    options {
+        timeout(time: 2, unit: 'HOURS')
+        timestamps()
+        ansiColor('xterm')
+        buildDiscarder(logRotator(
+            numToKeepStr: '50',
+            daysToKeepStr: '90',
+            artifactNumToKeepStr: '20'
+        ))
+        disableConcurrentBuilds()
+        skipDefaultCheckout()  // Checkout in specific stages
+    }
+    
+    environment {
+        APP_NAME = 'my-application'
+        REGISTRY = 'docker.io/myorg'
+        // Credentials loaded from Jenkins
+        DOCKER_CREDS = credentials('docker-registry-credentials')
+        DEPLOY_KEY = credentials('deployment-api-key')
+    }
+    
+    parameters {
+        choice(
+            name: 'DEPLOY_ENVIRONMENT',
+            choices: ['dev', 'staging', 'production'],
+            description: 'Target deployment environment'
+        )
+        booleanParam(
+            name: 'RUN_PERFORMANCE_TESTS',
+            defaultValue: false,
+            description: 'Run performance tests (slow)'
+        )
+        booleanParam(
+            name: 'SKIP_TESTS',
+            defaultValue: false,
+            description: 'Skip all tests (not recommended)'
+        )
+        string(
+            name: 'CUSTOM_TAG',
+            defaultValue: '',
+            description: 'Custom Docker tag (leave empty for auto-generated)'
+        )
+    }
+    
+    triggers {
+        // Poll SCM every 15 minutes
+        pollSCM('H/15 * * * *')
+        
+        // Daily build at 2 AM
+        cron('H 2 * * *')
+        
+        // Trigger on upstream job completion
+        upstream(
+            upstreamProjects: 'shared-library-build',
+            threshold: hudson.model.Result.SUCCESS
+        )
+    }
+    
+    stages {
+        stage('Initialize') {
+            agent any
+            steps {
+                checkout scm
+                
+                script {
+                    // Calculate version
+                    def version = sh(returnStdout: true, script: 'git describe --tags --always').trim()
+                    env.BUILD_VERSION = version
+                    
+                    // Set custom tag if provided
+                    if (params.CUSTOM_TAG) {
+                        env.DOCKER_TAG = params.CUSTOM_TAG
+                    } else {
+                        env.DOCKER_TAG = "${version}-${env.BUILD_NUMBER}"
+                    }
+                    
+                    // Update build display name
+                    currentBuild.displayName = "#${env.BUILD_NUMBER} - ${env.DOCKER_TAG}"
+                    currentBuild.description = "Branch: ${env.BRANCH_NAME} | Deploy: ${params.DEPLOY_ENVIRONMENT}"
+                }
+                
+                // Stash source code for other stages
+                stash name: 'source', includes: '**', excludes: '.git/**'
+            }
+        }
+        
+        stage('Build Matrix') {
+            // Build for multiple platforms and versions
+            matrix {
+                axes {
+                    axis {
+                        name 'PLATFORM'
+                        values 'linux/amd64', 'linux/arm64'
+                    }
+                    axis {
+                        name 'JAVA_VERSION'
+                        values '11', '17', '21'
+                    }
+                }
+                excludes {
+                    exclude {
+                        // ARM builds only for Java 17+
+                        axis {
+                            name 'PLATFORM'
+                            values 'linux/arm64'
+                        }
+                        axis {
+                            name 'JAVA_VERSION'
+                            values '11'
+                        }
+                    }
+                }
+                stages {
+                    stage('Build') {
+                        agent {
+                            docker {
+                                image "eclipse-temurin:${JAVA_VERSION}-jdk"
+                                args '--platform ${PLATFORM}'
+                            }
+                        }
+                        steps {
+                            unstash 'source'
+                            echo "Building on ${PLATFORM} with Java ${JAVA_VERSION}"
+                            sh './gradlew clean build -PjavaVersion=${JAVA_VERSION}'
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Test') {
+            when {
+                not {
+                    expression { return params.SKIP_TESTS }
+                }
+            }
+            parallel {
+                stage('Unit Tests') {
+                    agent {
+                        docker {
+                            image 'eclipse-temurin:17-jdk'
+                            args '-v $HOME/.gradle:/root/.gradle'
+                        }
+                    }
+                    steps {
+                        unstash 'source'
+                        sh './gradlew test'
+                    }
+                    post {
+                        always {
+                            junit '**/build/test-results/test/*.xml'
+                        }
+                    }
+                }
+                
+                stage('Integration Tests') {
+                    agent {
+                        docker {
+                            image 'eclipse-temurin:17-jdk'
+                            args '-v $HOME/.gradle:/root/.gradle'
+                        }
+                    }
+                    steps {
+                        unstash 'source'
+                        sh './gradlew integrationTest'
+                    }
+                    post {
+                        always {
+                            junit '**/build/test-results/integrationTest/*.xml'
+                        }
+                    }
+                }
+                
+                stage('Security Scan') {
+                    agent any
+                    steps {
+                        unstash 'source'
+                        
+                        script {
+                            // Use shared library function
+                            def audit = auditSecurity(
+                                archive: true,
+                                failOnCritical: false
+                            )
+                            
+                            if (audit.summary.critical > 0) {
+                                unstable("Found ${audit.summary.critical} critical security issues")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Performance Tests') {
+            when {
+                expression { return params.RUN_PERFORMANCE_TESTS }
+            }
+            agent {
+                label 'performance-test'
+            }
+            steps {
+                unstash 'source'
+                echo 'Running performance tests...'
+                sh './run-performance-tests.sh'
+            }
+            post {
+                always {
+                    // Archive performance results
+                    archiveArtifacts artifacts: 'performance-results/**', allowEmptyArchive: true
+                }
+            }
+        }
+        
+        stage('Quality Analysis') {
+            agent any
+            steps {
+                unstash 'source'
+                
+                script {
+                    // Use shared library function
+                    def metrics = analyzePipelineMetrics()
+                    
+                    echo "Pipeline Success Rate: ${metrics.summary.successRate}%"
+                    echo "Average Duration: ${metrics.summary.avgDuration / 60000} minutes"
+                    
+                    if (!metrics.isHealthy()) {
+                        unstable("Pipeline health is degraded")
+                    }
+                }
+            }
+        }
+        
+        stage('Build Docker Image') {
+            agent any
+            steps {
+                unstash 'source'
+                
+                script {
+                    docker.withRegistry('', 'docker-registry-credentials') {
+                        def image = docker.build(
+                            "${REGISTRY}/${APP_NAME}:${DOCKER_TAG}",
+                            "--build-arg VERSION=${BUILD_VERSION} ."
+                        )
+                        
+                        // Also tag as latest if on main branch
+                        if (env.BRANCH_NAME == 'main') {
+                            image.push('latest')
+                        }
+                        
+                        image.push()
+                    }
+                }
+            }
+        }
+        
+        stage('Deploy') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'develop'
+                }
+            }
+            agent any
+            steps {
+                script {
+                    def targetEnv = params.DEPLOY_ENVIRONMENT
+                    
+                    // For production, require approval
+                    if (targetEnv == 'production') {
+                        timeout(time: 1, unit: 'HOURS') {
+                            input(
+                                message: "Deploy ${BUILD_VERSION} to PRODUCTION?",
+                                ok: 'Deploy',
+                                submitter: 'admin,release-manager',
+                                parameters: [
+                                    booleanParam(
+                                        name: 'CONFIRMED',
+                                        defaultValue: false,
+                                        description: 'I confirm this deployment'
+                                    )
+                                ]
+                            )
+                        }
+                    }
+                    
+                    echo "Deploying to ${targetEnv}..."
+                    
+                    // Deploy using credentials
+                    withCredentials([string(credentialsId: 'deployment-api-key', variable: 'API_KEY')]) {
+                        sh """
+                            curl -X POST https://deploy.example.com/api/deploy \
+                                -H "Authorization: Bearer \${API_KEY}" \
+                                -d "environment=${targetEnv}" \
+                                -d "image=${REGISTRY}/${APP_NAME}:${DOCKER_TAG}"
+                        """
+                    }
+                }
+            }
+            post {
+                success {
+                    echo "Successfully deployed to ${params.DEPLOY_ENVIRONMENT}"
+                }
+                failure {
+                    echo "Deployment to ${params.DEPLOY_ENVIRONMENT} failed"
+                    
+                    // Trigger rollback if production deployment fails
+                    script {
+                        if (params.DEPLOY_ENVIRONMENT == 'production') {
+                            echo "Initiating rollback..."
+                            // Add rollback logic here
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Cloud Cost Analysis') {
+            when {
+                branch 'main'
+            }
+            agent any
+            steps {
+                script {
+                    // Use shared library function
+                    def costAnalysis = optimizeCloudCosts.analyze()
+                    
+                    echo "Total Monthly Cost: \$${costAnalysis.totalCost.monthly}"
+                    echo "Potential Savings: \$${costAnalysis.savings.monthlyTotal}/month"
+                    
+                    if (costAnalysis.hasSavingsOpportunity(500)) {
+                        echo "SIGNIFICANT SAVINGS OPPORTUNITY DETECTED!"
+                        
+                        def recommendations = costAnalysis.getTopRecommendations(5)
+                        recommendations.each { rec ->
+                            echo "  [${rec.priority}] ${rec.message}"
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            node('master') {
+                echo "Build completed with result: ${currentBuild.result ?: 'SUCCESS'}"
+                
+                // Clean workspace
+                cleanWs()
+            }
+        }
+        
+        success {
+            node('master') {
+                script {
+                    // Send success notification for main branches
+                    if (env.BRANCH_NAME in ['main', 'develop']) {
+                        emailext(
+                            to: 'team@example.com',
+                            subject: "✓ Success: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                            body: """
+                                Build succeeded!
+                                
+                                Version: ${env.BUILD_VERSION}
+                                Docker Tag: ${env.DOCKER_TAG}
+                                Branch: ${env.BRANCH_NAME}
+                                Deployed to: ${params.DEPLOY_ENVIRONMENT}
+                                
+                                ${env.BUILD_URL}
+                            """,
+                            mimeType: 'text/plain'
+                        )
+                    }
+                }
+            }
+        }
+        
+        failure {
+            node('master') {
+                script {
+                    emailext(
+                        to: 'team@example.com',
+                        subject: "✗ Failed: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                        body: """
+                            Build failed!
+                            
+                            Branch: ${env.BRANCH_NAME}
+                            Commit: ${env.GIT_COMMIT}
+                            
+                            Please check: ${env.BUILD_URL}
+                        """,
+                        mimeType: 'text/plain',
+                        attachLog: true
+                    )
+                }
+            }
+        }
+        
+        unstable {
+            node('master') {
+                echo 'Build marked as unstable'
+            }
+        }
+        
+        cleanup {
+            node('master') {
+                echo 'Performing cleanup...'
+            }
+        }
+    }
+}
