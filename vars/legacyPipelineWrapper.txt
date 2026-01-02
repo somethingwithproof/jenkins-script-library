@@ -1,0 +1,198 @@
+# legacyPipelineWrapper
+
+Provides backward compatibility for legacy scripted pipelines when migrating to declarative syntax.
+
+## Description
+
+The `legacyPipelineWrapper` function allows you to execute legacy scripted pipeline code within a declarative pipeline context, making it easier to gradually migrate existing pipelines.
+
+## Usage
+
+### Basic Usage in Declarative Pipeline
+
+```groovy
+@Library('jenkins-script-library') _
+
+pipeline {
+    agent any
+    stages {
+        stage('Run Legacy Code') {
+            steps {
+                legacyPipelineWrapper {
+                    // Your legacy scripted pipeline code
+                    node('linux') {
+                        stage('Build') {
+                            sh 'make build'
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+### With Configuration Options
+
+```groovy
+pipeline {
+    agent any
+    stages {
+        stage('Legacy Build') {
+            steps {
+                script {
+                    legacyPipelineWrapper(enableLogging: true, catchErrors: true) {
+                        node {
+                            try {
+                                stage('Build') {
+                                    sh 'make build'
+                                }
+                            } catch (Exception e) {
+                                echo "Build failed but continuing..."
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+### Wrapping Entire Scripted Pipeline
+
+```groovy
+@Library('jenkins-script-library') _
+
+// Wrap your entire existing scripted pipeline
+legacyPipelineWrapper {
+    node('linux') {
+        try {
+            stage('Checkout') {
+                checkout scm
+            }
+            
+            stage('Build') {
+                sh 'make build'
+            }
+            
+            stage('Test') {
+                sh 'make test'
+            }
+        } catch (Exception e) {
+            error "Pipeline failed: ${e.message}"
+        } finally {
+            cleanWs()
+        }
+    }
+}
+```
+
+## Configuration Options
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `enableLogging` | Boolean | `true` | Enable wrapper logging messages |
+| `catchErrors` | Boolean | `false` | Catch errors and continue instead of failing |
+
+## Helper Methods
+
+### executeNode
+
+Execute a node block in a compatible way:
+
+```groovy
+legacyPipelineWrapper.executeNode('docker') {
+    sh 'docker build -t myapp .'
+}
+```
+
+### executeParallel
+
+Execute parallel stages in a compatible format:
+
+```groovy
+legacyPipelineWrapper.executeParallel([
+    'Unit Tests': {
+        sh 'npm run test:unit'
+    },
+    'Integration Tests': {
+        sh 'npm run test:integration'
+    }
+])
+```
+
+## Migration Strategy
+
+1. **Initial State**: Legacy scripted pipeline
+   ```groovy
+   node {
+       stage('Build') {
+           sh 'make build'
+       }
+   }
+   ```
+
+2. **Step 1**: Wrap with compatibility layer
+   ```groovy
+   @Library('jenkins-script-library') _
+   
+   legacyPipelineWrapper {
+       node {
+           stage('Build') {
+               sh 'make build'
+           }
+       }
+   }
+   ```
+
+3. **Step 2**: Convert to declarative with wrapped legacy parts
+   ```groovy
+   pipeline {
+       agent any
+       stages {
+           stage('Build') {
+               steps {
+                   legacyPipelineWrapper {
+                       node {
+                           sh 'make build'
+                       }
+                   }
+               }
+           }
+       }
+   }
+   ```
+
+4. **Step 3**: Full declarative conversion
+   ```groovy
+   pipeline {
+       agent any
+       stages {
+           stage('Build') {
+               steps {
+                   sh 'make build'
+               }
+           }
+       }
+   }
+   ```
+
+## When to Use
+
+- **During Migration**: When gradually converting scripted to declarative pipelines
+- **Mixed Environments**: When some teams use scripted and others use declarative
+- **Legacy Code**: When you have complex scripted code that's difficult to convert immediately
+- **Third-party Integrations**: When using shared libraries that expect scripted syntax
+
+## When NOT to Use
+
+- **New Pipelines**: Always use declarative syntax for new pipelines
+- **Simple Pipelines**: If the pipeline is simple enough to convert directly
+- **Performance Critical**: The wrapper adds minimal overhead but pure declarative is preferred
+
+## See Also
+
+- [Pipeline Migration Guide](../PIPELINE_MIGRATION_GUIDE.md)
+- [Scripted vs Declarative Comparison](../examples/scripted-pipeline-legacy.jenkinsfile)
+- [Declarative Pipeline Example](../examples/declarative-equivalent.jenkinsfile)

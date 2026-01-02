@@ -1,0 +1,224 @@
+// DECLARATIVE PIPELINE EXAMPLE (After Migration)
+// This is the MIGRATED version of scripted-pipeline-legacy.jenkinsfile
+// Demonstrates modern declarative syntax with all the same functionality
+
+pipeline {
+    agent {
+        label 'docker'
+    }
+    
+    options {
+        // Pipeline configuration
+        timeout(time: 2, unit: 'HOURS')
+        timestamps()
+        buildDiscarder(logRotator(numToKeepStr: '30', daysToKeepStr: '90'))
+        disableConcurrentBuilds()
+    }
+    
+    environment {
+        // Environment variables
+        BUILD_VERSION = '1.0.0'
+        DEPLOY_ENV = 'staging'
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                echo 'Checking out source code...'
+                checkout scm
+                
+                script {
+                    // Read version from file
+                    def versionProps = readProperties file: 'version.properties'
+                    env.BUILD_VERSION = "${versionProps['version.major']}.${versionProps['version.minor']}.${versionProps['version.patch']}"
+                }
+            }
+        }
+        
+        stage('Build') {
+            agent {
+                docker {
+                    image 'maven:3.8-jdk-11'
+                    args '-v $HOME/.m2:/root/.m2'
+                    reuseNode true
+                }
+            }
+            steps {
+                echo "Building version ${env.BUILD_VERSION}..."
+                sh 'mvn clean package -DskipTests'
+            }
+        }
+        
+        stage('Test') {
+            parallel {
+                stage('Unit Tests') {
+                    agent {
+                        docker {
+                            image 'maven:3.8-jdk-11'
+                            args '-v $HOME/.m2:/root/.m2'
+                            reuseNode true
+                        }
+                    }
+                    steps {
+                        echo 'Running unit tests...'
+                        sh 'mvn test'
+                    }
+                    post {
+                        always {
+                            junit '**/target/surefire-reports/*.xml'
+                        }
+                    }
+                }
+                
+                stage('Integration Tests') {
+                    agent {
+                        docker {
+                            image 'maven:3.8-jdk-11'
+                            args '-v $HOME/.m2:/root/.m2'
+                            reuseNode true
+                        }
+                    }
+                    steps {
+                        echo 'Running integration tests...'
+                        sh 'mvn verify -Pintegration-tests'
+                    }
+                    post {
+                        always {
+                            junit '**/target/failsafe-reports/*.xml'
+                        }
+                    }
+                }
+                
+                stage('Code Quality') {
+                    agent {
+                        docker {
+                            image 'maven:3.8-jdk-11'
+                            args '-v $HOME/.m2:/root/.m2'
+                            reuseNode true
+                        }
+                    }
+                    steps {
+                        echo 'Running code quality analysis...'
+                        sh 'mvn sonar:sonar'
+                    }
+                }
+            }
+        }
+        
+        stage('Package') {
+            agent {
+                docker {
+                    image 'maven:3.8-jdk-11'
+                    args '-v $HOME/.m2:/root/.m2'
+                    reuseNode true
+                }
+            }
+            steps {
+                echo 'Creating artifacts...'
+                sh 'mvn package -DskipTests'
+            }
+            post {
+                success {
+                    archiveArtifacts artifacts: '**/target/*.jar', fingerprint: true
+                }
+            }
+        }
+        
+        stage('Deploy to Staging') {
+            when {
+                anyOf {
+                    branch 'develop'
+                    branch 'main'
+                }
+            }
+            steps {
+                echo "Deploying version ${env.BUILD_VERSION} to ${env.DEPLOY_ENV}..."
+                
+                withCredentials([string(credentialsId: 'deploy-api-key', variable: 'API_KEY')]) {
+                    sh """
+                        curl -X POST https://deploy-server/api/deploy \\
+                             -H "Authorization: Bearer \${API_KEY}" \\
+                             -d "version=${env.BUILD_VERSION}" \\
+                             -d "environment=${env.DEPLOY_ENV}"
+                    """
+                }
+            }
+            post {
+                success {
+                    echo "Successfully deployed ${env.BUILD_VERSION} to staging"
+                }
+                failure {
+                    echo 'Staging deployment failed'
+                }
+            }
+        }
+        
+        stage('Deploy to Production') {
+            when {
+                branch 'main'
+            }
+            input {
+                message 'Deploy to Production?'
+                ok 'Deploy'
+                submitter 'admin,release-manager'
+            }
+            steps {
+                script {
+                    env.DEPLOY_ENV = 'production'
+                }
+                
+                withCredentials([string(credentialsId: 'prod-deploy-api-key', variable: 'API_KEY')]) {
+                    sh """
+                        curl -X POST https://deploy-server/api/deploy \\
+                             -H "Authorization: Bearer \${API_KEY}" \\
+                             -d "version=${env.BUILD_VERSION}" \\
+                             -d "environment=${env.DEPLOY_ENV}"
+                    """
+                }
+            }
+            post {
+                success {
+                    echo "Successfully deployed ${env.BUILD_VERSION} to production"
+                }
+                failure {
+                    echo 'Production deployment failed'
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            echo 'Pipeline execution completed'
+            cleanWs()
+        }
+        
+        success {
+            echo 'Pipeline succeeded!'
+        }
+        
+        failure {
+            echo "Pipeline failed"
+            
+            script {
+                // Send notification for important branches
+                if (env.BRANCH_NAME == 'main' || env.BRANCH_NAME == 'develop') {
+                    mail to: 'team@example.com',
+                         subject: "Failed: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                         body: "Build failed: ${env.BUILD_URL}"
+                }
+            }
+            
+            // Archive logs on failure
+            archiveArtifacts artifacts: 'logs/**/*.log', allowEmptyArchive: true
+        }
+        
+        unstable {
+            echo 'Pipeline is unstable'
+        }
+        
+        cleanup {
+            echo 'Performing cleanup...'
+        }
+    }
+}

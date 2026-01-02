@@ -1,11 +1,13 @@
 # Jenkins Script Library
 
-A collection of Groovy utilities and scripts designed to automate and facilitate various operations within Jenkins environments. This library follows Jenkins-compatible practices and includes comprehensive test coverage. Supports Jenkins automation for modern environments.
+A collection of Groovy utilities and scripts designed to automate and facilitate various operations within Jenkins environments. This library follows Jenkins-compatible practices and includes comprehensive test coverage. **Fully supports modern declarative Jenkins pipelines** with Blue Ocean compatibility.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Groovy 3.0](https://img.shields.io/badge/Groovy-3.0-blue.svg)](https://groovy-lang.org/)
 [![Java 17+](https://img.shields.io/badge/Java-17+-orange.svg)](https://adoptium.net/)
 [![Jenkins 2.361.4+](https://img.shields.io/badge/Jenkins-2.361.4+-green.svg)](https://jenkins.io/)
+[![Declarative Pipeline](https://img.shields.io/badge/Pipeline-Declarative-blue.svg)](https://www.jenkins.io/doc/book/pipeline/syntax/)
+[![Blue Ocean](https://img.shields.io/badge/Blue%20Ocean-Compatible-brightgreen.svg)](https://www.jenkins.io/doc/book/blueocean/)
 [![Test Coverage](https://img.shields.io/badge/Coverage-91%25-brightgreen.svg)](./build/reports/jacoco/test/html/index.html)
 [![CI](https://github.com/thomasvincent/jenkins-script-library/actions/workflows/ci.yml/badge.svg)](https://github.com/thomasvincent/jenkins-script-library/actions/workflows/ci.yml)
 [![Gradle Build](https://github.com/thomasvincent/jenkins-script-library/actions/workflows/gradle.yml/badge.svg)](https://github.com/thomasvincent/jenkins-script-library/actions/workflows/gradle.yml)
@@ -13,12 +15,14 @@ A collection of Groovy utilities and scripts designed to automate and facilitate
 
 ## Features
 
+- **Declarative Pipeline Support**: Modern pipeline syntax with full Blue Ocean compatibility
 - **Job Management**: Enable/disable, clean, migrate, and templatize Jenkins jobs
 - **Cloud Integration**: Manage Jenkins agents on AWS, Azure, and Kubernetes
 - **Security**: Audit and secure Jenkins instances
 - **Performance Optimization**: Monitor and improve Jenkins performance
 - **Configuration Management**: Backup and restore Jenkins configurations
 - **Pipeline Generation**: Create Jenkins pipelines from reusable templates
+- **Legacy Support**: Backward compatibility wrapper for scripted pipelines
 
 ## Project Structure
 
@@ -65,6 +69,115 @@ This library can be used in two ways:
 2. **As individual scripts to run directly in Jenkins**:
 
    The scripts in `src/main/groovy/com/github/thomasvincent/jenkinsscripts/scripts/` can be executed directly in Jenkins Script Console or through the Jenkins CLI.
+
+3. **As a Jenkins Shared Library**:
+
+   Configure in Jenkins Global Configuration:
+   - Library Name: `jenkins-script-library`
+   - Default Version: `main`
+   - Repository URL: `https://github.com/thomasvincent/jenkins-script-library.git`
+
+   Then use in your declarative pipeline:
+   ```groovy
+   @Library('jenkins-script-library') _
+   
+   pipeline {
+       agent any
+       stages {
+           stage('Example') {
+               steps {
+                   // Use any shared library function
+                   analyzePipelineMetrics()
+               }
+           }
+       }
+   }
+   ```
+
+## Declarative Pipeline Support
+
+This library fully supports modern Jenkins declarative pipelines with:
+
+### Quick Start
+
+```groovy
+@Library('jenkins-script-library') _
+
+pipeline {
+    agent any
+    
+    stages {
+        stage('Analyze Pipeline') {
+            steps {
+                script {
+                    def metrics = analyzePipelineMetrics()
+                    echo "Success rate: ${metrics.summary.successRate}%"
+                }
+            }
+        }
+        
+        stage('Optimize Costs') {
+            steps {
+                script {
+                    def analysis = optimizeCloudCosts.analyze()
+                    echo "Monthly cost: \$${analysis.totalCost.monthly}"
+                }
+            }
+        }
+        
+        stage('Security Audit') {
+            steps {
+                script {
+                    def audit = auditSecurity()
+                    echo "Security issues: ${audit.summary.critical}"
+                }
+            }
+        }
+    }
+}
+```
+
+### Migration from Scripted Pipelines
+
+If you have existing scripted pipelines, see our comprehensive [Pipeline Migration Guide](PIPELINE_MIGRATION_GUIDE.md) which includes:
+
+- Side-by-side syntax comparisons
+- Step-by-step migration examples
+- Best practices for declarative pipelines
+- Validation and linting guide
+
+For legacy support, use the `legacyPipelineWrapper`:
+
+```groovy
+@Library('jenkins-script-library') _
+
+pipeline {
+    agent any
+    stages {
+        stage('Legacy Code') {
+            steps {
+                legacyPipelineWrapper {
+                    // Your existing scripted pipeline code
+                    node {
+                        stage('Build') {
+                            sh 'make build'
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+### Blue Ocean Compatibility
+
+All pipelines are fully compatible with Jenkins Blue Ocean for enhanced visualization. See the [Blue Ocean Guide](BLUE_OCEAN_GUIDE.md) for:
+
+- Setup instructions
+- Best practices for visualization
+- Interactive features
+- Troubleshooting tips
 
 ## Usage
 
@@ -373,6 +486,42 @@ The library supports the following cloud providers:
 - **Kubernetes**: Manage Kubernetes pods as Jenkins agents
 - **Oracle Cloud**: Manage Oracle Cloud Infrastructure (OCI) instances as Jenkins agents
 - **DigitalOcean**: Manage DigitalOcean droplets as Jenkins agents
+
+## Documentation
+
+### Pipeline Guides
+
+- **[Pipeline Migration Guide](PIPELINE_MIGRATION_GUIDE.md)** - Comprehensive guide for migrating from scripted to declarative pipelines
+  - Syntax comparisons and examples
+  - Best practices
+  - Common patterns and anti-patterns
+  - Validation and linting
+
+- **[Blue Ocean Compatibility Guide](BLUE_OCEAN_GUIDE.md)** - Ensure your pipelines work optimally with Blue Ocean
+  - Setup and configuration
+  - Visual features and requirements
+  - Troubleshooting common issues
+  - Verification checklist
+
+### Examples
+
+- **[Advanced Pipeline Example](examples/advanced-pipeline.jenkinsfile)** - Complex declarative pipeline with all features
+- **[Legacy Scripted Pipeline](examples/scripted-pipeline-legacy.jenkinsfile)** - Example of old scripted syntax
+- **[Declarative Equivalent](examples/declarative-equivalent.jenkinsfile)** - Same pipeline migrated to declarative
+
+### Shared Library Functions
+
+All functions in `vars/` directory are documented:
+- `analyzePipelineMetrics` - Analyze pipeline performance and health
+- `optimizeCloudCosts` - Cloud cost analysis and optimization
+- `backupJenkinsConfig` - Backup and restore Jenkins configuration
+- `rotateCredentials` - Credential rotation and compliance
+- `auditSecurity` - Security auditing
+- `disableJobs` - Job management
+- `generatePipeline` - Pipeline generation from templates
+- `legacyPipelineWrapper` - Backward compatibility for scripted pipelines
+
+Each function has a corresponding `.txt` file with detailed documentation (e.g., `vars/legacyPipelineWrapper.txt`).
 
 ## Upcoming Features
 
