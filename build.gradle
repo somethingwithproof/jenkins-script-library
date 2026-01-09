@@ -1,6 +1,14 @@
 plugins {
     id 'groovy'
     id 'maven-publish'
+    id 'codenarc'
+}
+
+codenarc {
+    toolVersion = '3.5.0'
+    configFile = file('config/codenarc/codenarc.xml')
+    reportFormat = 'html'
+    ignoreFailures = true  // Don't fail build on lint warnings
 }
 
 group = 'com.github.thomasvincent'

@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ruleset xmlns="http://codenarc.org/ruleset/1.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://codenarc.org/ruleset/1.0 http://codenarc.org/ruleset-schema.xsd"
+         xsi:noNamespaceSchemaLocation="http://codenarc.org/ruleset-schema.xsd">
+
+    <description>CodeNarc rules for Jenkins Script Library</description>
+
+    <!-- Basic rules -->
+    <ruleset-ref path='rulesets/basic.xml'/>
+
+    <!-- Braces rules -->
+    <ruleset-ref path='rulesets/braces.xml'/>
+
+    <!-- Concurrency rules -->
+    <ruleset-ref path='rulesets/concurrency.xml'/>
+
+    <!-- Convention rules -->
+    <ruleset-ref path='rulesets/convention.xml'>
+        <exclude name='NoDef'/>
+        <exclude name='VariableTypeRequired'/>
+        <exclude name='MethodReturnTypeRequired'/>
+    </ruleset-ref>
+
+    <!-- Design rules -->
+    <ruleset-ref path='rulesets/design.xml'>
+        <exclude name='BuilderMethodWithSideEffects'/>
+    </ruleset-ref>
+
+    <!-- Dry rules -->
+    <ruleset-ref path='rulesets/dry.xml'>
+        <rule-config name='DuplicateStringLiteral'>
+            <property name='ignoreStrings' value='true,false,null,""'/>
+        </rule-config>
+    </ruleset-ref>
+
+    <!-- Exception rules -->
+    <ruleset-ref path='rulesets/exceptions.xml'/>
+
+    <!-- Formatting rules -->
+    <ruleset-ref path='rulesets/formatting.xml'>
+        <exclude name='ClassJavadoc'/>
+        <exclude name='LineLength'/>
+        <exclude name='SpaceAroundMapEntryColon'/>
+    </ruleset-ref>
+
+    <!-- Generic rules -->
+    <ruleset-ref path='rulesets/generic.xml'/>
+
+    <!-- Groovyism rules -->
+    <ruleset-ref path='rulesets/groovyism.xml'>
+        <exclude name='GetterMethodCouldBeProperty'/>
+    </ruleset-ref>
+
+    <!-- Imports rules -->
+    <ruleset-ref path='rulesets/imports.xml'/>
+
+    <!-- Logging rules -->
+    <ruleset-ref path='rulesets/logging.xml'>
+        <exclude name='Println'/>
+    </ruleset-ref>
+
+    <!-- Naming rules -->
+    <ruleset-ref path='rulesets/naming.xml'>
+        <exclude name='FactoryMethodName'/>
+        <rule-config name='MethodName'>
+            <property name='regex' value='[a-z][\w_]*'/>
+        </rule-config>
+    </ruleset-ref>
+
+    <!-- Security rules -->
+    <ruleset-ref path='rulesets/security.xml'/>
+
+    <!-- Serialization rules -->
+    <ruleset-ref path='rulesets/serialization.xml'/>
+
+    <!-- Size rules -->
+    <ruleset-ref path='rulesets/size.xml'>
+        <rule-config name='MethodSize'>
+            <property name='maxLines' value='100'/>
+        </rule-config>
+        <rule-config name='ClassSize'>
+            <property name='maxLines' value='500'/>
+        </rule-config>
+    </ruleset-ref>
+
+    <!-- Unnecessary rules -->
+    <ruleset-ref path='rulesets/unnecessary.xml'>
+        <exclude name='UnnecessaryReturnKeyword'/>
+        <exclude name='UnnecessaryGetter'/>
+    </ruleset-ref>
+
+    <!-- Unused rules -->
+    <ruleset-ref path='rulesets/unused.xml'/>
+
+</ruleset>
