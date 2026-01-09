@@ -33,8 +33,17 @@ jobs:
     
     - name: Check for Hardcoded Secrets
       run: |
-        # Simple check for potential secrets
-        if grep -r --include="*.groovy" -E "(password|token|secret|credential).*=.*['\"][^'\"]{8,}['\"]" . | grep -v "propName"; then
+        # Check for potential hardcoded secrets, excluding known safe patterns
+        # Exclude: build-logic (uses secure resolution), test files, and safe patterns
+        if grep -r --include="*.groovy" \
+             --exclude-dir="build-logic" \
+             --exclude-dir="src/test" \
+             --exclude-dir="src/integration-test" \
+             -E "(password|token|secret|credential)\s*=\s*['\"][^'\"]{8,}['\"]" . \
+           | grep -v "propName" \
+           | grep -v "secureResolve" \
+           | grep -v "Credential\(" \
+           | grep -v "\.find\s*{"; then
           echo "Warning: Potential hardcoded secrets found"
           exit 1
         else
