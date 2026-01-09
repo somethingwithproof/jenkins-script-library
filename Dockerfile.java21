@@ -1,5 +1,5 @@
 # Dockerfile for building a Gradle project using JDK 21
-FROM eclipse-temurin:25-jdk
+FROM eclipse-temurin:21-jdk
 
 WORKDIR /app
 

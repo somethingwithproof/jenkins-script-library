@@ -131,7 +131,7 @@ jobs:
         docker compose -f docker-compose.test.yml run --rm \
           -e DOCKER_USER_ID=$(id -u) \
           -e DOCKER_GROUP_ID=$(id -g) \
-          java17 ./gradlew codenarc --no-daemon
+          java17 ./gradlew codenarcMain codenarcTest --no-daemon
           
         # Fix permissions for any new generated files
         sudo chown -R $(id -u):$(id -g) build

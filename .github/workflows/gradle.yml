@@ -43,7 +43,7 @@ jobs:
       run: ./gradlew test --no-daemon
       
     - name: Run CodeNarc
-      run: ./gradlew codenarc --no-daemon
+      run: ./gradlew codenarcMain codenarcTest --no-daemon
       
     - name: Check dependencies
       run: ./gradlew dependencyUpdates --no-daemon
