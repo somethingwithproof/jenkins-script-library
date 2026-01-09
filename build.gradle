@@ -15,15 +15,18 @@ repositories {
 }
 
 dependencies {
-    implementation 'org.codehaus.groovy:groovy-all:3.0.25'
-    implementation 'org.apache.logging.log4j:log4j-api:2.25.3'
-    implementation 'org.apache.logging.log4j:log4j-core:2.25.3'
-    implementation 'commons-io:commons-io:2.21.0'
+    // Use individual Groovy modules instead of deprecated groovy-all
+    implementation 'org.codehaus.groovy:groovy:3.0.22'
+    implementation 'org.codehaus.groovy:groovy-json:3.0.22'
+    implementation 'org.codehaus.groovy:groovy-xml:3.0.22'
+    implementation 'org.apache.logging.log4j:log4j-api:2.24.3'
+    implementation 'org.apache.logging.log4j:log4j-core:2.24.3'
+    implementation 'commons-io:commons-io:2.18.0'
 
     // Jenkins core APIs scoped to compile time only; version tracks latest LTS
     compileOnly "org.jenkins-ci.main:jenkins-core:${jenkinsLtsVersion}"
 
-    testImplementation 'org.spockframework:spock-core:2.4-groovy-5.0'
+    testImplementation 'org.spockframework:spock-core:2.3-groovy-3.0'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
