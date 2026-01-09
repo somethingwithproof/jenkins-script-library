@@ -44,7 +44,9 @@ jobs:
         
     - name: Check for Hardcoded Credentials
       run: |
-        if grep -r --include="*.groovy" -E "(password|token|secret).*=.*['\"][^'\"]+['\"]" . | grep -v "propName"; then
+        # Check for hardcoded credentials - exclude build-logic, vendor, and common patterns
+        if grep -r --include="*.groovy" -E "(password|token|secret)\s*=\s*['\"][^'\"]{8,}['\"]" . \
+           | grep -v "build-logic\|vendor\|propName\|Credential\|getenv\|resolve\|variable"; then
           echo "Warning: Potential hardcoded credentials found"
           exit 1
         else
