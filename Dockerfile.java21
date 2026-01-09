@@ -1,16 +1,44 @@
-# Dockerfile for building a Gradle project using JDK 21
+# Jenkins Script Library Testing Image (Java 21)
+#
+# This Dockerfile creates an environment for testing the Jenkins Script Library
+# with Java 21. It includes Gradle and all necessary testing tools.
+
 FROM eclipse-temurin:21-jdk
+
+# Set environment variables
+ENV GRADLE_VERSION=8.14.2
+
+# Install required packages
+RUN apt-get update && apt-get install -y \
+    curl \
+    unzip \
+    git \
+    wget \
+    jq \
+    gosu \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Gradle
+RUN wget -q https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip -O /tmp/gradle.zip \
+    && unzip /tmp/gradle.zip -d /opt \
+    && ln -s /opt/gradle-${GRADLE_VERSION} /opt/gradle \
+    && rm /tmp/gradle.zip
+
+# Add to PATH
+ENV PATH="$PATH:/opt/gradle/bin"
+
+# Create directories with appropriate permissions
+RUN mkdir -p /app/build/reports /app/build/test-results /app/.gradle && \
+    chmod -R 777 /app/build /app/.gradle
 
 WORKDIR /app
 
-# Copy build tool and configuration
-COPY gradlew gradle build.gradle gradle.properties ./
+# Create an entrypoint script to handle permissions and user setup
+COPY entrypoint-test.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
-# Copy source files
-COPY src ./src
+# Define an entrypoint that handles permissions
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
-# Ensure gradlew is executable
-RUN chmod +x ./gradlew
-
-# Build the project (disable daemon for CI/CD builds)
-RUN ./gradlew clean build --no-daemon --info
+# Default command runs the tests
+CMD ["./gradlew", "test", "--no-daemon"]

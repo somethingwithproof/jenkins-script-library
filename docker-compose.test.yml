@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Java 17 (Main Testing Environment)
   java17:
