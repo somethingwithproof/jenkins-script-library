@@ -15,7 +15,7 @@
     <!-- Concurrency rules -->
     <ruleset-ref path='rulesets/concurrency.xml'/>
 
-    <!-- Convention rules -->
+    <!-- Convention rules - exclude some overly strict rules -->
     <ruleset-ref path='rulesets/convention.xml'>
         <exclude name='NoDef'/>
         <exclude name='VariableTypeRequired'/>
@@ -28,11 +28,7 @@
     </ruleset-ref>
 
     <!-- Dry rules -->
-    <ruleset-ref path='rulesets/dry.xml'>
-        <rule-config name='DuplicateStringLiteral'>
-            <property name='ignoreStrings' value='true,false,null,""'/>
-        </rule-config>
-    </ruleset-ref>
+    <ruleset-ref path='rulesets/dry.xml'/>
 
     <!-- Exception rules -->
     <ruleset-ref path='rulesets/exceptions.xml'/>
@@ -63,9 +59,6 @@
     <!-- Naming rules -->
     <ruleset-ref path='rulesets/naming.xml'>
         <exclude name='FactoryMethodName'/>
-        <rule-config name='MethodName'>
-            <property name='regex' value='[a-z][\w_]*'/>
-        </rule-config>
     </ruleset-ref>
 
     <!-- Security rules -->
@@ -75,14 +68,7 @@
     <ruleset-ref path='rulesets/serialization.xml'/>
 
     <!-- Size rules -->
-    <ruleset-ref path='rulesets/size.xml'>
-        <rule-config name='MethodSize'>
-            <property name='maxLines' value='100'/>
-        </rule-config>
-        <rule-config name='ClassSize'>
-            <property name='maxLines' value='500'/>
-        </rule-config>
-    </ruleset-ref>
+    <ruleset-ref path='rulesets/size.xml'/>
 
     <!-- Unnecessary rules -->
     <ruleset-ref path='rulesets/unnecessary.xml'>
