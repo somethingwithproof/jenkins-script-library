@@ -1,6 +1,3 @@
-# EditorConfig for Groovy/Jenkins projects
-# https://editorconfig.org
-
 root = true
 
 [*]
@@ -9,46 +6,13 @@ end_of_line = lf
 insert_final_newline = true
 trim_trailing_whitespace = true
 
-# Groovy files
 [*.groovy]
 indent_style = space
 indent_size = 4
-continuation_indent_size = 8
 
-# Gradle files
-[*.gradle]
-indent_style = space
-indent_size = 4
-
-# Jenkins pipeline files
-[Jenkinsfile]
-indent_style = space
-indent_size = 4
-
-# YAML files (GitHub Actions, etc.)
 [*.{yml,yaml}]
 indent_style = space
 indent_size = 2
 
-# Properties files
-[*.properties]
-indent_style = space
-indent_size = 2
-
-# XML files
-[*.xml]
-indent_style = space
-indent_size = 2
-
-# Markdown files
 [*.md]
 trim_trailing_whitespace = false
-
-# Shell scripts
-[*.sh]
-indent_style = space
-indent_size = 2
-
-# Batch scripts
-[*.{bat,cmd}]
-end_of_line = crlf
