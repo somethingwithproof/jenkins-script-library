@@ -52,7 +52,7 @@ jobs:
         report_paths: '**/build/test-results/test/TEST-*.xml'
     
     - name: Upload Coverage Report
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: jacoco-report
         path: build/reports/jacoco/
