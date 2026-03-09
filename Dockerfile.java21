@@ -3,7 +3,7 @@
 # This Dockerfile creates an environment for testing the Jenkins Script Library
 # with Java 21. It includes Gradle and all necessary testing tools.
 
-FROM eclipse-temurin:21-jdk
+FROM eclipse-temurin:25-jdk
 
 # Set environment variables
 ENV GRADLE_VERSION=8.14.2
