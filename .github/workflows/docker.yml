@@ -38,7 +38,7 @@ jobs:
       uses: docker/setup-buildx-action@v3
     
     - name: Build and export
-      uses: docker/build-push-action@v6
+      uses: docker/build-push-action@v7
       with:
         context: .
         load: true
@@ -50,7 +50,7 @@ jobs:
     
     - name: Build and push (on main branch only)
       if: github.ref == 'refs/heads/main'
-      uses: docker/build-push-action@v6
+      uses: docker/build-push-action@v7
       with:
         context: .
         push: false
