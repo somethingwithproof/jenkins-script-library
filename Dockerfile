@@ -7,7 +7,7 @@
 # Run:   docker run -d -p 8080:8080 -p 50000:50000 --name jenkins-script-library jenkins-script-library:latest
 # Dockerfile
 
-FROM jenkins/jenkins:2.541.1-lts-jdk17
+FROM jenkins/jenkins:2.541.2-lts-jdk17
 
 LABEL maintainer="you@example.com"
 LABEL description="Jenkins Script Library Dev Environment"
