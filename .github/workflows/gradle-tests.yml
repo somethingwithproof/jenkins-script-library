@@ -18,7 +18,7 @@ permissions: read-all
 jobs:
   test:
     name: Run Gradle Tests
-    runs-on: [self-hosted]
+    runs-on: [self-hosted, linux, x64]
     timeout-minutes: 15  # Prevent hung jobs
     permissions:
       contents: read
