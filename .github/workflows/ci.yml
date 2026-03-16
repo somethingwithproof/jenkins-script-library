@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   test:
-    runs-on: [self-hosted]
+    runs-on: [self-hosted, linux, x64]
     timeout-minutes: 15  # Prevent hung jobs
     permissions:
       contents: read
