@@ -55,7 +55,7 @@ jobs:
         }' > sarif-output/no-results.sarif
 
     - name: Upload SARIF file
-      uses: github/codeql-action/upload-sarif@v4
+      uses: github/codeql-action/upload-sarif@v4.37.4
       continue-on-error: true  # Don't fail if code scanning is not enabled
       with:
         sarif_file: sarif-output/no-results.sarif
