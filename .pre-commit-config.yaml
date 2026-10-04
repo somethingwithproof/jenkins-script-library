@@ -18,7 +18,7 @@ repos:
       - id: mixed-line-ending
         args: ['--fix=lf']
       - id: detect-private-key
-        
+
   # Credential check
   - repo: https://github.com/yelp/detect-secrets
     rev: v1.4.0
@@ -26,14 +26,14 @@ repos:
       - id: detect-secrets
         exclude: '.*\.gradle$'
         args: ['--baseline', '.secrets.baseline']
-        
+
   # YAML validation
   - repo: https://github.com/adrienverge/yamllint.git
     rev: v1.33.0
     hooks:
       - id: yamllint
         args: ['-d', '{extends: relaxed, rules: {line-length: {max: 120}}}']
-        
+
   # Groovy linting
   - repo: local
     hooks:
@@ -43,20 +43,20 @@ repos:
         language: system
         pass_filenames: false
         files: '\.groovy$'
-        
+
       - id: credential-check
         name: Check for hardcoded credentials
-        entry: bash -c 'grep -r --include="*.groovy" -E "(password|token|secret).*=.*['"'"'\""][^'"'"'\"]+['"'"'\"]" . && exit 1 || exit 0'
+        entry: python3 scripts/check_hardcoded_credentials.py
         language: system
-        pass_filenames: false
-        
+        files: '\.groovy$'
+
       - id: groovy-syntax
         name: groovy syntax check
         language: system
         entry: groovy -e
         args: ["import org.codehaus.groovy.control.*; new GroovyShell(new CompilerConfiguration(scriptBaseClass: 'groovy.lang.Script')).parse(new File('$1'));"]
         files: '\.groovy$'
-        
+
   # Gradle validation
   - repo: local
     hooks:
