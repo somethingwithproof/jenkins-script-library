@@ -79,7 +79,7 @@ Each integration test follows this pattern:
 
 ### Docker-based Testing
 
-For more comprehensive tests, you can use the Docker environment:
+For more thorough tests, you can use the Docker environment:
 
 1. Build the Docker image:
 

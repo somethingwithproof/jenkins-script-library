@@ -228,7 +228,7 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 ### Programmatic API
 
-The library also provides a comprehensive programmatic API for use in your own Groovy scripts:
+The library also provides a programmatic API for use in your own Groovy scripts:
 
 #### Job Management
 
