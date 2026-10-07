@@ -1,5 +1,7 @@
 # CodeQL Configuration
 
+Project overview and status: [jenkins-script-library](../../README.md).
+
 ## CodeQL and Groovy Compatibility
 
 This directory contains configuration files for CodeQL static analysis.

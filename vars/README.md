@@ -1,5 +1,7 @@
 # Jenkins Shared Library Variables
 
+Project overview and status: [jenkins-script-library](../README.md).
+
 This directory contains global variables that can be used in Jenkins pipelines when this library is loaded.
 
 ## Usage
@@ -27,6 +29,7 @@ pipeline {
 Place your global pipeline variables here as `.groovy` files. Each file becomes a callable step in your pipeline.
 
 Example structure:
+
 - `vars/myStep.groovy` - Defines a `myStep()` function available in pipelines
 - `vars/myStep.txt` - Optional documentation for the step
 

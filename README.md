@@ -1,15 +1,9 @@
 # Jenkins Script Library
 
-A collection of Groovy utilities and scripts designed to automate and facilitate various operations within Jenkins environments. This library follows Jenkins-compatible practices and includes comprehensive test coverage. Supports Jenkins automation for modern environments.
+[![CI](https://github.com/somethingwithproof/jenkins-script-library/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/somethingwithproof/jenkins-script-library/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Groovy 3.0](https://img.shields.io/badge/Groovy-3.0-blue.svg)](https://groovy-lang.org/)
-[![Java 17+](https://img.shields.io/badge/Java-17+-orange.svg)](https://adoptium.net/)
-[![Jenkins 2.361.4+](https://img.shields.io/badge/Jenkins-2.361.4+-green.svg)](https://jenkins.io/)
-[![Test Coverage](https://img.shields.io/badge/Coverage-91%25-brightgreen.svg)](./build/reports/jacoco/test/html/index.html)
-[![CI](https://github.com/thomasvincent/jenkins-script-library/actions/workflows/ci.yml/badge.svg)](https://github.com/thomasvincent/jenkins-script-library/actions/workflows/ci.yml)
-[![Gradle Build](https://github.com/thomasvincent/jenkins-script-library/actions/workflows/gradle.yml/badge.svg)](https://github.com/thomasvincent/jenkins-script-library/actions/workflows/gradle.yml)
-[![Security Scan](https://github.com/thomasvincent/jenkins-script-library/actions/workflows/security.yml/badge.svg)](https://github.com/thomasvincent/jenkins-script-library/actions/workflows/security.yml)
+A collection of Groovy utilities and scripts designed to automate and facilitate various operations within Jenkins environments. This library follows Jenkins-compatible practices and includes unit and integration tests. Supports Jenkins automation for modern environments.
 
 ## Features
 
@@ -24,7 +18,7 @@ A collection of Groovy utilities and scripts designed to automate and facilitate
 
 The project follows standard Groovy project structure:
 
-```
+```text
 jenkins-script-library/
 ├── src/
 │   ├── main/groovy/            # Main source code
@@ -75,12 +69,14 @@ All command-line scripts support the `--help` option to display usage informatio
 #### Job Management
 
 ##### Job Cleaning
+
 ```bash
 # Clean build history for a job with limit of 50 builds and reset build number
 groovy CleanBuildHistory.groovy --limit 50 --reset my-jenkins-job
 ```
 
 ##### Job Enabling/Disabling
+
 ```bash
 # Disable a specific job
 groovy DisableJobs.groovy my-jenkins-job
@@ -93,6 +89,7 @@ groovy EnableJobs.groovy my-jenkins-job
 ```
 
 ##### Job Migration
+
 ```bash
 # Migrate a specific job
 groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job
@@ -105,11 +102,14 @@ groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin 
 ```
 
 ##### Job Templating
+
 ```bash
 # Create a job from a template
 groovy CreateJobFromTemplate.groovy --template-job template-job --target-job new-job --params-file params.json
 ```
+
 ##### Pipeline Generation
+
 ```groovy
 // Generate a Jenkinsfile from template
 generatePipeline(
@@ -119,8 +119,8 @@ generatePipeline(
 )
 ```
 
-
 ##### Job Analysis
+
 ```bash
 # Analyze job health
 groovy AnalyzeJobHealth.groovy --job my-jenkins-job
@@ -135,6 +135,7 @@ groovy AuditJobConfigurations.groovy --pattern "*.xml" --output audit-report.jso
 #### Node Management
 
 ##### Listing Nodes
+
 ```bash
 # List all slave nodes
 groovy ListSlaveNodes.groovy --all
@@ -147,6 +148,7 @@ groovy ListCloudNodes.groovy --cloud-type aws
 ```
 
 ##### Node Operations
+
 ```bash
 # Start all offline slave nodes
 groovy StartOfflineSlaveNodes.groovy --all
@@ -158,6 +160,7 @@ groovy StartOfflineSlaveNodes.groovy my-slave-node
 #### Cloud Provider Management
 
 ##### AWS Management
+
 ```bash
 # List EC2 instances used as Jenkins agents
 groovy ManageEC2Agents.groovy --list
@@ -170,6 +173,7 @@ groovy ManageEC2Agents.groovy --terminate --instance-id i-1234567890abcdef0
 ```
 
 ##### Azure Management
+
 ```bash
 # List Azure VMs used as Jenkins agents
 groovy ManageAzureVMAgents.groovy --list
@@ -182,6 +186,7 @@ groovy ManageAzureVMAgents.groovy --cleanup --node-name azure-agent-01
 ```
 
 ##### Kubernetes Management
+
 ```bash
 # List Kubernetes pods used as Jenkins agents
 groovy ManageKubernetesAgents.groovy --list
@@ -196,6 +201,7 @@ groovy ManageKubernetesAgents.groovy --delete --pod-name k8s-agent-xyz123
 #### Jenkins Instance Management
 
 ##### Health and Security
+
 ```bash
 # Perform a Jenkins instance health check
 groovy JenkinsInstanceHealthCheck.groovy
@@ -208,6 +214,7 @@ groovy SecurityVulnerabilityScan.groovy --critical-only
 ```
 
 ##### Configuration Management
+
 ```bash
 # Backup Jenkins configuration
 groovy BackupJenkinsConfig.groovy --output jenkins-backup.tar.gz
@@ -221,9 +228,10 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 ### Programmatic API
 
-The library also provides a comprehensive programmatic API for use in your own Groovy scripts:
+The library also provides a programmatic API for use in your own Groovy scripts:
 
 #### Job Management
+
 ```groovy
 import com.github.thomasvincent.jenkinsscripts.jobs.JobCleaner
 import com.github.thomasvincent.jenkinsscripts.jobs.JobMigrator
@@ -253,6 +261,7 @@ migrator.migrateJob("source-job", "target-job")
 ```
 
 #### Cloud Management
+
 ```groovy
 import com.github.thomasvincent.jenkinsscripts.cloud.AWSNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.AzureNodeManager
@@ -310,9 +319,11 @@ doManager.provisionNewDroplet("my-do-template")
 ```
 
 > **Note**: There's a known issue with the JFFI native dependency (jffi-1.2.17-native.jar) that may cause test failures. If you encounter this, you can skip tests with:
+>
 > ```bash
 > ./gradlew build -PskipTests
 > ```
+>
 > The GitHub Actions tests are currently configured to skip problematic tests.
 
 #### Docker Testing Environment
@@ -349,6 +360,7 @@ The Docker testing environment includes:
 #### Java Compatibility
 
 This library supports the following Java versions:
+
 - Java 8 (LTS)
 - Java 11 (LTS)
 - Java 17 (LTS)
@@ -368,6 +380,7 @@ This project uses CodeNarc for Groovy code quality checks:
 ## Available Cloud Integrations
 
 The library supports the following cloud providers:
+
 - **AWS EC2**: Manage EC2 instances as Jenkins agents
 - **Azure VMs**: Manage Azure virtual machines as Jenkins agents
 - **Kubernetes**: Manage Kubernetes pods as Jenkins agents
@@ -392,4 +405,3 @@ For security concerns, please review our [Security Policy](SECURITY.md).
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
