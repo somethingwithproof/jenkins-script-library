@@ -1,5 +1,7 @@
 # Jenkins Script Library Integration Tests
 
+Project overview and status: [jenkins-script-library](../../README.md).
+
 This directory contains integration tests for the Jenkins Script Library that verify the functionality with a real Jenkins environment.
 
 ## Overview
@@ -62,6 +64,7 @@ The integration tests use `JenkinsRule` to create a temporary Jenkins instance f
 ### JenkinsRule
 
 Tests use the `JenkinsRule` JUnit rule, which:
+
 - Creates a temporary Jenkins instance for each test
 - Handles setup and teardown automatically
 - Provides methods for creating test jobs and nodes
@@ -69,6 +72,7 @@ Tests use the `JenkinsRule` JUnit rule, which:
 ### Test Structure
 
 Each integration test follows this pattern:
+
 1. Setup test data (jobs, nodes, users)
 2. Execute the script functionality
 3. Verify the results
@@ -78,11 +82,13 @@ Each integration test follows this pattern:
 For more comprehensive tests, you can use the Docker environment:
 
 1. Build the Docker image:
+
    ```bash
    docker build -t jenkins-script-library:test .
    ```
 
 2. Start Jenkins with the library:
+
    ```bash
    docker-compose up -d
    ```
