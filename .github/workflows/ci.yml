@@ -15,33 +15,33 @@ concurrency:
 
 jobs:
   test:
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     timeout-minutes: 15  # Prevent hung jobs
     permissions:
       contents: read
       checks: write
       security-events: write
-    
+
     steps:
     - uses: actions/checkout@v7
-    
-    - name: Set up JDK 17
+
+    - name: Set up JDK 21
       uses: actions/setup-java@v6
       with:
-        java-version: '17'
+        java-version: '21'
         distribution: 'temurin'
-        
+
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v6
       with:
         gradle-version: 8.14.2
-      
+
     - name: Lint with CodeNarc
       run: ./gradlew codenarcMain --no-daemon
-        
+
     - name: Run unit tests
       run: ./gradlew test --no-daemon
-        
+
     - name: Check for Hardcoded Credentials
       run: |
         # Check for hardcoded credentials - exclude build-logic, vendor, and common patterns
@@ -52,7 +52,7 @@ jobs:
         else
           echo "No hardcoded credentials found"
         fi
-        
+
     - name: Check for Jenkins Best Practices
       run: |
         # Check for proper exception handling
@@ -61,7 +61,7 @@ jobs:
         else
           echo "Exception handling check passed"
         fi
-        
+
         # Check for proper logging
         if grep -r --include="*.groovy" -L "log\." . | grep -v "README\|LICENSE\|.git"; then
           echo "Warning: Some files may be missing proper logging"
