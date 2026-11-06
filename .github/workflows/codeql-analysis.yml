@@ -27,13 +27,15 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v7
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      with:
+        persist-credentials: false
 
     - name: CodeQL Status
       run: |
         echo "::notice title=CodeQL Status::CodeQL is disabled for this repository as it does not support Groovy properly"
         echo "Please see .github/codeql/README.md for more information"
-        
+
         # Create empty SARIF file to satisfy code scanning
         mkdir -p sarif-output
         echo '{
@@ -55,7 +57,7 @@ jobs:
         }' > sarif-output/no-results.sarif
 
     - name: Upload SARIF file
-      uses: github/codeql-action/upload-sarif@v4
+      uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4
       continue-on-error: true  # Don't fail if code scanning is not enabled
       with:
         sarif_file: sarif-output/no-results.sarif

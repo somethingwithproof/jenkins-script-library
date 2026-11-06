@@ -21,16 +21,18 @@ jobs:
     permissions:
       contents: read
       security-events: write
-    
+
     steps:
-    - uses: actions/checkout@v7
-    
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      with:
+        persist-credentials: false
+
     - name: Set up JDK 11
-      uses: actions/setup-java@v6
+      uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
       with:
         java-version: '11'
         distribution: 'temurin'
-    
+
     - name: Check for Hardcoded Secrets
       run: |
         # Check for potential hardcoded secrets, excluding known safe patterns
@@ -49,7 +51,7 @@ jobs:
         else
           echo "No hardcoded secrets found"
         fi
-        
+
     - name: Check for Security Best Practices
       run: |
         # Check for proper input validation
@@ -59,7 +61,7 @@ jobs:
         else
           echo "Input validation check passed"
         fi
-        
+
         # Check for secure coding patterns
         echo "Checking for secure coding patterns..."
         if grep -r --include="*.groovy" -E "(System\.exit|Runtime\.exec)" .; then
