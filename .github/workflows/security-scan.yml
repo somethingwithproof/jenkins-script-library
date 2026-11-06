@@ -20,33 +20,35 @@ permissions:
 jobs:
   security-scan:
     runs-on: ubuntu-latest
-    
+
     steps:
-      - uses: actions/checkout@v7
-      
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
       - name: Set up JDK 11
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
           java-version: '11'
           distribution: 'temurin'
-      
+
       - name: Check for Hardcoded Secrets
         run: |
           # Create an improved security scanning script
           cat > scan_secrets.sh << 'EOF'
           #!/usr/bin/env bash
-          
+
           # Set strict error handling
           set -euo pipefail
-          
+
           # Define color codes for output
           RED='\033[0;31m'
           GREEN='\033[0;32m'
           YELLOW='\033[0;33m'
           NC='\033[0m' # No Color
-          
+
           echo "Running enhanced security scan..."
-          
+
           # Safe patterns that should be excluded (these are good security practices)
           SAFE_PATTERNS=(
             # Environment and property access patterns (proper practices)
@@ -54,33 +56,33 @@ jobs:
             "project\.findProperty\(['\"].*['\"]\)"                         # Gradle property lookups
             "credentials\.(username|password)\s*=\s*resolveCredential"      # Credential resolution methods
             "credentials\.(username|password)\s*=\s*(project|System|env)"   # Common credential resolution
-            
+
             # Security documentation and annotations
             "\/\*\*\s*\*\s*SECURITY.*NO[T]?\s*contain.*hardcoded"          # Security documentation annotation
             "\/\/\s*SECURITY.*NO[T]?\s*hardcoded"                           # Security inline annotation
             "@security"                                                     # Security tag annotation
             "secureResolveCredential"                                       # Secure credential resolution method
-            
+
             # CLI option definitions (common false positives)
             "(longOpt|argName|name):\s*['\"].*['\"]"                        # CLI option specifications
             "options\.\w+\s*=\s*['\"].*['\"]"                               # Command-line options
-            
+
             # Configuration keys (not secrets)
             "keys\s*=\s*\[[^\]]*\]"                                         # Configuration key arrays
             "key(s)?:\s*['\"][^'\"]*['\"]"                                  # Named configuration keys
             "['\"]git\.(branch|commit|tag)['\"]"                            # Git metadata keys
-            
+
             # Gradle and build-related safe patterns
             "(args|path|directory|location|file|url)(\s*:|:)?\s*['\"][^'\"]*['\"]"  # Common path/location configs
             "(name|group|version|description)(\s*:|:)?\s*['\"][^'\"]*['\"]"  # Project metadata
-            
+
             # Meta-programming and reflection (common in Groovy)
             "property\(['\"].*['\"]\)"                                      # Property access via reflection
           )
-          
+
           # Join safe patterns with OR operator for grep
           SAFE_PATTERN_REGEX=$(IFS="|"; echo "${SAFE_PATTERNS[*]}")
-          
+
           # Define specific exclusion files/paths that are known safe
           EXCLUDE_PATHS=(
             "./.git/"                       # Git directory
@@ -89,13 +91,13 @@ jobs:
             "./config/codenarc/"            # CodeNarc config
             "./src/test/"                   # Test files often have test fixtures
           )
-          
+
           # Build exclude path arguments for grep
           EXCLUDE_ARGS=""
           for path in "${EXCLUDE_PATHS[@]}"; do
             EXCLUDE_ARGS="$EXCLUDE_ARGS --exclude-dir=${path}"
           done
-          
+
           # More sophisticated pattern to avoid common false positives
           # - Using word boundary \b for more precise matches
           # - Excluding common safe patterns like 'api-key' in documentation
@@ -108,7 +110,7 @@ jobs:
             | grep -v "sample" \
             | grep -v "test" \
             | grep -v -E "$SAFE_PATTERN_REGEX" || true)
-          
+
           # Check if there are any potential secrets after filtering
           if [ -n "$POTENTIAL_SECRETS" ]; then
             echo -e "${RED}Warning: Potential hardcoded secrets found:${NC}"
@@ -122,10 +124,10 @@ jobs:
           else
             echo -e "${GREEN}No hardcoded secrets found.${NC}"
           fi
-          
+
           # Check for other security issues
           echo "Checking for other security issues..."
-          
+
           # Check for insecure random number generation
           INSECURE_RANDOM=$(grep -r --include="*.groovy" --include="*.java" "new Random()" . || true)
           if [ -n "$INSECURE_RANDOM" ]; then
@@ -133,7 +135,7 @@ jobs:
             echo "$INSECURE_RANDOM"
             echo -e "${YELLOW}Consider using SecureRandom instead.${NC}"
           fi
-          
+
           # Check for hardcoded IP addresses
           IP_ADDRESSES=$(grep -r --include="*.groovy" --include="*.java" --include="*.gradle" \
             -E "[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}" . \
@@ -151,33 +153,32 @@ jobs:
             echo "$IP_ADDRESSES"
             echo -e "${YELLOW}Consider using configuration files or environment variables.${NC}"
           fi
-          
+
           echo -e "${GREEN}Security scan completed.${NC}"
           exit 0
           EOF
-          
+
           # Make script executable
           chmod +x scan_secrets.sh
-          
+
           # Run the improved security scan
           ./scan_secrets.sh
-      
+
       - name: Run OWASP Dependency Check
         run: |
           ./gradlew dependencyCheckAnalyze --info || true
-          
+
           # Check if report was generated
           if [ -f "build/reports/dependency-check-report.html" ]; then
             echo "Dependency check report generated."
           else
             echo "Dependency check report not found."
           fi
-      
+
       - name: Upload Dependency Check Reports
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: dependency-check-reports
           path: build/reports/dependency-check-*
           retention-days: 7
-
