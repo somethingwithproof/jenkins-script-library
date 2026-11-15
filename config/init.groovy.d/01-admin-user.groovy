@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2025-2026 Thomas Vincent <thomasvincent@gmail.com>
+// SPDX-License-Identifier: MIT
+
 import jenkins.model.*
 import hudson.security.*
 import hudson.security.csrf.DefaultCrumbIssuer
