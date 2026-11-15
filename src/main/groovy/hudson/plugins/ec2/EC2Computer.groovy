@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2025-2026 Thomas Vincent <thomasvincent@gmail.com>
+// SPDX-License-Identifier: MIT
+
 /*
  * Mock implementation of hudson.plugins.ec2.EC2Computer
  * Created for testing and compilation purposes only

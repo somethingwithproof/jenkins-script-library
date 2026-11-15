@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025-2026 Thomas Vincent <thomasvincent@gmail.com>
+# SPDX-License-Identifier: MIT
+
 # Jenkins Script Library Development and Testing Image
 #
 # This Dockerfile creates an environment for developing and testing the Jenkins
