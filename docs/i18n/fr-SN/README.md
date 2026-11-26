@@ -346,42 +346,10 @@ doManager.provisionNewDroplet("my-do-template")
 
 Le projet inclut un environnement de test basé sur Docker pour vérifier la compatibilité avec différentes versions de Java :
 
-```bash
-# Run tests in Java 8 (default)
-./run-tests.sh java8
-
-# Run tests in Java 11 with longer timeout
-./run-tests.sh java11 30m
-
-# Run tests in Java 17 with longer timeout
-./run-tests.sh java17 30m
-
-# Run all Java versions
-./run-tests.sh all 1h
-
-# Run tests with different scopes
-./run-tests.sh java8 30m false minimal  # Run minimal test set (core utilities only)
-./run-tests.sh java8 30m false default  # Run default test set
-./run-tests.sh java8 30m false all      # Run all tests including integration tests
+```sh
+docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-L'environnement de test Docker comprend :
-
-- Le pré-téléchargement des dépendances pour accélérer l'exécution des tests
-- La mise en cache sur volumes pour les dépendances Gradle et Maven
-- Une configuration de base partagée pour garantir un environnement cohérent
-- La prise en charge de différents périmètres de test (minimal, default, all)
-- Des limites de mémoire et des vérifications d'état de santé pour les conteneurs Docker
-
-#### Compatibilité Java
-
-Cette bibliothèque prend en charge les versions de Java suivantes :
-
-- Java 8 (LTS)
-- Java 11 (LTS)
-- Java 17 (LTS)
-
-Nous maintenons la rétrocompatibilité avec Java 8 afin de prendre en charge les anciennes installations Jenkins. La bibliothèque est compilée par défaut avec les options de compatibilité Java 8.
 
 Les tests d'intégration utilisent JenkinsRule pour créer une instance Jenkins temporaire dédiée aux tests, vous évitant ainsi d'avoir besoin d'un serveur Jenkins en cours d'exécution. Ces tests vérifient que les scripts fonctionnent correctement avec de véritables API et structures de données Jenkins. Consultez la [documentation des tests d'intégration](../../../src/integration-test/README.md) pour plus de détails.
 

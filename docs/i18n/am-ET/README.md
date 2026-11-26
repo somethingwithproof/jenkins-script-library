@@ -346,42 +346,10 @@ doManager.provisionNewDroplet("my-do-template")
 
 ፕሮጀክቱ ከተለያዩ የJava ሥሪቶች ጋር ያለውን ተኳሃኝነት ለማረጋገጥ በDocker ላይ የተመሠረተ የሙከራ አካባቢን ያካትታል፦
 
-```bash
-# Run tests in Java 8 (default)
-./run-tests.sh java8
-
-# Run tests in Java 11 with longer timeout
-./run-tests.sh java11 30m
-
-# Run tests in Java 17 with longer timeout
-./run-tests.sh java17 30m
-
-# Run all Java versions
-./run-tests.sh all 1h
-
-# Run tests with different scopes
-./run-tests.sh java8 30m false minimal  # Run minimal test set (core utilities only)
-./run-tests.sh java8 30m false default  # Run default test set
-./run-tests.sh java8 30m false all      # Run all tests including integration tests
+```sh
+docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-የDocker ሙከራ አካባቢ የሚከተሉትን ያካትታል፦
-
-- ፈጣን የሙከራ አፈጻጸም ለማግኘት ጥገኞችን አስቀድሞ ማውረድ
-- ለGradle እና Maven ጥገኞች የቅጽ መሸጎጫ
-- ለወጥ አካባቢ የጋራ መሠረታዊ ውቅር
-- ለተለያዩ የሙከራ ወሰኖች ድጋፍ (አነስተኛ፣ ነባሪ፣ ሁሉም)
-- ለDocker ኮንቴይነሮች የማህደረ ትውስታ ገደቦች እና የጤና ፍተሻዎች
-
-#### የJava ተኳሃኝነት
-
-ይህ ቤተ-መጻሕፍት የሚከተሉትን የJava ሥሪቶች ይደግፋል፦
-
-- Java 8 (LTS)
-- Java 11 (LTS)
-- Java 17 (LTS)
-
-የቆዩ የJenkins ጭነቶችን ለመደገፍ ከJava 8 ጋር ወደኋላ ተኳሃኝነትን እንጠብቃለን። ቤተ-መጻሕፍቱ በነባሪነት በJava 8 የተኳሃኝነት አማራጮች ይጠናቀራል።
 
 የውህደት ሙከራዎቹ ለሙከራ ጊዜያዊ የJenkins አሃድ ለመፍጠር JenkinsRuleን ይጠቀማሉ፣ ስለዚህ እየሠራ ያለ የJenkins አገልጋይ አያስፈልግዎትም። እነዚህ ሙከራዎች ስክሪፕቶቹ ከእውነተኛ የJenkins APIዎች እና የውሂብ መዋቅሮች ጋር በትክክል እንደሚሠሩ ያረጋግጣሉ። ለተጨማሪ ዝርዝሮች [የውህደት ሙከራ ሰነድ](../../../src/integration-test/README.md)ን ይመልከቱ።
 

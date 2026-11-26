@@ -346,42 +346,10 @@ doManager.provisionNewDroplet("my-do-template")
 
 Ọrụ a gụnyere gburugburu nnwale dabere na Docker iji nyochaa ndakọrịta na ụdị Java dị iche iche:
 
-```bash
-# Run tests in Java 8 (default)
-./run-tests.sh java8
-
-# Run tests in Java 11 with longer timeout
-./run-tests.sh java11 30m
-
-# Run tests in Java 17 with longer timeout
-./run-tests.sh java17 30m
-
-# Run all Java versions
-./run-tests.sh all 1h
-
-# Run tests with different scopes
-./run-tests.sh java8 30m false minimal  # Run minimal test set (core utilities only)
-./run-tests.sh java8 30m false default  # Run default test set
-./run-tests.sh java8 30m false all      # Run all tests including integration tests
+```sh
+docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-Gburugburu nnwale Docker gụnyere:
-
-- Iburu ụzọ budata ndabere maka ịgba nnwale ọsọsọ
-- Nchekwa cache nke volume maka ndabere Gradle na Maven
-- Nhazi ntọala e kekọrịtara maka gburugburu na-agbanweghị agbanwe
-- Nkwado maka oke nnwale dị iche iche (minimal, default, all)
-- Oke memory na nnyocha ahụike maka container Docker
-
-#### Ndakọrịta Java
-
-Ọba akwụkwọ koodu a na-akwado ụdị Java ndị a:
-
-- Java 8 (LTS)
-- Java 11 (LTS)
-- Java 17 (LTS)
-
-Anyị na-edobe ndakọrịta azụ na Java 8 iji kwado nwụnye Jenkins ochie. A na-achịkọta ọba akwụkwọ koodu a na nhọrọ ndakọrịta Java 8 na ndabara.
 
 Nnwale njikọta na-eji JenkinsRule iji mepụta instance Jenkins nwa oge maka nnwale, yabụ ị chọghị sava Jenkins na-agba ọsọ. Nnwale ndị a na-ekwenye na skriptị ndị ahụ na-arụ ọrụ nke ọma na API na nhazi data Jenkins n'ezie. Hụ [akwụkwọ nkọwa nnwale njikọta](../../../src/integration-test/README.md) maka nkọwa ndị ọzọ.
 

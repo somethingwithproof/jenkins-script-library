@@ -346,42 +346,10 @@ doManager.provisionNewDroplet("my-do-template")
 
 Projek ini menyertakan persekitaran pengujian berasaskan Docker untuk mengesahkan keserasian dengan versi Java yang berbeza:
 
-```bash
-# Run tests in Java 8 (default)
-./run-tests.sh java8
-
-# Run tests in Java 11 with longer timeout
-./run-tests.sh java11 30m
-
-# Run tests in Java 17 with longer timeout
-./run-tests.sh java17 30m
-
-# Run all Java versions
-./run-tests.sh all 1h
-
-# Run tests with different scopes
-./run-tests.sh java8 30m false minimal  # Run minimal test set (core utilities only)
-./run-tests.sh java8 30m false default  # Run default test set
-./run-tests.sh java8 30m false all      # Run all tests including integration tests
+```sh
+docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-Persekitaran pengujian Docker merangkumi:
-
-- Pramuat turun kebergantungan untuk pelaksanaan ujian yang lebih pantas
-- Cache volum untuk kebergantungan Gradle dan Maven
-- Konfigurasi asas berkongsi untuk persekitaran yang konsisten
-- Sokongan untuk skop ujian yang berbeza (minimal, default, all)
-- Had memori dan semakan kesihatan untuk kontena Docker
-
-#### Keserasian Java
-
-Pustaka ini menyokong versi Java berikut:
-
-- Java 8 (LTS)
-- Java 11 (LTS)
-- Java 17 (LTS)
-
-Kami mengekalkan keserasian ke belakang dengan Java 8 untuk menyokong pemasangan Jenkins legasi. Pustaka ini dikompil dengan pilihan keserasian Java 8 secara lalai.
 
 Ujian integrasi menggunakan JenkinsRule untuk mencipta tika Jenkins sementara bagi tujuan pengujian, jadi anda tidak memerlukan pelayan Jenkins yang sedang berjalan. Ujian ini menentusahkan bahawa skrip berfungsi dengan betul bersama API dan struktur data Jenkins sebenar. Lihat [dokumentasi ujian integrasi](../../../src/integration-test/README.md) untuk butiran lanjut.
 

@@ -346,42 +346,10 @@ doManager.provisionNewDroplet("my-do-template")
 
 このプロジェクトには、異なる Java バージョンとの互換性を検証するための Docker ベースのテスト環境が含まれています。
 
-```bash
-# Run tests in Java 8 (default)
-./run-tests.sh java8
-
-# Run tests in Java 11 with longer timeout
-./run-tests.sh java11 30m
-
-# Run tests in Java 17 with longer timeout
-./run-tests.sh java17 30m
-
-# Run all Java versions
-./run-tests.sh all 1h
-
-# Run tests with different scopes
-./run-tests.sh java8 30m false minimal  # Run minimal test set (core utilities only)
-./run-tests.sh java8 30m false default  # Run default test set
-./run-tests.sh java8 30m false all      # Run all tests including integration tests
+```sh
+docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-Docker テスト環境には次の特徴があります。
-
-- テスト実行を高速化するための依存関係の事前ダウンロード
-- Gradle および Maven 依存関係のボリュームキャッシュ
-- 一貫した環境のための共有ベース構成
-- 各種テストスコープ（minimal、default、all）のサポート
-- Docker コンテナのメモリ制限とヘルスチェック
-
-#### Java 互換性
-
-このライブラリは次の Java バージョンをサポートしています。
-
-- Java 8 (LTS)
-- Java 11 (LTS)
-- Java 17 (LTS)
-
-従来の Jenkins 環境をサポートするため、Java 8 との後方互換性を維持しています。ライブラリはデフォルトで Java 8 互換オプションを使用してコンパイルされます。
 
 結合テストでは JenkinsRule を使用してテスト用の一時的な Jenkins インスタンスを作成するため、稼働中の Jenkins サーバーを用意する必要はありません。これらのテストにより、実際の Jenkins API やデータ構造と組み合わせてスクリプトが正しく動作することを検証します。詳細は [結合テストドキュメント](../../../src/integration-test/README.md) を参照してください。
 

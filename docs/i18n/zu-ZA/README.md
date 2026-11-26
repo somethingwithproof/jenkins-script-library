@@ -346,42 +346,10 @@ doManager.provisionNewDroplet("my-do-template")
 
 Iphrojekthi ihlanganisa indawo yokuhlola esekelwe ku-Docker yokuqinisekisa ukuhambisana nezinguqulo ezahlukene ze-Java:
 
-```bash
-# Run tests in Java 8 (default)
-./run-tests.sh java8
-
-# Run tests in Java 11 with longer timeout
-./run-tests.sh java11 30m
-
-# Run tests in Java 17 with longer timeout
-./run-tests.sh java17 30m
-
-# Run all Java versions
-./run-tests.sh all 1h
-
-# Run tests with different scopes
-./run-tests.sh java8 30m false minimal  # Run minimal test set (core utilities only)
-./run-tests.sh java8 30m false default  # Run default test set
-./run-tests.sh java8 30m false all      # Run all tests including integration tests
+```sh
+docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-Indawo yokuhlola ye-Docker ihlanganisa:
-
-- Ukulanda izidingo kusenesikhathi ukuze ukuhlolwa kusheshe kusebenze
-- Ukugcinwa kwesikhashana kwevolumu (volume caching) kwezidingo ze-Gradle ne-Maven
-- Izilungiselelo eziyisisekelo ezabiwayo zendawo engaguquki
-- Ukusekelwa kwezinhlobo ezahlukene zobubanzi bokuhlola (minimal, default, all)
-- Imikhawulo yememori nokuhlolwa kwempilo kwama-container e-Docker
-
-#### Ukuhambisana Ne-Java
-
-Le layibhrari isekela izinhlobo ezilandelayo ze-Java:
-
-- I-Java 8 (LTS)
-- I-Java 11 (LTS)
-- I-Java 17 (LTS)
-
-Sigcina ukuhambisana emuva ne-Java 8 ukuze sisekele ukufakwa okudala kwe-Jenkins. Le layibhrari ihlanganiswa (compiled) ngezinketho zokuhambisana ne-Java 8 ngokuzenzakalelayo.
 
 Ukuhlolwa kokuhlanganiswa kusebenzisa i-JenkinsRule ukudala isibonelo sesikhashana se-Jenkins sokuhlola, ngakho awudingi iseva ye-Jenkins esebenzayo. Lokhu kuhlolwa kuqinisekisa ukuthi imibhalo isebenza kahle ngama-API angempela e-Jenkins nezakhiwo zedatha. Bheka [imibhalo yokuhlolwa kokuhlanganiswa](../../../src/integration-test/README.md) ukuthola imininingwane eyengeziwe.
 

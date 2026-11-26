@@ -346,42 +346,10 @@ doManager.provisionNewDroplet("my-do-template")
 
 Die projek sluit 'n Docker-gebaseerde toetsomgewing in om versoenbaarheid met verskillende Java-weergawes te verifieer:
 
-```bash
-# Run tests in Java 8 (default)
-./run-tests.sh java8
-
-# Run tests in Java 11 with longer timeout
-./run-tests.sh java11 30m
-
-# Run tests in Java 17 with longer timeout
-./run-tests.sh java17 30m
-
-# Run all Java versions
-./run-tests.sh all 1h
-
-# Run tests with different scopes
-./run-tests.sh java8 30m false minimal  # Run minimal test set (core utilities only)
-./run-tests.sh java8 30m false default  # Run default test set
-./run-tests.sh java8 30m false all      # Run all tests including integration tests
+```sh
+docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-Die Docker-toetsomgewing sluit in:
-
-- Voorafaflaai van afhanklikhede vir vinniger toetsuitvoering
-- Volumekasgeheue vir Gradle- en Maven-afhanklikhede
-- Gedeelde basiskonfigurasie vir 'n konsekwente omgewing
-- Ondersteuning vir verskillende toetsomvange (minimal, default, all)
-- Geheuelimiete en gesondheidskontroles vir Docker-houers
-
-#### Java-versoenbaarheid
-
-Hierdie biblioteek ondersteun die volgende Java-weergawes:
-
-- Java 8 (LTS)
-- Java 11 (LTS)
-- Java 17 (LTS)
-
-Ons handhaaf terugwaartse versoenbaarheid met Java 8 om ouer Jenkins-installasies te ondersteun. Die biblioteek word by verstek met Java 8-versoenbaarheidsopsies gekompileer.
 
 Die integrasietoetse gebruik JenkinsRule om 'n tydelike Jenkins-instansie vir toetsing te skep, sodat jy nie 'n lopende Jenkins-bediener nodig het nie. Hierdie toetse verifieer dat die skripte korrek werk met werklike Jenkins-API's en datastrukture. Sien die [integrasietoets-dokumentasie](../../../src/integration-test/README.md) vir meer besonderhede.
 

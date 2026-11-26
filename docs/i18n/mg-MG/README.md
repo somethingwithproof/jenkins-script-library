@@ -346,42 +346,10 @@ doManager.provisionNewDroplet("my-do-template")
 
 Ahitana tontolo fitsapana mifototra amin'ny Docker ity tetikasa ity mba hanamarinana ny fifanarahana amin'ny dika Java samihafa:
 
-```bash
-# Run tests in Java 8 (default)
-./run-tests.sh java8
-
-# Run tests in Java 11 with longer timeout
-./run-tests.sh java11 30m
-
-# Run tests in Java 17 with longer timeout
-./run-tests.sh java17 30m
-
-# Run all Java versions
-./run-tests.sh all 1h
-
-# Run tests with different scopes
-./run-tests.sh java8 30m false minimal  # Run minimal test set (core utilities only)
-./run-tests.sh java8 30m false default  # Run default test set
-./run-tests.sh java8 30m false all      # Run all tests including integration tests
+```sh
+docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-Ahitana ireto ny tontolo fitsapana Docker:
-
-- Fakana mialoha ny fiankinan-doha mba hanafainganana ny fampandehanana fitsapana
-- Fitahirizana cache amin'ny volume ho an'ny fiankinan-doha Gradle sy Maven
-- Fandrindrana fototra iraisana ho an'ny tontolo mirindra
-- Fanohanana ny sahan-tsapana samihafa (minimal, default, all)
-- Fetran'ny fitadidiana sy fanamarinana fahasalamana ho an'ny kaontenera Docker
-
-#### Fifanarahana amin'ny Java
-
-Manohana ireto dika Java ireto ity tranomboky ity:
-
-- Java 8 (LTS)
-- Java 11 (LTS)
-- Java 17 (LTS)
-
-Mitazona fifanarahana mihemotra amin'ny Java 8 izahay mba hanohanana ny fametrahana Jenkins taloha. Ny tranomboky dia angonina (compiled) amin'ny safidy fifanarahana Java 8 ho safidy fototra.
 
 Mampiasa JenkinsRule ny fitsapana fampidirana mba hamoronana tranga Jenkins vonjimaika ho an'ny fitsapana, ka tsy mila mpizara Jenkins mandeha ianao. Manamarina ireo fitsapana ireo fa miasa tsara amin'ny API sy firafitry ny angon-drakitra Jenkins tena izy ireo soratra. Jereo ny [antontan-taratasy fitsapana fampidirana](../../../src/integration-test/README.md) raha mila antsipiriany fanampiny.
 

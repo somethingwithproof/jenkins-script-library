@@ -346,42 +346,10 @@ doManager.provisionNewDroplet("my-do-template")
 
 Dự án đi kèm một môi trường kiểm thử dựa trên Docker để xác minh khả năng tương thích với các phiên bản Java khác nhau:
 
-```bash
-# Run tests in Java 8 (default)
-./run-tests.sh java8
-
-# Run tests in Java 11 with longer timeout
-./run-tests.sh java11 30m
-
-# Run tests in Java 17 with longer timeout
-./run-tests.sh java17 30m
-
-# Run all Java versions
-./run-tests.sh all 1h
-
-# Run tests with different scopes
-./run-tests.sh java8 30m false minimal  # Run minimal test set (core utilities only)
-./run-tests.sh java8 30m false default  # Run default test set
-./run-tests.sh java8 30m false all      # Run all tests including integration tests
+```sh
+docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-Môi trường kiểm thử Docker bao gồm:
-
-- Tải trước các thành phần phụ thuộc để thực thi kiểm thử nhanh hơn
-- Lưu trữ bộ nhớ đệm bằng volume cho các phụ thuộc của Gradle và Maven
-- Cấu hình nền tảng dùng chung nhằm đảm bảo môi trường nhất quán
-- Hỗ trợ nhiều phạm vi kiểm thử khác nhau (minimal, default, all)
-- Giới hạn bộ nhớ và kiểm tra trạng thái hoạt động (health check) cho các container Docker
-
-#### Khả năng tương thích Java
-
-Thư viện này hỗ trợ các phiên bản Java sau:
-
-- Java 8 (LTS)
-- Java 11 (LTS)
-- Java 17 (LTS)
-
-Chúng tôi duy trì khả năng tương thích ngược với Java 8 để hỗ trợ các bản cài đặt Jenkins cũ. Thư viện được biên dịch mặc định với các tùy chọn tương thích Java 8.
 
 Các bài kiểm thử tích hợp sử dụng JenkinsRule để tạo một phiên bản Jenkins tạm thời cho việc kiểm thử, vì vậy bạn không cần một máy chủ Jenkins đang chạy sẵn. Các kiểm thử này xác minh rằng kịch bản hoạt động chính xác với API và cấu trúc dữ liệu thực của Jenkins. Xem [tài liệu kiểm thử tích hợp](../../../src/integration-test/README.md) để biết thêm chi tiết.
 
