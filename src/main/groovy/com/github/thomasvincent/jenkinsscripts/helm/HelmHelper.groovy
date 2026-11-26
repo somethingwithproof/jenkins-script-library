@@ -50,10 +50,10 @@ class HelmHelper implements Serializable {
 
     private static final long serialVersionUID = 1L
 
-    /** Reference to the pipeline script context */
-    private transient def pipeline
-    
-    /** Utility class for common pipeline operations */
+    /** Reference to the pipeline script context (Serializable in Jenkins CPS) */
+    private final def pipeline
+
+    /** Lazily re-initialized utility for common pipeline operations */
     private transient PipelineUtils utils
 
     /**
@@ -66,6 +66,16 @@ class HelmHelper implements Serializable {
     HelmHelper(def pipeline) {
         this.pipeline = pipeline
         this.utils = new PipelineUtils(pipeline)
+    }
+
+    private PipelineUtils getUtils() {
+        if (utils == null) {
+            if (pipeline == null) {
+                throw new IllegalStateException("Pipeline script context is not initialized")
+            }
+            utils = new PipelineUtils(pipeline)
+        }
+        return utils
     }
 
     /**
@@ -91,14 +101,15 @@ class HelmHelper implements Serializable {
      */
     void use(String version = '2.12.3') {
         String normalizedVersion = normalizeVersion(version)
-        String os = utils.currentOS()
-        String arch = normalizeArchitecture(utils.currentArchitecture())
+        PipelineUtils pipelineUtils = getUtils()
+        String os = pipelineUtils.currentOS()
+        String arch = normalizeArchitecture(pipelineUtils.currentArchitecture())
         String extension = determineFileExtension()
         String helmInstallPath = buildInstallPath(normalizedVersion)
-        
+
         def installer = createInstaller(normalizedVersion, os, arch, extension, helmInstallPath)
         def helmTool = createToolInstallation(normalizedVersion, helmInstallPath, installer)
-        
+
         configureEnvironment(helmTool, normalizedVersion)
     }
     

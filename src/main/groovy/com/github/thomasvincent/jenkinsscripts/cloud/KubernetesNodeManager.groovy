@@ -31,6 +31,7 @@ import com.github.thomasvincent.jenkinsscripts.util.ValidationUtils
 import com.github.thomasvincent.jenkinsscripts.util.ErrorHandler
 
 import jenkins.model.Jenkins
+import hudson.model.Label
 import hudson.model.Node
 import org.csanchez.jenkins.plugins.kubernetes.KubernetesCloud
 import org.csanchez.jenkins.plugins.kubernetes.KubernetesSlave
@@ -289,8 +290,8 @@ class KubernetesNodeManager extends CloudNodesManager {
             for (cloud in clouds) {
                 def template = cloud.getTemplates().find { it.label == templateLabel }
                 if (template) {
-                    // Provision a new node using this template
-                    cloud.provision(new Node.Mode(), templateLabel)
+                    // Provision a new node using this template label
+                    cloud.provision(Label.get(templateLabel), 1)
                     LOGGER.info("Provisioning initiated for new Kubernetes pod from template: ${templateLabel}")
                     return true
                 }
@@ -313,25 +314,18 @@ class KubernetesNodeManager extends CloudNodesManager {
         ValidationUtils.requireNonEmpty(podName, "Pod name")
         
         return ErrorHandler.withErrorHandling("terminating Kubernetes pod", {
-            // Find node by pod name
-            def nodes = getKubernetesNodesInfo()
-            def nodeInfo = nodes.find { it.kubernetes?.podName == podName }
-            
-            if (!nodeInfo) {
+            // Locate the matching pod directly in O(N) without extracting info for every node
+            KubernetesSlave targetNode = getKubernetesNodes().find { Node node ->
+                node instanceof KubernetesSlave && ((KubernetesSlave) node).getPodName() == podName
+            } as KubernetesSlave
+
+            if (!targetNode) {
                 LOGGER.warning("No Kubernetes pod found with name: ${podName}")
                 return false
             }
-            
-            // Get the node
-            def node = jenkins.getNode(nodeInfo.name as String)
-            if (!node || !(node instanceof KubernetesSlave)) {
-                LOGGER.warning("Node not found or not a Kubernetes node: ${nodeInfo.name}")
-                return false
-            }
-            
-            // Terminate the pod
-            node.terminate()
-            
+
+            targetNode.terminate()
+
             LOGGER.info("Kubernetes pod termination initiated for: ${podName}")
             return true
         }, LOGGER, false)

@@ -36,7 +36,9 @@ import hudson.plugins.ec2.EC2Cloud
 import hudson.plugins.ec2.EC2Computer
 import hudson.plugins.ec2.SlaveTemplate
 
-import java.text.SimpleDateFormat
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.logging.Level
 import java.util.logging.Logger
 
@@ -51,7 +53,8 @@ import java.util.logging.Logger
  */
 class AWSNodeManager extends CloudNodesManager {
     private static final Logger LOGGER = Logger.getLogger(AWSNodeManager.class.getName())
-    private static final SimpleDateFormat DATE_FORMATTER = new SimpleDateFormat("yyyy-MM-dd HH:mm")
+    private static final DateTimeFormatter DATE_FORMATTER =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault())
     
     /**
      * Cached reference to the EC2 cloud configuration.
@@ -163,7 +166,7 @@ class AWSNodeManager extends CloudNodesManager {
                         privateIp: instance.getPrivateIpAddress(),
                         publicIp: instance.getPublicIpAddress(),
                         amiId: instance.getImageId(),
-                        launchTime: instance.getLaunchTime() ? DATE_FORMATTER.format(instance.getLaunchTime()) : null,
+                        launchTime: formatLaunchTime(instance.getLaunchTime()),
                         state: instance.getState()?.getName(),
                         region: findInstanceRegion(ec2Computer),
                         tags: instance.getTags()?.collectEntries { [(it.key): it.value] }
@@ -289,6 +292,19 @@ class AWSNodeManager extends CloudNodesManager {
         }, LOGGER, false)
     }
     
+    private static String formatLaunchTime(Object launchTime) {
+        if (launchTime == null) {
+            return null
+        }
+        if (launchTime instanceof Instant) {
+            return DATE_FORMATTER.format((Instant) launchTime)
+        }
+        if (launchTime instanceof Date) {
+            return DATE_FORMATTER.format(((Date) launchTime).toInstant())
+        }
+        return launchTime.toString()
+    }
+
     /**
      * Terminates an EC2 instance.
      * 
@@ -301,27 +317,27 @@ class AWSNodeManager extends CloudNodesManager {
         ValidationUtils.requireNonEmpty(instanceId, "Instance ID")
         
         return ErrorHandler.withErrorHandling("terminating EC2 instance", {
-            // Find node by instance ID
-            def nodes = getEC2NodesInfo()
-            def nodeInfo = nodes.find { it.ec2?.instanceId == instanceId }
-            
-            if (!nodeInfo) {
+            // Locate matching EC2 computer directly in O(N) without describing unrelated instances twice
+            EC2Computer targetComputer = null
+            for (Node node : getEC2Nodes()) {
+                if (node.computer instanceof EC2Computer) {
+                    EC2Computer candidate = (EC2Computer) node.computer
+                    def instance = candidate.describeInstance()
+                    if (instance?.getInstanceId() == instanceId) {
+                        targetComputer = candidate
+                        break
+                    }
+                }
+            }
+
+            if (targetComputer == null) {
                 LOGGER.warning("No EC2 instance found with ID: ${instanceId}")
                 return false
             }
-            
-            // Get the node and its computer
-            def node = jenkins.getNode(nodeInfo.name as String)
-            if (!node || !(node.computer instanceof EC2Computer)) {
-                LOGGER.warning("Node not found or not an EC2 node: ${nodeInfo.name}")
-                return false
-            }
-            
-            // Terminate the instance
-            def computer = node.computer as EC2Computer
-            computer.disconnect(null)
-            computer.getCloud().doTerminate(computer)
-            
+
+            targetComputer.disconnect(null)
+            targetComputer.getCloud().doTerminate(targetComputer)
+
             LOGGER.info("EC2 instance termination initiated for: ${instanceId}")
             return true
         }, LOGGER, false)

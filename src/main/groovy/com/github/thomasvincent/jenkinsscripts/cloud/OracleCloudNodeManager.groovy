@@ -32,11 +32,12 @@ import com.github.thomasvincent.jenkinsscripts.util.ErrorHandler
 
 import jenkins.model.Jenkins
 import hudson.model.Node
-import com.oracle.cloud.compute.jenkins.OracleCloudComputer
-import com.oracle.cloud.compute.jenkins.OracleCloud
-import com.oracle.cloud.compute.jenkins.template.OCITemplate
+import com.oracle.cloud.baremetal.jenkins.BaremetalCloud
+import com.oracle.cloud.baremetal.jenkins.BaremetalCloudAgentTemplate
+import com.oracle.cloud.baremetal.jenkins.BaremetalCloudComputer
 
-import java.text.SimpleDateFormat
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.logging.Level
 import java.util.logging.Logger
 
@@ -51,15 +52,14 @@ import java.util.logging.Logger
  */
 class OracleCloudNodeManager extends CloudNodesManager {
     private static final Logger LOGGER = Logger.getLogger(OracleCloudNodeManager.class.getName())
-    private static final ThreadLocal<SimpleDateFormat> DATE_FORMATTER = ThreadLocal.withInitial({ 
-        new SimpleDateFormat("yyyy-MM-dd HH:mm") 
-    })
+    private static final DateTimeFormatter DATE_FORMATTER =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault())
     
     /**
      * Cached reference to the Oracle Cloud configuration.
      * Set lazily on first access.
      */
-    private List<OracleCloud> oracleClouds = null
+    private List<BaremetalCloud> oracleClouds = null
     
     /**
      * Creates a new OracleCloudNodeManager.
@@ -75,14 +75,15 @@ class OracleCloudNodeManager extends CloudNodesManager {
     /**
      * Gets all Oracle Cloud configurations.
      * 
-     * <p>Returns all OracleCloud instances configured in Jenkins.</p>
+     * <p>Returns all BaremetalCloud instances configured in Jenkins.</p>
      * 
-     * @return List of OracleCloud configurations, or empty list if none found
+     * @return List of BaremetalCloud configurations, or empty list if none found
      */
-    List<OracleCloud> getOracleClouds() {
+    List<BaremetalCloud> getOracleClouds() {
         if (this.oracleClouds == null) {
-            // Use the helper from the superclass
-            this.oracleClouds = getCachedCloudsByType(OracleCloud.class, "Oracle Cloud")
+            this.oracleClouds = ErrorHandler.withErrorHandling("retrieving Oracle Cloud configurations", {
+                return getConfiguredClouds().findAll { it instanceof BaremetalCloud } as List<BaremetalCloud>
+            }, LOGGER, [])
         }
         return this.oracleClouds
     }
@@ -94,9 +95,8 @@ class OracleCloudNodeManager extends CloudNodesManager {
      * 
      * @return true if Oracle Cloud is configured, false otherwise
      */
-    @Override
     boolean isProviderConfigured() {
-        return super.isCloudConfigured(OracleCloud.class)
+        return super.isCloudConfigured(BaremetalCloud.class)
     }
     
     /**
@@ -106,7 +106,6 @@ class OracleCloudNodeManager extends CloudNodesManager {
      * 
      * @return List of Oracle Cloud agent nodes
      */
-    @Override
     List<Node> getManagedNodes() {
         return getOracleCloudNodes()
     }
@@ -118,9 +117,9 @@ class OracleCloudNodeManager extends CloudNodesManager {
      */
     List<Node> getOracleCloudNodes() {
         return ErrorHandler.withErrorHandling("retrieving Oracle Cloud nodes", {
-            // Find nodes with computers that are instances of OracleCloudComputer
+            // Find nodes with computers that are instances of BaremetalCloudComputer
             return jenkins.nodes.findAll { node ->
-                node.computer instanceof OracleCloudComputer
+                node.computer instanceof BaremetalCloudComputer
             }
         }, LOGGER, [])
     }
@@ -128,7 +127,7 @@ class OracleCloudNodeManager extends CloudNodesManager {
     /**
      * Gets detailed information about all Oracle Cloud agent nodes.
      * 
-     * <p>Returns comprehensive information including OCI-specific details
+     * <p>Returns information including OCI-specific details
      * for all Oracle Cloud agent nodes.</p>
      * 
      * @return List of maps containing detailed node information
@@ -150,11 +149,9 @@ class OracleCloudNodeManager extends CloudNodesManager {
     }
     
     /**
-     * {@inheritDoc}
      * Extracts Oracle Cloud-specific information for a node.
      */
-    @Override
-    public Map<String, Object> extractProviderSpecificNodeInfo(Node node) {
+    Map<String, Object> extractProviderSpecificNodeInfo(Node node) {
         return extractOracleCloudNodeInfo(node)
     }
     
@@ -172,26 +169,27 @@ class OracleCloudNodeManager extends CloudNodesManager {
         def info = extractNodeInfo(node)
         
         // Add Oracle Cloud-specific information if available
-        if (node.computer instanceof OracleCloudComputer) {
-            def ociComputer = node.computer as OracleCloudComputer
+        if (node.computer instanceof BaremetalCloudComputer) {
+            def ociComputer = node.computer as BaremetalCloudComputer
             
             return ErrorHandler.withErrorHandling("extracting Oracle Cloud node information", {
+                def launchTime = ociComputer.hasProperty('launchTime') ? ociComputer.launchTime : null
                 info.oci = [
-                    instanceId: ociComputer.getInstanceId(),
-                    instanceName: ociComputer.getNodeName(),
-                    compartmentId: ociComputer.getCompartmentId(),
-                    availabilityDomain: ociComputer.getAvailabilityDomain(),
-                    vcnId: ociComputer.getVcnId(),
-                    subnetId: ociComputer.getSubnetId(),
-                    shape: ociComputer.getShape(),
-                    templateId: ociComputer.getTemplateId(),
-                    ocpus: ociComputer.getOcpus(),
-                    memoryInGBs: ociComputer.getMemoryInGBs(),
-                    region: ociComputer.getRegion(),
-                    privateIp: ociComputer.getPrivateIp(),
-                    publicIp: ociComputer.getPublicIp(),
-                    instanceState: ociComputer.getInstanceState(),
-                    launchTime: ociComputer.getLaunchTime() ? DATE_FORMATTER.get().format(ociComputer.getLaunchTime()) : null
+                    instanceId: ociComputer.hasProperty('instanceId') ? ociComputer.instanceId : null,
+                    instanceName: node.nodeName,
+                    compartmentId: ociComputer.hasProperty('compartmentId') ? ociComputer.compartmentId : null,
+                    availabilityDomain: ociComputer.hasProperty('availabilityDomain') ? ociComputer.availabilityDomain : null,
+                    vcnId: ociComputer.hasProperty('vcnId') ? ociComputer.vcnId : null,
+                    subnetId: ociComputer.hasProperty('subnetId') ? ociComputer.subnetId : null,
+                    shape: ociComputer.hasProperty('shape') ? ociComputer.shape : null,
+                    templateId: ociComputer.hasProperty('templateId') ? ociComputer.templateId : null,
+                    ocpus: ociComputer.hasProperty('ocpus') ? ociComputer.ocpus : null,
+                    memoryInGBs: ociComputer.hasProperty('memoryInGBs') ? ociComputer.memoryInGBs : null,
+                    region: ociComputer.hasProperty('region') ? ociComputer.region : null,
+                    privateIp: ociComputer.hasProperty('privateIp') ? ociComputer.privateIp : null,
+                    publicIp: ociComputer.hasProperty('publicIp') ? ociComputer.publicIp : null,
+                    instanceState: ociComputer.hasProperty('instanceState') ? ociComputer.instanceState : null,
+                    launchTime: launchTime instanceof Date ? DATE_FORMATTER.format(launchTime.toInstant()) : launchTime?.toString()
                 ]
                 return info
             }, LOGGER, info)
@@ -203,12 +201,11 @@ class OracleCloudNodeManager extends CloudNodesManager {
     /**
      * Gets all available Oracle Cloud templates.
      * 
-     * <p>Returns all OCITemplates configured across all Oracle Cloud configurations.</p>
+     * <p>Returns all BaremetalCloudAgentTemplate instances configured across all Oracle Cloud configurations.</p>
      * 
      * @return List of Oracle Cloud templates
      */
-    @Override
-    List<OCITemplate> getResourceTemplates() {
+    List<BaremetalCloudAgentTemplate> getResourceTemplates() {
         return getOracleCloudTemplates()
     }
 
@@ -217,11 +214,11 @@ class OracleCloudNodeManager extends CloudNodesManager {
      *
      * @return List of Oracle Cloud templates
      */
-    List<OCITemplate> getOracleCloudTemplates() {
+    List<BaremetalCloudAgentTemplate> getOracleCloudTemplates() {
         return ErrorHandler.withErrorHandling("retrieving Oracle Cloud templates", {
             def templates = []
             getOracleClouds().each { cloud ->
-                templates.addAll(cloud.getTemplates())
+                templates.addAll(cloud.getTemplates() ?: [])
             }
             return templates
         }, LOGGER, [])
@@ -230,12 +227,8 @@ class OracleCloudNodeManager extends CloudNodesManager {
     /**
      * Gets template information for all Oracle Cloud templates.
      * 
-     * <p>Returns configuration details for all Oracle Cloud templates
-     * configured in Jenkins.</p>
-     * 
      * @return List of maps containing template information
      */
-    @Override
     List<Map<String, Object>> getResourceTemplatesInfo() {
         return getOracleCloudTemplatesInfo()
     }
@@ -254,7 +247,7 @@ class OracleCloudNodeManager extends CloudNodesManager {
                 def templateInfo = [
                     description: template.getDescription(),
                     templateId: template.getTemplateId(),
-                    compartmentId: template.getCompartmentId(),
+                    compartmentId: template.hasProperty('compartmentId') ? template.compartmentId : null,
                     availabilityDomain: template.getAvailabilityDomain(),
                     vcnCompartmentId: template.getVcnCompartmentId(),
                     vcnId: template.getVcnId(),
@@ -263,16 +256,16 @@ class OracleCloudNodeManager extends CloudNodesManager {
                     imageCompartmentId: template.getImageCompartmentId(),
                     imageId: template.getImageId(),
                     shape: template.getShape(),
-                    ocpus: template.getOcpus(),
-                    memoryInGBs: template.getMemoryInGBs(),
-                    sshPublicKey: template.getSshPublicKey() ? "(SSH key provided)" : "(None)",
+                    ocpus: template.hasProperty('ocpus') ? template.ocpus : null,
+                    memoryInGBs: template.hasProperty('memoryInGBs') ? template.memoryInGBs : null,
+                    sshPublicKey: template.hasProperty('sshPublicKey') && template.sshPublicKey ? "(SSH key provided)" : "(None)",
                     labels: template.getLabelString(),
                     mode: template.getMode()?.toString(),
                     numExecutors: template.getNumExecutors(),
                     remoteFS: template.getRemoteFS(),
                     assignPublicIP: template.getAssignPublicIP(),
                     usePublicIP: template.getUsePublicIP(),
-                    timeout: template.getTimeout()
+                    timeout: template.hasProperty('timeout') ? template.timeout : null
                 ]
                 
                 result.add(templateInfo)
@@ -285,13 +278,10 @@ class OracleCloudNodeManager extends CloudNodesManager {
     /**
      * Provision a new Oracle Cloud instance.
      * 
-     * <p>Provisions a new Oracle Cloud instance based on a template.</p>
-     * 
-     * @param templateId The id of the template to use
-     * @param cloudName The name of the Oracle Cloud configuration to use (optional, if multiple are configured)
+     * @param templateIdentifier The id of the template to use
+     * @param cloudInstanceName The name of the Oracle Cloud configuration to use (optional)
      * @return true if provisioning was initiated successfully, false otherwise
      */
-    @Override
     boolean provisionNewResource(String templateIdentifier, String cloudInstanceName = null) {
         return provisionNewInstance(templateIdentifier, cloudInstanceName)
     }
@@ -318,10 +308,9 @@ class OracleCloudNodeManager extends CloudNodesManager {
             
             // Find template by ID
             for (cloud in clouds) {
-                def template = cloud.getTemplates().find { it.getTemplateId() == templateId }
+                def template = cloud.getTemplates().find { it.getTemplateId()?.toString() == templateId }
                 if (template) {
-                    // Provision a new node using this template
-                    cloud.provision(template, 1)
+                    cloud.provision(hudson.model.Label.get(template.getLabelString()), 1)
                     LOGGER.info("Provisioning initiated for new Oracle Cloud instance from template: ${templateId}")
                     return true
                 }
@@ -335,12 +324,10 @@ class OracleCloudNodeManager extends CloudNodesManager {
     /**
      * Terminates an Oracle Cloud instance.
      * 
-     * <p>Terminates the specified Oracle Cloud instance and removes it from Jenkins.</p>
-     * 
-     * @param instanceId The instance ID to terminate
+     * @param resourceIdentifier The instance ID to terminate
+     * @param nodeNameHint Optional node name hint
      * @return true if termination was initiated successfully, false otherwise
      */
-    @Override
     boolean terminateResource(String resourceIdentifier, String nodeNameHint = null) {
         return terminateInstance(resourceIdentifier)
     }
@@ -355,26 +342,21 @@ class OracleCloudNodeManager extends CloudNodesManager {
         ValidationUtils.requireNonEmpty(instanceId, "Instance ID")
         
         return ErrorHandler.withErrorHandling("terminating Oracle Cloud instance", {
-            // Find node by instance ID
-            def nodes = getOracleCloudNodesInfo()
-            def nodeInfo = nodes.find { it.oci?.instanceId == instanceId }
-            
-            if (!nodeInfo) {
+            Node targetNode = getOracleCloudNodes().find { Node node ->
+                def computer = node.computer
+                computer instanceof BaremetalCloudComputer &&
+                    computer.hasProperty('instanceId') &&
+                    computer.instanceId == instanceId
+            }
+
+            if (!targetNode) {
                 LOGGER.warning("No Oracle Cloud instance found with ID: ${instanceId}")
                 return false
             }
-            
-            // Get the node and its computer
-            def node = jenkins.getNode(nodeInfo.name as String)
-            if (!node || !(node.computer instanceof OracleCloudComputer)) {
-                LOGGER.warning("Node not found or not an Oracle Cloud node: ${nodeInfo.name}")
-                return false
-            }
-            
-            // Terminate the instance
-            def computer = node.computer as OracleCloudComputer
-            computer.terminate()
-            
+
+            def computer = targetNode.computer as BaremetalCloudComputer
+            computer.disconnect(null)
+
             LOGGER.info("Oracle Cloud instance termination initiated for: ${instanceId}")
             return true
         }, LOGGER, false)
@@ -383,12 +365,9 @@ class OracleCloudNodeManager extends CloudNodesManager {
     /**
      * Formats Oracle Cloud node information for display.
      * 
-     * <p>Creates a human-readable representation of Oracle Cloud node details.</p>
-     * 
      * @param nodeInfo The node information map to format
      * @return Formatted string with Oracle Cloud node details
      */
-    @Override
     String formatProviderNodeInfo(Map<String, Object> nodeInfo) {
         if (nodeInfo == null || nodeInfo.isEmpty()) {
             return "No information available"
@@ -434,21 +413,16 @@ class OracleCloudNodeManager extends CloudNodesManager {
     }
 
     /**
-     * Gets Oracle Cloud nodes if the specified cloud class matches OracleCloud.
-     *
-     * <p>Overrides the base implementation to provide specific node retrieval
-     * for Oracle Cloud.</p>
+     * Gets Oracle Cloud nodes if the specified cloud class matches BaremetalCloud.
      *
      * @param cloudClassToCheck The specific cloud class type to check against.
-     * @return List of Oracle Cloud nodes if cloudClassToCheck is OracleCloud, otherwise an empty list.
+     * @return List of Oracle Cloud nodes if cloudClassToCheck is BaremetalCloud, otherwise an empty list.
      */
     @Override
     protected List<Node> getCloudNodes(Class cloudClassToCheck) {
-        if (OracleCloud.class.isAssignableFrom(cloudClassToCheck)) {
-            // Delegate to the method that specifically gets Oracle Cloud nodes
+        if (BaremetalCloud.class.isAssignableFrom(cloudClassToCheck)) {
             return getOracleCloudNodes()
         }
-        // This manager specifically handles Oracle Cloud, so return empty for other types
         return []
     }
 }

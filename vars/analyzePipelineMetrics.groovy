@@ -25,8 +25,8 @@
  * SOFTWARE.
  */
 
+import com.cloudbees.groovy.cps.NonCPS
 import com.github.thomasvincent.jenkinsscripts.analytics.PipelineMetricsCollector
-import com.github.thomasvincent.jenkinsscripts.util.JenkinsLogger
 import jenkins.model.Jenkins
 
 /**
@@ -69,58 +69,45 @@ import jenkins.model.Jenkins
  */
 def call(Map args = [:]) {
     // Default to current job if not specified
-    def jobName = args.jobName ?: env.JOB_NAME
-    def historyLimit = args.historyLimit ?: 100
-    def includeRecommendations = args.includeRecommendations != false
-    
+    String jobName = (args.jobName ?: env.JOB_NAME) as String
+    int historyLimit = (args.historyLimit ?: 100) as int
+    boolean includeRecommendations = args.includeRecommendations != false
+
     // Validate inputs
     if (!jobName) {
         error "Pipeline metrics analysis requires a job name"
     }
-    
-    def jenkins = Jenkins.get()
-    def logger = new JenkinsLogger(currentBuild.rawBuild.getListener(), 'analyzePipelineMetrics')
-    
-    logger.info("Analyzing pipeline metrics for: ${jobName}")
-    
+
+    echo "[analyzePipelineMetrics] Analyzing pipeline metrics for: ${jobName}"
+
     try {
-        def collector = new PipelineMetricsCollector(jenkins)
-        def metrics = collector.collectPipelineMetrics(jobName, historyLimit)
-        
-        // Log summary to build console
-        logger.info("Analysis complete:")
-        logger.info("  Total builds analyzed: ${metrics.summary.totalBuilds}")
-        logger.info("  Success rate: ${metrics.summary.successRate}%")
-        logger.info("  Average duration: ${formatDuration(metrics.summary.avgDuration)}")
-        
-        // Log top recommendations if enabled
+        // Confine Jenkins and collector inside @NonCPS and return plain serializable map
+        Map metrics = collectMetricsNonCps(jobName, historyLimit)
+
+        echo "[analyzePipelineMetrics] Analysis complete:"
+        echo "  Total builds analyzed: ${metrics.summary.totalBuilds}"
+        echo "  Success rate: ${metrics.summary.successRate}%"
+        echo "  Average duration: ${formatDuration((metrics.summary.avgDuration ?: 0) as long)}"
+
         if (includeRecommendations && metrics.recommendations) {
-            logger.info("Top recommendations:")
+            echo "[analyzePipelineMetrics] Top recommendations:"
             metrics.recommendations.take(3).each { rec ->
-                logger.info("  [${rec.priority}] ${rec.message}")
+                echo "  [${rec.priority}] ${rec.message}"
             }
         }
-        
-        // Add convenience methods to the result
-        metrics.metaClass.hasAnomalies = { -> 
-            metrics.anomalies && !metrics.anomalies.isEmpty() 
-        }
-        
-        metrics.metaClass.getTopRecommendations = { int count = 3 ->
-            metrics.recommendations?.take(count) ?: []
-        }
-        
-        metrics.metaClass.isHealthy = { ->
-            metrics.summary.successRate >= 80 && 
-            metrics.anomalies.count { it.severity == 'HIGH' } == 0
-        }
-        
+
         return metrics
-        
     } catch (Exception e) {
-        logger.error("Failed to analyze pipeline metrics: ${e.message}")
+        echo "[analyzePipelineMetrics] ERROR: Failed to analyze pipeline metrics: ${e.message}"
         throw e
     }
+}
+
+@NonCPS
+private Map collectMetricsNonCps(String jobName, int historyLimit) {
+    def jenkins = Jenkins.get()
+    def collector = new PipelineMetricsCollector(jenkins)
+    return collector.collectPipelineMetrics(jobName, historyLimit)
 }
 
 /**
@@ -133,14 +120,15 @@ def call(String jobName) {
 /**
  * Formats duration for display.
  */
+@NonCPS
 private String formatDuration(long millis) {
     if (millis < 1000) {
         return "${millis}ms"
     } else if (millis < 60000) {
-        return "${(millis / 1000).round(1)}s"
+        return "${(millis / 1000.0).round(1)}s"
     } else {
-        def minutes = millis / 60000
-        def seconds = (millis % 60000) / 1000
-        return "${minutes.toInteger()}m ${seconds.round()}s"
+        long minutes = millis.intdiv(60000).longValue()
+        long seconds = Math.round((millis % 60000) / 1000.0)
+        return "${minutes}m ${seconds}s"
     }
 }

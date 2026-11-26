@@ -109,8 +109,8 @@ class SlaveInfoManager {
                 if (info) {
                     result.add(info)
                 }
-                return null // No specific return value needed
-            }, LOGGER, Level.WARNING)
+                return null
+            }, LOGGER, null)
         }
         
         return result
@@ -215,8 +215,8 @@ class SlaveInfoManager {
                     tags: instance.getTags()?.collectEntries { [(it.key): it.value] }
                 ]
             }
-            return null // No specific return value needed
-        }, LOGGER, Level.WARNING)
+            return null
+        }, LOGGER, null)
         
         if (!info.containsKey('ec2')) {
             info.ec2Error = "Failed to retrieve EC2 instance information"

@@ -144,19 +144,7 @@ class GroovyCompatibilityVerifier {
      * ```
      */
     static int compareVersions(String version1, String version2) {
-        def v1Parts = version1.tokenize(DOT)
-        def v2Parts = version2.tokenize(DOT)
-        
-        for (int i = 0; i < Math.min(v1Parts.size(), v2Parts.size()); i++) {
-            def v1Part = v1Parts[i].replaceAll(NON_DIGIT_REGEX, EMPTY_STRING).toInteger()
-            def v2Part = v2Parts[i].replaceAll(NON_DIGIT_REGEX, EMPTY_STRING).toInteger()
-            
-            if (v1Part != v2Part) {
-                return v1Part <=> v2Part
-            }
-        }
-        
-        return v1Parts.size() <=> v2Parts.size()
+        return StringUtils.compareVersions(version1, version2)
     }
     
     /**

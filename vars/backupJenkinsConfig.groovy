@@ -9,7 +9,6 @@
 
 import com.github.thomasvincent.jenkinsscripts.config.JenkinsConfigBackup
 import jenkins.model.Jenkins
-import hudson.FilePath
 import com.cloudbees.groovy.cps.NonCPS
 
 /**
@@ -22,7 +21,7 @@ import com.cloudbees.groovy.cps.NonCPS
  * 
  * // Backup to specific location
  * backupJenkinsConfig(
- *     destination: '/backup/jenkins-config.tar.gz',
+ *     destination: '/backup/jenkins-config.zip',
  *     includeJobs: true,
  *     includePlugins: true,
  *     compress: true
@@ -33,54 +32,36 @@ import com.cloudbees.groovy.cps.NonCPS
  * ```
  */
 def call(Map args = [:]) {
-    def jenkins = Jenkins.get()
-    def backup = new JenkinsConfigBackup(jenkins)
-    def logger = new com.github.thomasvincent.jenkinsscripts.util.JenkinsLogger(
-        currentBuild.rawBuild.getListener(),
-        'backupJenkinsConfig'
-    )
-    
-    // Default options
-    def includeJobs = args.includeJobs ?: true
-    def includePlugins = args.includePlugins ?: true
-    def includeNodes = args.includeNodes ?: true
-    def compress = args.compress ?: true
-    def archive = args.archive ?: false
-    
+    // Default options (preserve explicit false)
+    boolean includeJobs = args.includeJobs != false
+    boolean includePlugins = args.includePlugins != false
+    boolean includeNodes = args.includeNodes != false
+    boolean compress = args.compress != false
+    boolean archive = args.archive == true
+
     // Determine destination
-    def destination = args.destination
+    String destination = args.destination as String
     if (!destination) {
-        def timestamp = new Date().format('yyyy-MM-dd_HH-mm-ss')
-        def filename = compress ? "jenkins-backup-${timestamp}.tar.gz" : "jenkins-backup-${timestamp}"
+        String timestamp = new Date().format('yyyy-MM-dd_HH-mm-ss')
+        String filename = compress ? "jenkins-backup-${timestamp}.zip" : "jenkins-backup-${timestamp}"
         destination = "${env.WORKSPACE}/${filename}"
     }
-    
-    logger.info("Starting Jenkins configuration backup")
-    logger.info("Options: includeJobs=${includeJobs}, includePlugins=${includePlugins}, " +
-                "includeNodes=${includeNodes}, compress=${compress}")
-    
-    // Perform backup
-    def backupPath = backup.performBackup(
-        destination,
-        includeJobs,
-        includePlugins,
-        includeNodes,
-        compress
-    )
-    
+
+    echo "[backupJenkinsConfig] Starting Jenkins configuration backup"
+    echo "[backupJenkinsConfig] Options: includeJobs=${includeJobs}, includePlugins=${includePlugins}, " +
+         "includeNodes=${includeNodes}, compress=${compress}"
+
+    Map backupResult = performBackupNonCps(destination, includeJobs, includePlugins, includeNodes, compress)
+    String backupPath = backupResult.path as String
+
     if (backupPath) {
-        logger.info("Backup completed successfully: ${backupPath}")
-        
-        // Archive if requested
-        if (archive) {
-            def workspace = new FilePath(currentBuild.rawBuild.workspace)
-            def backupFile = new File(backupPath)
-            if (backupFile.exists()) {
-                archiveArtifacts artifacts: backupFile.name, fingerprint: true
-                logger.info("Backup archived as build artifact")
-            }
+        echo "[backupJenkinsConfig] Backup completed successfully: ${backupPath}"
+
+        if (archive && backupResult.exists && backupResult.fileName) {
+            archiveArtifacts artifacts: backupResult.fileName as String, fingerprint: true
+            echo "[backupJenkinsConfig] Backup archived as build artifact"
         }
-        
+
         return backupPath
     } else {
         error "Backup failed - check logs for details"
@@ -94,25 +75,42 @@ def restore(Map args = [:]) {
     if (!args.backupFile) {
         error "backupFile parameter is required for restore"
     }
-    
-    def jenkins = Jenkins.get()
-    def backup = new JenkinsConfigBackup(jenkins)
-    def logger = new com.github.thomasvincent.jenkinsscripts.util.JenkinsLogger(
-        currentBuild.rawBuild.getListener(),
-        'backupJenkinsConfig'
-    )
-    
-    logger.warning("Restoring Jenkins configuration from: ${args.backupFile}")
-    logger.warning("This will overwrite current configuration!")
-    
-    def success = backup.restoreBackup(args.backupFile as String)
-    
+
+    echo "[backupJenkinsConfig] WARNING: Restoring Jenkins configuration from: ${args.backupFile}"
+    echo "[backupJenkinsConfig] WARNING: This will overwrite current configuration!"
+
+    boolean success = performRestoreNonCps(args.backupFile as String)
+
     if (success) {
-        logger.info("Restore completed successfully")
-        logger.warning("Jenkins restart may be required for all changes to take effect")
+        echo "[backupJenkinsConfig] Restore completed successfully"
+        echo "[backupJenkinsConfig] WARNING: Jenkins restart may be required for all changes to take effect"
     } else {
         error "Restore failed - check logs for details"
     }
-    
+
     return success
+}
+
+@NonCPS
+private Map performBackupNonCps(String destination, boolean includeJobs, boolean includePlugins,
+                                boolean includeNodes, boolean compress) {
+    def jenkins = Jenkins.get()
+    def backup = new JenkinsConfigBackup(jenkins)
+    String backupPath = backup.performBackup(destination, includeJobs, includePlugins, includeNodes, compress)
+    if (!backupPath) {
+        return [path: null, exists: false, fileName: null]
+    }
+    File backupFile = new File(backupPath)
+    return [
+        path: backupPath,
+        exists: backupFile.exists(),
+        fileName: backupFile.name
+    ]
+}
+
+@NonCPS
+private boolean performRestoreNonCps(String backupFilePath) {
+    def jenkins = Jenkins.get()
+    def backup = new JenkinsConfigBackup(jenkins)
+    return backup.restoreBackup(backupFilePath)
 }

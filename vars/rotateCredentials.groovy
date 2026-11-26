@@ -25,8 +25,8 @@
  * SOFTWARE.
  */
 
+import com.cloudbees.groovy.cps.NonCPS
 import com.github.thomasvincent.jenkinsscripts.credentials.CredentialRotationManager
-import com.github.thomasvincent.jenkinsscripts.util.JenkinsLogger
 import jenkins.model.Jenkins
 
 /**
@@ -70,76 +70,75 @@ import jenkins.model.Jenkins
  * }
  */
 def call(Map args = [:]) {
-    def action = args.action ?: 'analyze'
-    def jenkins = Jenkins.get()
-    def logger = new JenkinsLogger(currentBuild.rawBuild.getListener(), 'rotateCredentials')
-    
+    String action = (args.action ?: 'analyze') as String
+
     try {
-        def manager = new CredentialRotationManager(jenkins)
-        
         switch (action.toLowerCase()) {
             case 'analyze':
-                logger.info("Analyzing credential health and compliance...")
-                def analysis = manager.analyzeCredentials(args.includeUsage ?: true)
-                
-                // Log summary
-                logger.info("Credential analysis summary:")
-                logger.info("  Total credentials: ${analysis.summary.totalCredentials}")
-                logger.info("  Needing rotation: ${analysis.summary.needingRotation}")
-                logger.info("  Compliance status: ${analysis.compliance.overall}")
-                
-                // Add Pipeline-friendly methods
-                analysis.metaClass.isCompliant = { ->
-                    analysis.compliance.overall == 'COMPLIANT'
-                }
-                
-                analysis.metaClass.getViolations = { ->
-                    def violations = []
-                    ['sox', 'hipaa', 'pciDss'].each { standard ->
-                        if (!analysis.compliance[standard].compliant) {
-                            violations.addAll(analysis.compliance[standard].violations)
-                        }
-                    }
-                    return violations
-                }
-                
+                echo "[rotateCredentials] Analyzing credential health and compliance..."
+                boolean includeUsage = args.includeUsage != false
+                Map analysis = analyzeCredentialsNonCps(includeUsage)
+
+                echo "[rotateCredentials] Credential analysis summary:"
+                echo "  Total credentials: ${analysis.summary.totalCredentials}"
+                echo "  Needing rotation: ${analysis.summary.needingRotation}"
+                echo "  Compliance status: ${analysis.compliance.overall}"
+
                 return analysis
-                
+
             case 'rotate':
-                def dryRun = args.dryRun != false  // Default to dry run for safety
-                def policy = args.policy ?: [:]
-                
-                logger.info("${dryRun ? 'Preview' : 'Executing'} credential rotation...")
-                def results = manager.rotateCredentials(dryRun, policy)
-                
-                logger.info("Rotation results:")
-                logger.info("  Rotated: ${results.rotated.size()}")
-                logger.info("  Failed: ${results.failed.size()}")
-                logger.info("  Skipped: ${results.skipped.size()}")
-                
+                boolean dryRun = args.dryRun != false
+                Map policy = (args.policy ?: [:]) as Map
+
+                echo "[rotateCredentials] ${dryRun ? 'Preview' : 'Executing'} credential rotation..."
+                Map results = rotateCredentialsNonCps(dryRun, policy)
+
+                echo "[rotateCredentials] Rotation results:"
+                echo "  Rotated: ${results.rotated.size()}"
+                echo "  Failed: ${results.failed.size()}"
+                echo "  Skipped: ${results.skipped.size()}"
+
                 if (!dryRun && results.failed) {
-                    logger.warning("Failed to rotate ${results.failed.size()} credentials")
+                    echo "[rotateCredentials] WARNING: Failed to rotate ${results.failed.size()} credentials"
                 }
-                
+
                 return results
-                
+
             case 'unused':
-                def days = args.days ?: 90
-                logger.info("Finding credentials unused for ${days} days...")
-                
-                def unused = manager.findUnusedCredentials(days)
-                logger.info("Found ${unused.size()} unused credentials")
-                
+                int days = (args.days ?: 90) as int
+                echo "[rotateCredentials] Finding credentials unused for ${days} days..."
+
+                List unused = findUnusedCredentialsNonCps(days)
+                echo "[rotateCredentials] Found ${unused.size()} unused credentials"
+
                 return unused
-                
+
             default:
                 error "Unknown credential action: ${action}. Valid actions: analyze, rotate, unused"
         }
-        
+
     } catch (Exception e) {
-        logger.error("Credential management failed: ${e.message}")
+        echo "[rotateCredentials] ERROR: Credential management failed: ${e.message}"
         throw e
     }
+}
+
+@NonCPS
+private Map analyzeCredentialsNonCps(boolean includeUsage) {
+    def manager = new CredentialRotationManager(Jenkins.get())
+    return manager.analyzeCredentials(includeUsage)
+}
+
+@NonCPS
+private Map rotateCredentialsNonCps(boolean dryRun, Map policy) {
+    def manager = new CredentialRotationManager(Jenkins.get())
+    return manager.rotateCredentials(dryRun, policy)
+}
+
+@NonCPS
+private List findUnusedCredentialsNonCps(int days) {
+    def manager = new CredentialRotationManager(Jenkins.get())
+    return manager.findUnusedCredentials(days)
 }
 
 /**
@@ -167,10 +166,23 @@ def rotate(Map args = [:]) {
  * Check compliance status.
  */
 def checkCompliance() {
-    def analysis = analyze()
+    Map analysis = analyze()
+    List violations = extractComplianceViolations(analysis)
     return [
         compliant: analysis.compliance.overall == 'COMPLIANT',
-        violations: analysis.getViolations(),
+        violations: violations,
         summary: analysis.compliance
     ]
+}
+
+@NonCPS
+private List extractComplianceViolations(Map analysis) {
+    List violations = []
+    ['sox', 'hipaa', 'pciDss'].each { standard ->
+        def standardReport = analysis.compliance?.get(standard)
+        if (standardReport && !standardReport.compliant && standardReport.violations) {
+            violations.addAll(standardReport.violations)
+        }
+    }
+    return violations
 }
