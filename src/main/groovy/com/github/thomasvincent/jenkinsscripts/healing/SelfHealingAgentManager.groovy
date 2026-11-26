@@ -24,6 +24,8 @@ import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.ThreadFactory
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 import java.util.logging.Level
 import java.util.logging.Logger
 
@@ -493,15 +495,47 @@ class SelfHealingAgentManager {
      */
     static class AgentHealthState {
         final String agentName
-        volatile AgentStatus status = AgentStatus.UNKNOWN
-        volatile long lastCheckTime = 0
-        volatile long lastHealthyTime = 0
-        volatile long lastFailureTime = 0
+        private final AtomicReference<AgentStatus> statusRef = new AtomicReference<>(AgentStatus.UNKNOWN)
+        private final AtomicLong lastCheckTimeRef = new AtomicLong(0L)
+        private final AtomicLong lastHealthyTimeRef = new AtomicLong(0L)
+        private final AtomicLong lastFailureTimeRef = new AtomicLong(0L)
         final List<String> warnings = []
         final List<String> recoveryHistory = []
 
         AgentHealthState(String agentName) {
             this.agentName = agentName
+        }
+
+        AgentStatus getStatus() {
+            return statusRef.get()
+        }
+
+        void setStatus(AgentStatus status) {
+            statusRef.set(status)
+        }
+
+        long getLastCheckTime() {
+            return lastCheckTimeRef.get()
+        }
+
+        void setLastCheckTime(long timestamp) {
+            lastCheckTimeRef.set(timestamp)
+        }
+
+        long getLastHealthyTime() {
+            return lastHealthyTimeRef.get()
+        }
+
+        void setLastHealthyTime(long timestamp) {
+            lastHealthyTimeRef.set(timestamp)
+        }
+
+        long getLastFailureTime() {
+            return lastFailureTimeRef.get()
+        }
+
+        void setLastFailureTime(long timestamp) {
+            lastFailureTimeRef.set(timestamp)
         }
 
         void addWarning(String warning) {
@@ -533,10 +567,10 @@ class SelfHealingAgentManager {
             }
             return [
                     agentName      : agentName,
-                    status         : status.name(),
-                    lastCheckTime  : lastCheckTime,
-                    lastHealthyTime: lastHealthyTime,
-                    lastFailureTime: lastFailureTime,
+                    status         : getStatus().name(),
+                    lastCheckTime  : getLastCheckTime(),
+                    lastHealthyTime: getLastHealthyTime(),
+                    lastFailureTime: getLastFailureTime(),
                     warnings       : warningsSnapshot,
                     recoveryHistory: historySnapshot
             ]
