@@ -27,7 +27,9 @@
 
 package com.github.thomasvincent.jenkinsscripts.analytics
 
+import edu.umd.cs.findbugs.annotations.NonNull
 import hudson.Extension
+import hudson.model.AbstractDescribableImpl
 import hudson.model.Job
 import hudson.model.Run
 import hudson.model.TaskListener
@@ -35,20 +37,21 @@ import hudson.model.listeners.RunListener
 import hudson.security.ACL
 import hudson.security.ACLContext
 import jenkins.model.Jenkins
+import org.jenkinsci.plugins.workflow.actions.ErrorAction
+import org.jenkinsci.plugins.workflow.actions.LabelAction
+import org.jenkinsci.plugins.workflow.actions.TimingAction
+import org.jenkinsci.plugins.workflow.graph.BlockEndNode
+import org.jenkinsci.plugins.workflow.graph.BlockStartNode
+import org.jenkinsci.plugins.workflow.graph.FlowGraphWalker
+import org.jenkinsci.plugins.workflow.graph.FlowNode
 import org.jenkinsci.plugins.workflow.job.WorkflowJob
 import org.jenkinsci.plugins.workflow.job.WorkflowRun
-import org.jenkinsci.plugins.workflow.graph.FlowNode
-import org.jenkinsci.plugins.workflow.graphanalysis.DepthFirstScanner
 import org.kohsuke.stapler.DataBoundConstructor
-import org.kohsuke.stapler.DataBoundSetter
 import groovy.transform.CompileStatic
-import java.time.Duration
 import java.time.Instant
-import java.time.LocalDateTime
-import java.time.ZoneId
+import java.util.concurrent.TimeUnit
 import java.util.logging.Level
 import java.util.logging.Logger
-import javax.annotation.Nonnull
 import com.github.thomasvincent.jenkinsscripts.utils.ErrorHandler
 
 /**
@@ -66,7 +69,7 @@ import com.github.thomasvincent.jenkinsscripts.utils.ErrorHandler
  * @since 1.4.0
  */
 @CompileStatic
-class PipelineMetricsCollector {
+class PipelineMetricsCollector extends AbstractDescribableImpl<PipelineMetricsCollector> {
     
     private static final Logger LOGGER = Logger.getLogger(PipelineMetricsCollector.class.name)
     private final Jenkins jenkins
@@ -79,7 +82,14 @@ class PipelineMetricsCollector {
         this.jenkins = Jenkins.get()
         this.errorHandler = new ErrorHandler(LOGGER)
     }
-    
+
+    /**
+     * Constructor using a provided Jenkins instance and default ErrorHandler.
+     */
+    PipelineMetricsCollector(Jenkins jenkins) {
+        this(jenkins, new ErrorHandler(LOGGER))
+    }
+
     /**
      * Constructor for testing with dependency injection.
      */
@@ -89,7 +99,7 @@ class PipelineMetricsCollector {
     }
     
     /**
-     * Collects comprehensive metrics for a pipeline including stage-level analytics.
+     * Collects metrics for a pipeline including stage-level analytics.
      * Requires Job/Read permission.
      */
     Map<String, Object> collectPipelineMetrics(String jobName, int historyLimit = DEFAULT_HISTORY_LIMIT) {
@@ -97,7 +107,7 @@ class PipelineMetricsCollector {
             // Security check
             jenkins.checkPermission(Jenkins.READ)
             
-            def job = jenkins.getItemByFullName(jobName, WorkflowJob)
+            WorkflowJob job = jenkins.getItemByFullName(jobName, WorkflowJob)
             if (!job) {
                 throw new IllegalArgumentException("Pipeline job not found: ${jobName}")
             }
@@ -105,36 +115,36 @@ class PipelineMetricsCollector {
             // Check job-level permissions
             job.checkPermission(Job.READ)
         
-        def metrics = [
-            jobName: jobName,
-            analysisTimestamp: Instant.now().toString(),
-            summary: [:],
-            stageMetrics: [:],
-            anomalies: [],
-            trends: [:],
-            recommendations: []
-        ]
+            Map<String, Object> metrics = [
+                jobName: jobName,
+                analysisTimestamp: Instant.now().toString(),
+                summary: [:],
+                stageMetrics: [:],
+                anomalies: [],
+                trends: [:],
+                recommendations: []
+            ] as Map<String, Object>
         
-        // Collect build history
-        def builds = job.getBuilds().limit(historyLimit)
-        def buildMetrics = builds.collect { build ->
-            analyzeBuild(build as WorkflowRun)
-        }
+            // Collect build history
+            List<WorkflowRun> builds = job.getBuilds().limit(historyLimit)
+            List<Map<String, Object>> buildMetrics = builds.collect { WorkflowRun build ->
+                analyzeBuild(build)
+            }
         
-        // Calculate summary statistics
-        metrics.summary = calculateSummaryStats(buildMetrics)
+            // Calculate summary statistics
+            metrics.summary = calculateSummaryStats(buildMetrics)
         
-        // Analyze stage-level performance
-        metrics.stageMetrics = analyzeStagePerformance(buildMetrics)
+            // Analyze stage-level performance
+            metrics.stageMetrics = analyzeStagePerformance(buildMetrics)
         
-        // Detect anomalies
-        metrics.anomalies = detectAnomalies(buildMetrics, metrics.stageMetrics as Map)
+            // Detect anomalies
+            metrics.anomalies = detectAnomalies(buildMetrics, (Map<String, Map<String, Object>>) metrics.stageMetrics)
         
-        // Calculate trends
-        metrics.trends = calculateTrends(buildMetrics)
+            // Calculate trends
+            metrics.trends = calculateTrends(buildMetrics)
         
-        // Generate recommendations
-        metrics.recommendations = generateRecommendations(metrics)
+            // Generate recommendations
+            metrics.recommendations = generateRecommendations(metrics)
         
             return metrics
         }
@@ -144,7 +154,7 @@ class PipelineMetricsCollector {
      * Analyzes a single build and extracts detailed metrics.
      */
     private Map<String, Object> analyzeBuild(WorkflowRun build) {
-        def buildMetrics = [
+        Map<String, Object> buildMetrics = [
             buildNumber: build.number,
             startTime: build.getStartTimeInMillis(),
             duration: build.getDuration(),
@@ -152,44 +162,65 @@ class PipelineMetricsCollector {
             stages: [:],
             queueTime: calculateQueueTime(build),
             executorCount: build.getExecutor()?.getOwner()?.getExecutors()?.size() ?: 1
-        ]
+        ] as Map<String, Object>
         
         // Extract stage-level metrics
         if (build.execution) {
-            def stages = extractStageMetrics(build)
-            buildMetrics.stages = stages
+            buildMetrics.stages = extractStageMetrics(build)
         }
         
         return buildMetrics
     }
     
     /**
-     * Extracts stage-level metrics from a pipeline run.
+     * Extracts stage-level metrics from a pipeline run by matching BlockStartNode to BlockEndNode.
      */
-    private Map<String, Map> extractStageMetrics(WorkflowRun build) {
-        def stages = [:]
+    private Map<String, Map<String, Object>> extractStageMetrics(WorkflowRun build) {
+        Map<String, Map<String, Object>> stages = [:]
         def execution = build.execution
         
-        if (!execution) return stages
-        
-        // Use DepthFirstScanner to traverse the flow graph
-        def scanner = new DepthFirstScanner()
-        def visitor = { FlowNode node ->
-            if (node.getDisplayName() && isStageNode(node)) {
-                def stageName = node.getDisplayName()
-                def startTime = node.getAction(org.jenkinsci.plugins.workflow.actions.TimingAction)?.getStartTime() ?: 0
-                def endTime = getNodeEndTime(node)
-                
-                stages[stageName] = [
-                    duration: endTime - startTime,
-                    startTime: startTime,
-                    endTime: endTime,
-                    status: getNodeStatus(node)
-                ]
-            }
+        if (!execution) {
+            return stages
         }
         
-        scanner.visitAll(execution.currentHeads, visitor)
+        Map<String, BlockEndNode> endNodesByStartId = [:]
+        List<FlowNode> stageNodes = []
+        FlowGraphWalker walker = new FlowGraphWalker(execution)
+        for (FlowNode node : walker) {
+            if (node instanceof BlockEndNode) {
+                BlockEndNode endNode = (BlockEndNode) node
+                BlockStartNode startNode = endNode.getStartNode()
+                if (startNode != null) {
+                    endNodesByStartId[startNode.id] = endNode
+                }
+            }
+            if (node.getDisplayName() && isStageNode(node)) {
+                stageNodes.add(node)
+            }
+        }
+
+        // Sort stage nodes chronologically for fallback end-time computation
+        stageNodes.sort { FlowNode n -> n.getAction(TimingAction)?.getStartTime() ?: 0L }
+
+        long buildEndTime = build.result != null
+                ? (build.getStartTimeInMillis() + build.getDuration())
+                : System.currentTimeMillis()
+
+        for (int i = 0; i < stageNodes.size(); i++) {
+            FlowNode node = stageNodes[i]
+            String stageName = node.getDisplayName()
+            long startTime = node.getAction(TimingAction)?.getStartTime() ?: 0L
+            BlockEndNode matchingEnd = endNodesByStartId[node.id]
+            long endTime = resolveNodeEndTime(node, matchingEnd, stageNodes, i, startTime, buildEndTime)
+            long duration = Math.max(0L, endTime - startTime)
+
+            stages[stageName] = [
+                duration: duration,
+                startTime: startTime,
+                endTime: endTime,
+                status: getNodeStatus(node, matchingEnd)
+            ] as Map<String, Object>
+        }
         
         return stages
     }
@@ -198,24 +229,33 @@ class PipelineMetricsCollector {
      * Checks if a flow node represents a stage.
      */
     private boolean isStageNode(FlowNode node) {
-        node.getAction(org.jenkinsci.plugins.workflow.actions.LabelAction) != null
+        return node.getAction(LabelAction) != null
     }
     
     /**
-     * Gets the end time of a flow node.
+     * Resolves the actual end time of a stage FlowNode using its matching BlockEndNode,
+     * falling back to the next stage start or build end time.
      */
-    private long getNodeEndTime(FlowNode node) {
-        // This is a simplified implementation
-        // In reality, you'd need to traverse child nodes to find the actual end time
-        def timing = node.getAction(org.jenkinsci.plugins.workflow.actions.TimingAction)
-        return timing ? timing.getStartTime() + 1000 : System.currentTimeMillis()
+    private long resolveNodeEndTime(FlowNode node, BlockEndNode matchingEnd, List<FlowNode> stageNodes,
+                                    int index, long startTime, long buildEndTime) {
+        TimingAction endTiming = matchingEnd?.getAction(TimingAction)
+        if (endTiming != null) {
+            return endTiming.getStartTime()
+        }
+        if (index + 1 < stageNodes.size()) {
+            TimingAction nextTiming = stageNodes[index + 1].getAction(TimingAction)
+            if (nextTiming != null) {
+                return nextTiming.getStartTime()
+            }
+        }
+        return startTime > 0L ? Math.max(startTime, buildEndTime) : startTime
     }
     
     /**
      * Gets the status of a flow node.
      */
-    private String getNodeStatus(FlowNode node) {
-        def errorAction = node.getAction(org.jenkinsci.plugins.workflow.actions.ErrorAction)
+    private String getNodeStatus(FlowNode node, BlockEndNode endNode = null) {
+        ErrorAction errorAction = node.getAction(ErrorAction) ?: endNode?.getAction(ErrorAction)
         return errorAction ? 'FAILED' : 'SUCCESS'
     }
     
@@ -223,123 +263,172 @@ class PipelineMetricsCollector {
      * Calculates queue time for a build.
      */
     private long calculateQueueTime(Run build) {
-        def scheduledTime = build.getTimeInMillis()
-        def startTime = build.getStartTimeInMillis()
-        return Math.max(0, startTime - scheduledTime)
+        long scheduledTime = build.getTimeInMillis()
+        long startTime = build.getStartTimeInMillis()
+        return Math.max(0L, startTime - scheduledTime)
+    }
+
+    /**
+     * Filters out builds that are still in progress.
+     */
+    private List<Map<String, Object>> filterCompletedBuilds(List<Map<String, Object>> buildMetrics) {
+        return buildMetrics.findAll { Map<String, Object> b -> b.result != 'IN_PROGRESS' }
     }
     
     /**
-     * Calculates summary statistics across all builds.
+     * Calculates summary statistics across completed builds.
      */
-    private Map<String, Object> calculateSummaryStats(List<Map> buildMetrics) {
-        if (buildMetrics.isEmpty()) {
-            return [:]
+    private Map<String, Object> calculateSummaryStats(List<Map<String, Object>> buildMetrics) {
+        List<Map<String, Object>> completed = filterCompletedBuilds(buildMetrics)
+        if (completed.isEmpty()) {
+            return [
+                totalBuilds: 0,
+                successRate: 0.0d,
+                avgDuration: 0L,
+                minDuration: 0L,
+                maxDuration: 0L,
+                stdDeviation: 0.0d,
+                avgQueueTime: 0.0d
+            ] as Map<String, Object>
         }
         
-        def durations = buildMetrics.findAll { it.result != 'IN_PROGRESS' }
-                                   .collect { it.duration as Long }
-        
-        def successfulBuilds = buildMetrics.count { it.result == 'SUCCESS' }
-        def totalBuilds = buildMetrics.size()
+        List<Long> durations = completed.collect { Map<String, Object> b -> ((Number) b.duration).longValue() }
+        int successfulBuilds = completed.count { Map<String, Object> b -> b.result == 'SUCCESS' }.intValue()
+        int totalBuilds = completed.size()
+
+        long durationSum = 0L
+        long minDuration = Long.MAX_VALUE
+        long maxDuration = Long.MIN_VALUE
+        for (Long d : durations) {
+            long val = d.longValue()
+            durationSum += val
+            if (val < minDuration) minDuration = val
+            if (val > maxDuration) maxDuration = val
+        }
+
+        long queueSum = 0L
+        for (Map<String, Object> b : completed) {
+            queueSum += ((Number) b.queueTime).longValue()
+        }
         
         return [
             totalBuilds: totalBuilds,
-            successRate: totalBuilds > 0 ? (successfulBuilds / totalBuilds * 100).round(2) : 0,
-            avgDuration: durations ? (durations.sum() / durations.size()).round() : 0,
-            minDuration: durations ? durations.min() : 0,
-            maxDuration: durations ? durations.max() : 0,
+            successRate: Math.round((successfulBuilds * 100.0d / totalBuilds) * 100.0d) / 100.0d,
+            avgDuration: Math.round((double) durationSum / durations.size()),
+            minDuration: minDuration,
+            maxDuration: maxDuration,
             stdDeviation: calculateStandardDeviation(durations),
-            avgQueueTime: buildMetrics.collect { it.queueTime as Long }.sum() / buildMetrics.size()
-        ]
+            avgQueueTime: (double) queueSum / totalBuilds
+        ] as Map<String, Object>
     }
     
     /**
-     * Analyzes stage-level performance across builds.
+     * Analyzes stage-level performance across completed builds.
      */
-    private Map<String, Map> analyzeStagePerformance(List<Map> buildMetrics) {
-        def stageStats = [:]
+    private Map<String, Map<String, Object>> analyzeStagePerformance(List<Map<String, Object>> buildMetrics) {
+        List<Map<String, Object>> completed = filterCompletedBuilds(buildMetrics)
+        Map<String, List<Long>> stageDurationsMap = [:]
+        Map<String, Integer> stageFailuresMap = [:]
+        Map<String, Integer> stageExecutionsMap = [:]
         
-        // Collect all stage data
-        buildMetrics.each { build ->
-            def stages = build.stages as Map<String, Map>
-            stages.each { stageName, stageData ->
-                if (!stageStats[stageName]) {
-                    stageStats[stageName] = [
-                        durations: [],
-                        failures: 0,
-                        executions: 0
-                    ]
-                }
-                
-                stageStats[stageName].durations << (stageData.duration as Long)
-                stageStats[stageName].executions++
+        completed.each { Map<String, Object> build ->
+            Map<String, Map<String, Object>> stages = (Map<String, Map<String, Object>>) build.stages
+            stages?.each { String stageName, Map<String, Object> stageData ->
+                List<Long> durs = stageDurationsMap.computeIfAbsent(stageName) { new ArrayList<Long>() }
+                durs.add(((Number) stageData.duration).longValue())
+                stageExecutionsMap[stageName] = (stageExecutionsMap[stageName] ?: 0) + 1
                 if (stageData.status != 'SUCCESS') {
-                    stageStats[stageName].failures++
+                    stageFailuresMap[stageName] = (stageFailuresMap[stageName] ?: 0) + 1
                 }
             }
         }
         
-        // Calculate statistics for each stage
-        def result = [:]
-        stageStats.each { stageName, data ->
-            def durations = data.durations as List<Long>
+        Map<String, Map<String, Object>> result = [:]
+        stageDurationsMap.each { String stageName, List<Long> durations ->
+            if (durations.isEmpty()) {
+                return
+            }
+            long sum = 0L
+            long min = Long.MAX_VALUE
+            long max = Long.MIN_VALUE
+            for (Long d : durations) {
+                long val = d.longValue()
+                sum += val
+                if (val < min) min = val
+                if (val > max) max = val
+            }
+            int executions = stageExecutionsMap[stageName] ?: durations.size()
+            int failures = stageFailuresMap[stageName] ?: 0
             result[stageName] = [
-                avgDuration: durations.sum() / durations.size(),
-                minDuration: durations.min(),
-                maxDuration: durations.max(),
+                avgDuration: (double) sum / durations.size(),
+                minDuration: min,
+                maxDuration: max,
                 stdDeviation: calculateStandardDeviation(durations),
-                failureRate: (data.failures / data.executions * 100).round(2),
-                executions: data.executions
-            ]
+                failureRate: executions > 0 ? Math.round((failures * 100.0d / executions) * 100.0d) / 100.0d : 0.0d,
+                executions: executions
+            ] as Map<String, Object>
         }
         
         return result
     }
     
     /**
-     * Detects anomalies in build and stage performance.
+     * Detects anomalies in build and stage performance across completed builds.
      */
-    private List<Map> detectAnomalies(List<Map> buildMetrics, Map<String, Map> stageMetrics) {
-        def anomalies = []
+    private List<Map<String, Object>> detectAnomalies(List<Map<String, Object>> buildMetrics,
+                                                      Map<String, Map<String, Object>> stageMetrics) {
+        List<Map<String, Object>> anomalies = []
+        List<Map<String, Object>> completed = filterCompletedBuilds(buildMetrics)
+        if (completed.isEmpty()) {
+            return anomalies
+        }
         
-        // Check for build duration anomalies
-        def avgBuildDuration = buildMetrics.collect { it.duration as Long }.sum() / buildMetrics.size()
-        def stdDev = calculateStandardDeviation(buildMetrics.collect { it.duration as Long })
+        List<Long> buildDurations = completed.collect { Map<String, Object> b -> ((Number) b.duration).longValue() }
+        long sum = 0L
+        for (Long d : buildDurations) {
+            sum += d.longValue()
+        }
+        double avgBuildDuration = (double) sum / completed.size()
+        double stdDev = calculateStandardDeviation(buildDurations)
         
-        buildMetrics.each { build ->
-            def deviation = Math.abs(build.duration - avgBuildDuration) / stdDev
-            if (deviation > ANOMALY_THRESHOLD) {
-                anomalies << [
-                    type: 'BUILD_DURATION',
-                    buildNumber: build.buildNumber,
-                    value: build.duration,
-                    expectedValue: avgBuildDuration,
-                    deviation: deviation,
-                    severity: deviation > 3 ? 'HIGH' : 'MEDIUM'
-                ]
+        if (stdDev > 0.0d) {
+            completed.each { Map<String, Object> build ->
+                long duration = ((Number) build.duration).longValue()
+                double deviation = Math.abs(duration - avgBuildDuration) / stdDev
+                if (deviation > ANOMALY_THRESHOLD) {
+                    anomalies.add([
+                        type: 'BUILD_DURATION',
+                        buildNumber: build.buildNumber,
+                        value: duration,
+                        expectedValue: avgBuildDuration,
+                        deviation: deviation,
+                        severity: deviation > 3.0d ? 'HIGH' : 'MEDIUM'
+                    ] as Map<String, Object>)
+                }
             }
         }
         
         // Check for stage anomalies
-        buildMetrics.each { build ->
-            def stages = build.stages as Map<String, Map>
-            stages.each { stageName, stageData ->
-                def stageStats = stageMetrics[stageName]
+        completed.each { Map<String, Object> build ->
+            Map<String, Map<String, Object>> stages = (Map<String, Map<String, Object>>) build.stages
+            stages?.each { String stageName, Map<String, Object> stageData ->
+                Map<String, Object> stageStats = stageMetrics[stageName]
                 if (stageStats) {
-                    def avgDuration = stageStats.avgDuration as Double
-                    def stageStdDev = stageStats.stdDeviation as Double
-                    if (stageStdDev > 0) {
-                        def deviation = Math.abs(stageData.duration - avgDuration) / stageStdDev
+                    double avgDuration = ((Number) stageStats.avgDuration).doubleValue()
+                    double stageStdDev = ((Number) stageStats.stdDeviation).doubleValue()
+                    if (stageStdDev > 0.0d) {
+                        long stageDuration = ((Number) stageData.duration).longValue()
+                        double deviation = Math.abs(stageDuration - avgDuration) / stageStdDev
                         if (deviation > ANOMALY_THRESHOLD) {
-                            anomalies << [
+                            anomalies.add([
                                 type: 'STAGE_DURATION',
                                 buildNumber: build.buildNumber,
                                 stageName: stageName,
-                                value: stageData.duration,
+                                value: stageDuration,
                                 expectedValue: avgDuration,
                                 deviation: deviation,
-                                severity: deviation > 3 ? 'HIGH' : 'MEDIUM'
-                            ]
+                                severity: deviation > 3.0d ? 'HIGH' : 'MEDIUM'
+                            ] as Map<String, Object>)
                         }
                     }
                 }
@@ -350,83 +439,96 @@ class PipelineMetricsCollector {
     }
     
     /**
-     * Calculates performance trends.
+     * Calculates performance trends across completed builds.
      */
-    private Map<String, Object> calculateTrends(List<Map> buildMetrics) {
-        if (buildMetrics.size() < 5) {
-            return [message: 'Insufficient data for trend analysis']
+    private Map<String, Object> calculateTrends(List<Map<String, Object>> buildMetrics) {
+        List<Map<String, Object>> completed = filterCompletedBuilds(buildMetrics)
+        if (completed.size() < 5) {
+            return [message: 'Insufficient data for trend analysis'] as Map<String, Object>
         }
         
-        // Split into recent and historical
-        def midpoint = buildMetrics.size() / 2
-        def recent = buildMetrics.take(midpoint as Integer)
-        def historical = buildMetrics.drop(midpoint as Integer)
+        int midpoint = completed.size().intdiv(2).intValue()
+        List<Map<String, Object>> recent = completed.subList(0, midpoint)
+        List<Map<String, Object>> historical = completed.subList(midpoint, completed.size())
         
-        def recentAvg = recent.collect { it.duration as Long }.sum() / recent.size()
-        def historicalAvg = historical.collect { it.duration as Long }.sum() / historical.size()
-        def percentChange = ((recentAvg - historicalAvg) / historicalAvg * 100).round(2)
+        long recentSum = 0L
+        for (Map<String, Object> b : recent) {
+            recentSum += ((Number) b.duration).longValue()
+        }
+        long historicalSum = 0L
+        for (Map<String, Object> b : historical) {
+            historicalSum += ((Number) b.duration).longValue()
+        }
+
+        double recentAvg = (double) recentSum / recent.size()
+        double historicalAvg = (double) historicalSum / historical.size()
+        double percentChange = historicalAvg > 0.0d
+                ? Math.round(((recentAvg - historicalAvg) / historicalAvg * 100.0d) * 100.0d) / 100.0d
+                : 0.0d
         
-        def recentSuccessRate = recent.count { it.result == 'SUCCESS' } / recent.size() * 100
-        def historicalSuccessRate = historical.count { it.result == 'SUCCESS' } / historical.size() * 100
+        double recentSuccessRate = recent.count { Map<String, Object> b -> b.result == 'SUCCESS' } * 100.0d / recent.size()
+        double historicalSuccessRate = historical.count { Map<String, Object> b -> b.result == 'SUCCESS' } * 100.0d / historical.size()
         
         return [
-            durationTrend: percentChange > 0 ? 'INCREASING' : 'DECREASING',
+            durationTrend: percentChange > 0.0d ? 'INCREASING' : 'DECREASING',
             durationChange: percentChange,
             successRateTrend: recentSuccessRate >= historicalSuccessRate ? 'IMPROVING' : 'DEGRADING',
-            successRateChange: (recentSuccessRate - historicalSuccessRate).round(2)
-        ]
+            successRateChange: Math.round((recentSuccessRate - historicalSuccessRate) * 100.0d) / 100.0d
+        ] as Map<String, Object>
     }
     
     /**
      * Generates actionable recommendations based on metrics.
      */
-    private List<Map> generateRecommendations(Map<String, Object> metrics) {
-        def recommendations = []
+    private List<Map<String, Object>> generateRecommendations(Map<String, Object> metrics) {
+        List<Map<String, Object>> recommendations = []
         
-        // Check for high failure rate
-        def summary = metrics.summary as Map
-        if (summary.successRate < 80) {
-            recommendations << [
-                type: 'STABILITY',
-                priority: 'HIGH',
-                message: "Success rate is ${summary.successRate}%. Consider adding more comprehensive testing or fixing flaky tests.",
-                impact: 'Improving stability can reduce time spent on debugging failed builds'
-            ]
-        }
-        
-        // Check for long queue times
-        if (summary.avgQueueTime > 60000) { // 1 minute
-            recommendations << [
-                type: 'CAPACITY',
-                priority: 'MEDIUM',
-                message: "Average queue time is ${summary.avgQueueTime / 1000}s. Consider adding more executors or agents.",
-                impact: 'Reducing queue time can improve developer feedback loops'
-            ]
-        }
-        
-        // Check for slow stages
-        def stageMetrics = metrics.stageMetrics as Map<String, Map>
-        stageMetrics.each { stageName, stats ->
-            if (stats.avgDuration > 300000) { // 5 minutes
-                recommendations << [
-                    type: 'PERFORMANCE',
+        Map<String, Object> summary = (Map<String, Object>) metrics.summary
+        if (summary && ((Number) (summary.totalBuilds ?: 0)).intValue() > 0) {
+            double successRate = ((Number) (summary.successRate ?: 0.0d)).doubleValue()
+            if (successRate < 80.0d) {
+                recommendations.add([
+                    type: 'STABILITY',
+                    priority: 'HIGH',
+                    message: "Success rate is ${successRate}%. Consider adding more tests or fixing flaky tests.",
+                    impact: 'Improving stability can reduce time spent on debugging failed builds'
+                ] as Map<String, Object>)
+            }
+
+            double avgQueueTime = ((Number) (summary.avgQueueTime ?: 0.0d)).doubleValue()
+            if (avgQueueTime > 60000.0d) {
+                recommendations.add([
+                    type: 'CAPACITY',
                     priority: 'MEDIUM',
-                    message: "Stage '${stageName}' averages ${stats.avgDuration / 1000}s. Consider parallelizing or optimizing this stage.",
-                    impact: 'Optimizing slow stages can significantly reduce overall build time'
-                ]
+                    message: "Average queue time is ${avgQueueTime / 1000.0d}s. Consider adding more executors or agents.",
+                    impact: 'Reducing queue time can improve developer feedback loops'
+                ] as Map<String, Object>)
             }
         }
         
-        // Check for high variance stages
-        stageMetrics.each { stageName, stats ->
-            def cv = stats.stdDeviation / stats.avgDuration // Coefficient of variation
-            if (cv > 0.5) {
-                recommendations << [
-                    type: 'CONSISTENCY',
-                    priority: 'LOW',
-                    message: "Stage '${stageName}' has high variance. Consider investigating environmental factors.",
-                    impact: 'Reducing variance improves predictability and planning'
-                ]
+        Map<String, Map<String, Object>> stageMetrics = (Map<String, Map<String, Object>>) metrics.stageMetrics
+        stageMetrics?.each { String stageName, Map<String, Object> stats ->
+            double avgDuration = ((Number) (stats.avgDuration ?: 0.0d)).doubleValue()
+            if (avgDuration > 300000.0d) {
+                recommendations.add([
+                    type: 'PERFORMANCE',
+                    priority: 'MEDIUM',
+                    message: "Stage '${stageName}' averages ${avgDuration / 1000.0d}s. Consider parallelizing or optimizing this stage.",
+                    impact: 'Optimizing slow stages can significantly reduce overall build time'
+                ] as Map<String, Object>)
+            }
+
+            if (avgDuration > 0.0d) {
+                double stdDev = ((Number) (stats.stdDeviation ?: 0.0d)).doubleValue()
+                double cv = stdDev / avgDuration
+                if (cv > 0.5d) {
+                    recommendations.add([
+                        type: 'CONSISTENCY',
+                        priority: 'LOW',
+                        message: "Stage '${stageName}' has high variance. Consider investigating environmental factors.",
+                        impact: 'Reducing variance improves predictability and planning'
+                    ] as Map<String, Object>)
+                }
             }
         }
         
@@ -437,11 +539,21 @@ class PipelineMetricsCollector {
      * Calculates standard deviation for a list of numbers.
      */
     private double calculateStandardDeviation(List<Long> values) {
-        if (values.size() < 2) return 0.0
+        if (values == null || values.size() < 2) {
+            return 0.0d
+        }
         
-        def mean = values.sum() / values.size()
-        def variance = values.collect { (it - mean) * (it - mean) }.sum() / values.size()
-        return Math.sqrt(variance)
+        double sum = 0.0d
+        for (Long v : values) {
+            sum += v.doubleValue()
+        }
+        double mean = sum / values.size()
+        double sqDiffSum = 0.0d
+        for (Long v : values) {
+            double diff = v.doubleValue() - mean
+            sqDiffSum += diff * diff
+        }
+        return Math.sqrt(sqDiffSum / values.size())
     }
     
     /**
@@ -452,35 +564,26 @@ class PipelineMetricsCollector {
         private static final Logger LISTENER_LOGGER = Logger.getLogger(MetricsRunListener.class.name)
         
         @Override
-        void onCompleted(WorkflowRun run, @Nonnull TaskListener listener) {
-            try (ACLContext ctx = ACL.as(ACL.SYSTEM)) {
-                // Collect metrics asynchronously to avoid blocking build completion
-                Jenkins.get().getTimer().schedule({
-                    try {
-                        def collector = new PipelineMetricsCollector()
-                        def jobName = run.parent.fullName
-                        
-                        // Store basic metrics for trend analysis
-                        def buildMetrics = [
-                            buildNumber: run.number,
-                            duration: run.getDuration(),
-                            result: run.result?.toString(),
-                            timestamp: Instant.now().toString()
-                        ]
-                        
-                        LISTENER_LOGGER.log(Level.FINE, "Collected metrics for {0} #{1}", 
-                            [jobName, run.number] as Object[])
-                    } catch (Exception e) {
-                        LISTENER_LOGGER.log(Level.WARNING, 
-                            "Failed to collect metrics for ${run.fullDisplayName}", e)
-                    }
-                } as Runnable, 5000) // Delay 5 seconds
-            }
+        void onCompleted(WorkflowRun run, @NonNull TaskListener listener) {
+            String jobName = ((Job) run.parent).fullName
+            int buildNumber = run.number
+            long duration = run.getDuration()
+            String result = run.result?.toString()
+            String displayName = run.fullDisplayName
+
+            jenkins.util.Timer.get().schedule({
+                try (ACLContext ctx = ACL.as(ACL.SYSTEM)) {
+                    LISTENER_LOGGER.log(Level.FINE, "Collected metrics for {0} #{1} (duration={2}ms, result={3})",
+                        [jobName, buildNumber, duration, result] as Object[])
+                } catch (Exception e) {
+                    LISTENER_LOGGER.log(Level.WARNING,
+                        "Failed to collect metrics for ${displayName}", e)
+                }
+            } as Runnable, 5L, TimeUnit.SECONDS)
         }
         
         @Override
         void onStarted(WorkflowRun run, TaskListener listener) {
-            // Could track queue time and start time here
             LISTENER_LOGGER.log(Level.FINE, "Build started: {0}", run.fullDisplayName)
         }
     }

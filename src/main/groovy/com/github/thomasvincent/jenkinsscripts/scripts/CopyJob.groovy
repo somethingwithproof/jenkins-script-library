@@ -3,7 +3,7 @@
 
 package com.github.thomasvincent.jenkinsscripts.scripts
 
-import groovy.util.CliBuilder
+import groovy.cli.commons.CliBuilder
 import jenkins.model.Jenkins
 import hudson.model.AbstractItem
 import hudson.model.Job

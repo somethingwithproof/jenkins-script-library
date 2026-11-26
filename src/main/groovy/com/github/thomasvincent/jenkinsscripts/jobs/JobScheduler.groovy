@@ -35,6 +35,7 @@ import hudson.model.Run
 import hudson.model.Computer
 import hudson.model.Executor
 import hudson.model.Label
+import hudson.model.Node
 import java.util.concurrent.TimeUnit
 
 import com.github.thomasvincent.jenkinsscripts.util.ValidationUtils
@@ -405,34 +406,37 @@ class JobScheduler {
      */
     private Map<String, Integer> calculateThrottleSettings(QueueAnalysisReport report) {
         Map<String, Integer> throttleSettings = [:]
-        
-        // In a real implementation, we would analyze job history
-        // to make intelligent recommendations based on resource usage
-        
-        // For this example, we'll use a simple heuristic based on queue size
-        // In a real implementation, this would be much more sophisticated
-        
-        // Find jobs with more than 3 simultaneous executions
+
+        // Count active builds directly from computers/executors in O(E) instead of scanning full build history
         Map<String, Integer> concurrentByJob = [:]
-        
-        jenkins.getAllItems(Job.class).each { job ->
-            String jobName = job.fullName
-            int running = 0
-            
-            // Count builds that are currently running
-            job.builds.each { build ->
-                if (build.building) {
-                    running++
+        Map<String, Job> jobsByName = [:]
+
+        for (Computer computer : jenkins.computers) {
+            if (computer == null || computer.offline) {
+                continue
+            }
+            for (Executor executor : computer.executors) {
+                if (executor.busy) {
+                    Queue.Executable executable = executor.currentExecutable
+                    if (executable instanceof Run) {
+                        Run run = (Run) executable
+                        Job parentJob = run.parent
+                        if (parentJob != null) {
+                            String jobName = parentJob.fullName
+                            concurrentByJob[jobName] = (concurrentByJob[jobName] ?: 0) + 1
+                            jobsByName[jobName] = parentJob
+                        }
+                    }
                 }
             }
-            
+        }
+
+        concurrentByJob.each { String jobName, int running ->
             if (running > 3) {
-                // This job has high concurrency, consider throttling
-                int recommendedLimit = calculateRecommendedLimit(job, running)
-                throttleSettings[jobName] = recommendedLimit
+                throttleSettings[jobName] = calculateRecommendedLimit(jobsByName[jobName], running)
             }
         }
-        
+
         return throttleSettings
     }
     
@@ -470,17 +474,22 @@ class JobScheduler {
             return 0
         }
 
-        Job job = jenkins.getItemByFullName(jobFullName, Job.class)
-        if (!job) {
-            LOGGER.fine("Job not found while counting running builds: ${jobFullName}")
-            return 0
-        }
-
         return ErrorHandler.withErrorHandling("counting running builds for job ${jobFullName}", {
-            // Ensure getBuilds() doesn't return null; it typically returns an empty list.
-            return (job.getBuilds() ?: []).count { Run build ->
-                build.isBuilding()
+            int running = 0
+            for (Computer computer : jenkins.computers) {
+                if (computer == null || computer.offline) {
+                    continue
+                }
+                for (Executor executor : computer.executors) {
+                    if (executor.busy) {
+                        Queue.Executable executable = executor.currentExecutable
+                        if (executable instanceof Run && ((Run) executable).parent?.fullName == jobFullName) {
+                            running++
+                        }
+                    }
+                }
             }
+            return running
         }, LOGGER, 0)
     }
 
@@ -525,15 +534,29 @@ class JobScheduler {
  * Configuration for throttling jobs.
  */
 class ThrottleConfig {
-    int maxConcurrent
-    int periodSeconds
-    List<Long> executionTimes = []
-    
+    final int maxConcurrent
+    final int periodSeconds
+    final Deque<Long> executionTimes = new ArrayDeque<>()
+
     ThrottleConfig(int maxConcurrent, int periodSeconds) {
         this.maxConcurrent = maxConcurrent
         this.periodSeconds = periodSeconds
     }
-    
+
+    /**
+     * Atomically checks concurrency/rate limits and records an execution if allowed.
+     *
+     * @param currentRunningExecutions Number of instances currently running for the associated job/label.
+     * @return true if acquired (and recorded when rate-limited), false if throttled.
+     */
+    synchronized boolean tryAcquire(int currentRunningExecutions) {
+        if (!isAllowedToStart(currentRunningExecutions)) {
+            return false
+        }
+        recordExecution()
+        return true
+    }
+
     /**
      * Checks if a new build is allowed to start under this throttle config.
      * Considers both immediate concurrency and rate limiting over a period.
@@ -541,52 +564,40 @@ class ThrottleConfig {
      * @param currentRunningExecutions Number of instances currently running for the associated job/label.
      * @return true if allowed to start, false if throttled.
      */
-    boolean isAllowedToStart(int currentRunningExecutions) {
-        // Check immediate concurrency limit
-        // This assumes maxConcurrent is a hard cap on simultaneous builds regardless of period.
+    synchronized boolean isAllowedToStart(int currentRunningExecutions) {
         if (currentRunningExecutions >= maxConcurrent) {
             return false
         }
 
-        // Check rate limit if periodSeconds is defined
         if (periodSeconds > 0) {
-            long cutoffTime = System.currentTimeMillis() - (periodSeconds * 1000L) // Ensure long arithmetic
-
-            // Count executions within the recent time period
-            int recentPastExecutions = executionTimes.count { timestamp ->
-                timestamp >= cutoffTime
-            }
-
-            // 'maxConcurrent' also serves as the count for the rate limit within the period
-            if (recentPastExecutions >= maxConcurrent) {
-                return false // Rate limit for the period exceeded
+            long cutoffTime = System.currentTimeMillis() - (periodSeconds * 1000L)
+            evictExpired(cutoffTime)
+            if (executionTimes.size() >= maxConcurrent) {
+                return false
             }
         }
 
-        return true // Allowed by both concurrency and rate limits
+        return true
     }
 
     /**
-     * Records a new execution under this throttle.
-     * Call this AFTER isAllowedToStart returns true and the build actually starts.
+     * Records a new execution under this throttle when rate limiting is enabled.
+     * Skips timestamp recording when periodSeconds <= 0 to avoid unbounded growth.
      */
-    void recordExecution() {
+    synchronized void recordExecution() {
+        if (periodSeconds <= 0) {
+            return
+        }
         long currentTime = System.currentTimeMillis()
-        executionTimes.add(currentTime)
+        evictExpired(currentTime - (periodSeconds * 1000L))
+        executionTimes.addLast(currentTime)
+    }
 
-        // Clean up old timestamps if rate limiting is active, to prevent list from growing indefinitely
-        if (periodSeconds > 0) {
-            // Keep a bit more than the period to handle edge cases with clock sync or slight delays
-            // A simple cleanup: remove entries older than 2x period, or a sufficiently large window.
-            // This ensures the list doesn't grow unbounded over a very long time
-            // while still keeping enough history for the rate calculation.
-            long cleanupCutoffTime = currentTime - (periodSeconds * 1000L * 2) 
-            executionTimes.removeAll { timestamp ->
-                timestamp < cleanupCutoffTime
-            }
+    private void evictExpired(long cutoffTime) {
+        while (!executionTimes.isEmpty() && executionTimes.peekFirst() < cutoffTime) {
+            executionTimes.pollFirst()
         }
     }
-    // Removed private int countCurrentExecutions()
 }
 
 /**

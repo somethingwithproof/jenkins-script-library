@@ -447,30 +447,32 @@ class InsecureCredentialsRule extends BaseAuditRule {
         return IssueSeverity.CRITICAL
     }
     
+    private static final Pattern SCRIPT_BLOCK_PATTERN =
+            Pattern.compile('<(script|command|targets|properties)>([\\s\\S]*?)</\\1>', Pattern.CASE_INSENSITIVE)
+    private static final Pattern CREDENTIALS_ID_TAG_PATTERN =
+            Pattern.compile('<credentialsId>[^<]*</credentialsId>', Pattern.CASE_INSENSITIVE)
+    private static final Pattern HARDCODED_ASSIGNMENT_PATTERN =
+            Pattern.compile('(?i)\\b(?:pass(?:word|wd)?|pwd|api[_-]?key|access[_-]?key|auth[_-]?token|secret(?:[_-]?key)?)\\s*[:=]\\s*(?:["\']([^"\'\\s$][^"\']*)["\'])')
+
     /**
-     * Checks XML for sensitive data patterns without using regex patterns
-     * that would trigger security scanners
-     * 
+     * Checks script/command blocks in XML for hardcoded credential literal assignments,
+     * ignoring Jenkins credentialsId references and variable interpolations.
+     *
      * @param xml XML string to check
-     * @return true if sensitive data is found
+     * @return true if hardcoded credential assignments are found
      */
     private boolean checkForSensitiveData(String xml) {
-        // Check for sensitive patterns carefully to avoid triggering security scanners
-        String[] sensitivePrefixes = [
-            "pass", 
-            "pwd", 
-            "auth", 
-            "key", 
-            "cred", 
-            "secret"
-        ]
-        
-        for (String prefix : sensitivePrefixes) {
-            if (xml.contains(prefix) && (xml.contains("'") || xml.contains("\""))) {
+        if (!xml) {
+            return false
+        }
+        String sanitized = CREDENTIALS_ID_TAG_PATTERN.matcher(xml).replaceAll('')
+        def blockMatcher = SCRIPT_BLOCK_PATTERN.matcher(sanitized)
+        while (blockMatcher.find()) {
+            String blockContent = blockMatcher.group(2)
+            if (HARDCODED_ASSIGNMENT_PATTERN.matcher(blockContent).find()) {
                 return true
             }
         }
-        
         return false
     }
     
@@ -696,10 +698,11 @@ class GitShallowCloneRule extends BaseAuditRule {
                     }
                 }
                 
-                // Add shallow clone if not present
+                // Add shallow clone if not present and persist configuration
                 if (!hasShallowClone) {
                     CloneOption cloneOption = new CloneOption(true, false, null, null)
                     gitScm.extensions.add(cloneOption)
+                    job.save()
                     fixed = true
                 }
             }

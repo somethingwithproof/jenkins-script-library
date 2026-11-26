@@ -110,17 +110,45 @@ class ComputerLauncher {
      * println "Started ${started} offline agents"  // Shows count of started agents
      * ```
      */
-    int startAllOfflineComputers() {
-        int startedCount = 0
-        
-        jenkins.computers.each { computer ->
+    int startAllOfflineComputers(long timeoutSeconds = 60L) {
+        Map<Computer, Future<?>> pending = new LinkedHashMap<>()
+
+        // Initiate all connection attempts concurrently
+        for (Computer computer : jenkins.computers) {
             if (!(computer instanceof Jenkins.MasterComputer) && computer.offline) {
-                if (startComputerInternal(computer)) {
-                    startedCount++
+                try {
+                    LOGGER.info("Attempting to start computer ${computer.name}...")
+                    Future<?> future = computer.connect(false)
+                    if (future != null) {
+                        pending[computer] = future
+                    }
+                } catch (Exception e) {
+                    ErrorHandler.handleError("starting computer ${computer.name}", e, LOGGER)
                 }
             }
         }
-        
+
+        // Await all initiated connections against a single shared deadline
+        int startedCount = 0
+        long deadlineNanos = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(timeoutSeconds)
+
+        pending.each { Computer computer, Future<?> future ->
+            long remainingNanos = Math.max(0L, deadlineNanos - System.nanoTime())
+            try {
+                future.get(remainingNanos, java.util.concurrent.TimeUnit.NANOSECONDS)
+                LOGGER.info("Computer ${computer.name} started successfully.")
+                startedCount++
+            } catch (java.util.concurrent.TimeoutException e) {
+                LOGGER.warning("Starting computer ${computer.name} exceeded the shared ${timeoutSeconds}s deadline. " +
+                              "The connection attempt will continue in the background.")
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt()
+                LOGGER.warning("Interrupted while waiting for computer ${computer.name} to start.")
+            } catch (Exception e) {
+                ErrorHandler.handleError("starting computer ${computer.name}", e, LOGGER)
+            }
+        }
+
         LOGGER.info("Started ${startedCount} offline computers")
         return startedCount
     }

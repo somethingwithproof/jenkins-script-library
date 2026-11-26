@@ -39,6 +39,7 @@ import com.github.thomasvincent.jenkinsscripts.util.ErrorHandler
 
 import java.util.logging.Level
 import java.util.logging.Logger
+import java.util.regex.Pattern
 
 /**
  * Analyzes Jenkins job performance and health metrics.
@@ -217,15 +218,14 @@ class JobHealthAnalyzer {
      */
     private List<Run> getBuildsForAnalysis(Job job, Date cutoffDate) {
         List<Run> builds = []
-        int count = 0
-        
-        job.getBuilds().each { build ->
-            if (count < buildCount && build.getTime().after(cutoffDate)) {
-                builds.add(build)
-                count++
+
+        for (Run build : job.getBuilds()) {
+            if (builds.size() >= buildCount || !build.getTime().after(cutoffDate)) {
+                break
             }
+            builds.add(build)
         }
-        
+
         return builds
     }
     
@@ -296,8 +296,9 @@ class JobHealthAnalyzer {
         
         // Calculate duration trend
         if (builds.size() >= 5) {
-            List<Run> firstHalf = builds.subList(builds.size() / 2, builds.size())
-            List<Run> secondHalf = builds.subList(0, builds.size() / 2)
+            int mid = builds.size().intdiv(2).intValue()
+            List<Run> firstHalf = builds.subList(mid, builds.size())
+            List<Run> secondHalf = builds.subList(0, mid)
             
             long firstHalfTotal = 0
             firstHalf.each { build -> firstHalfTotal += build.getDuration() }

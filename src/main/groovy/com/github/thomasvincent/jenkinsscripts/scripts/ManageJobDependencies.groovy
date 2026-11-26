@@ -239,9 +239,9 @@ if (options.j) {
     
     def completeGraph = manager.getCompleteDependencyGraph()
     int totalJobs = completeGraph.jobGraphs.size()
-    
-    List<String> orphanedJobs = manager.findOrphanedJobs()
-    List<List<String>> cycles = manager.findCircularDependencies()
+
+    List<String> orphanedJobs = completeGraph.findOrphanedJobs()
+    List<List<String>> cycles = completeGraph.findCircularDependencies()
     
     println "Total Jobs: ${totalJobs}"
     println "Orphaned Jobs: ${orphanedJobs.size()}"

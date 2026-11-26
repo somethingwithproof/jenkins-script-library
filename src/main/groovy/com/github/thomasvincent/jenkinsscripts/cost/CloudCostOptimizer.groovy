@@ -74,477 +74,524 @@ class CloudCostOptimizer {
      * Analyzes cloud costs and generates optimization recommendations.
      */
     Map<String, Object> analyzeCosts(Map<String, Object> options = [:]) {
-        def analysis = [
+        Map<String, Object> providerResults = [:]
+        Set<String> activeComputerNames = new HashSet<>()
+        jenkins.computers.each { Computer c ->
+            if (c?.name != null) {
+                activeComputerNames.add(c.name)
+            }
+        }
+        pruneRemovedComputers(activeComputerNames)
+
+        providers.each { String name, CloudProvider provider ->
+            providerResults[name] = analyzeProvider(provider)
+        }
+
+        Map<String, Object> analysis = [
             timestamp: Instant.now().toString(),
-            providers: [:],
-            totalCost: [:],
-            savings: [:],
+            providers: providerResults,
+            totalCost: calculateTotalCosts(providerResults),
+            savings: identifySavings(providerResults),
             recommendations: [],
             allocations: [:]
-        ]
-        
-        // Analyze each cloud provider
-        providers.each { name, provider ->
-            analysis.providers[name] = analyzeProvider(provider)
-        }
-        
-        // Calculate totals
-        analysis.totalCost = calculateTotalCosts(analysis.providers as Map)
-        
-        // Identify savings opportunities
-        analysis.savings = identifySavings(analysis.providers as Map)
-        
-        // Generate recommendations
+        ] as Map<String, Object>
+
         analysis.recommendations = generateRecommendations(analysis)
-        
-        // Calculate cost allocations
+
         if (options.includeAllocations) {
             analysis.allocations = calculateCostAllocations()
         }
-        
+
         return analysis
     }
-    
+
+    private void pruneRemovedComputers(Set<String> activeComputerNames) {
+        usageData.keySet().removeIf { String name -> !activeComputerNames.contains(name) }
+    }
+
     /**
      * Optimizes cloud resources based on current usage.
      */
     Map<String, Object> optimizeResources(boolean dryRun = true) {
-        def results = [
-            timestamp: Instant.now().toString(),
-            dryRun: dryRun,
-            actions: [],
-            estimatedSavings: 0.0
-        ]
-        
+        List<Map<String, Object>> actions = []
+        double estimatedSavings = 0.0d
+        Set<String> terminatedAgents = new HashSet<>()
+
         // Find idle agents
-        def idleAgents = findIdleAgents()
-        idleAgents.each { agent ->
-            def action = [
+        List<Map<String, Object>> idleAgents = findIdleAgents()
+        idleAgents.each { Map<String, Object> agent ->
+            double hourlyCost = ((Number) agent.hourlyCost).doubleValue()
+            String agentName = agent.name as String
+            Map<String, Object> action = [
                 type: 'TERMINATE_IDLE',
-                agent: agent.name,
+                agent: agentName,
                 provider: agent.provider,
                 idleTime: agent.idleMinutes,
-                hourlyCost: agent.hourlyCost,
-                savingsPerHour: agent.hourlyCost
-            ]
-            
+                hourlyCost: hourlyCost,
+                savingsPerHour: hourlyCost
+            ] as Map<String, Object>
+
             if (!dryRun) {
                 terminateAgent(agent)
             }
-            
-            results.actions << action
-            results.estimatedSavings += action.savingsPerHour
+
+            terminatedAgents.add(agentName)
+            actions.add(action)
+            estimatedSavings += hourlyCost
         }
-        
-        // Find spot instance opportunities
-        def spotOpportunities = findSpotOpportunities()
-        spotOpportunities.each { opp ->
-            def action = [
+
+        // Find spot instance opportunities, excluding agents slated for termination
+        List<Map<String, Object>> spotOpportunities = findSpotOpportunities(terminatedAgents)
+        spotOpportunities.each { Map<String, Object> opp ->
+            double currentCost = ((Number) opp.currentCost).doubleValue()
+            double spotCost = ((Number) opp.spotCost).doubleValue()
+            double savingsPerHour = currentCost - spotCost
+            double savingsPercent = ((Number) opp.savingsPercent).doubleValue()
+            Map<String, Object> action = [
                 type: 'CONVERT_TO_SPOT',
                 agent: opp.agent,
                 provider: opp.provider,
-                currentCost: opp.currentCost,
-                spotCost: opp.spotCost,
-                savingsPerHour: opp.currentCost - opp.spotCost
-            ]
-            
-            if (!dryRun && opp.savingsPercent > SPOT_SAVINGS_THRESHOLD) {
+                currentCost: currentCost,
+                spotCost: spotCost,
+                savingsPerHour: savingsPerHour
+            ] as Map<String, Object>
+
+            if (!dryRun && savingsPercent > SPOT_SAVINGS_THRESHOLD) {
                 convertToSpot(opp)
             }
-            
-            results.actions << action
-            results.estimatedSavings += action.savingsPerHour
+
+            actions.add(action)
+            estimatedSavings += savingsPerHour
         }
-        
-        // Right-size instances
-        def rightsizeOpportunities = findRightsizeOpportunities()
-        rightsizeOpportunities.each { opp ->
-            def action = [
+
+        // Right-size instances, excluding agents slated for termination
+        List<Map<String, Object>> rightsizeOpportunities = findRightsizeOpportunities(terminatedAgents)
+        rightsizeOpportunities.each { Map<String, Object> opp ->
+            double currentCost = ((Number) opp.currentCost).doubleValue()
+            double newCost = ((Number) opp.newCost).doubleValue()
+            double savingsPerHour = currentCost - newCost
+            Map<String, Object> action = [
                 type: 'RIGHTSIZE_INSTANCE',
                 agent: opp.agent,
                 currentType: opp.currentType,
                 recommendedType: opp.recommendedType,
-                currentCost: opp.currentCost,
-                newCost: opp.newCost,
-                savingsPerHour: opp.currentCost - opp.newCost
-            ]
-            
+                currentCost: currentCost,
+                newCost: newCost,
+                savingsPerHour: savingsPerHour
+            ] as Map<String, Object>
+
             if (!dryRun) {
                 rightsizeInstance(opp)
             }
-            
-            results.actions << action
-            results.estimatedSavings += action.savingsPerHour
+
+            actions.add(action)
+            estimatedSavings += savingsPerHour
         }
-        
-        results.estimatedMonthlySavings = results.estimatedSavings * 24 * 30
-        
-        return results
+
+        return [
+            timestamp: Instant.now().toString(),
+            dryRun: dryRun,
+            actions: actions,
+            estimatedSavings: estimatedSavings,
+            estimatedMonthlySavings: estimatedSavings * 24.0d * 30.0d
+        ] as Map<String, Object>
     }
-    
+
     /**
      * Monitors budget and sends alerts.
      */
     Map<String, Object> monitorBudget(Map<String, Double> budgets) {
-        def monitoring = [
-            timestamp: Instant.now().toString(),
-            budgetStatus: [:],
-            alerts: []
-        ]
-        
-        def currentCosts = getCurrentMonthlyCosts()
-        
-        budgets.each { category, budget ->
-            def spent = currentCosts[category] ?: 0.0
-            def percentUsed = (spent / budget * 100).round(2)
-            
-            monitoring.budgetStatus[category] = [
+        Map<String, Object> budgetStatus = [:]
+        List<Map<String, Object>> alerts = []
+
+        Map<String, Double> currentCosts = getCurrentMonthlyCosts()
+
+        budgets.each { String category, Double budgetVal ->
+            double budget = budgetVal != null ? budgetVal.doubleValue() : 0.0d
+            double spent = currentCosts[category] != null ? currentCosts[category].doubleValue() : 0.0d
+            double percentUsed = budget > 0.0d
+                    ? Math.round((spent / budget * 100.0d) * 100.0d) / 100.0d
+                    : (spent > 0.0d ? 100.0d : 0.0d)
+
+            budgetStatus[category] = [
                 budget: budget,
                 spent: spent,
                 remaining: budget - spent,
                 percentUsed: percentUsed
             ]
-            
-            // Generate alerts
-            if (percentUsed >= 90) {
-                monitoring.alerts << [
+
+            if (percentUsed >= 90.0d) {
+                alerts.add([
                     severity: 'HIGH',
                     category: category,
                     message: "Budget alert: ${category} has used ${percentUsed}% of monthly budget"
-                ]
-            } else if (percentUsed >= 75) {
-                monitoring.alerts << [
+                ] as Map<String, Object>)
+            } else if (percentUsed >= 75.0d) {
+                alerts.add([
                     severity: 'MEDIUM',
                     category: category,
                     message: "Budget warning: ${category} has used ${percentUsed}% of monthly budget"
-                ]
+                ] as Map<String, Object>)
             }
         }
-        
-        return monitoring
+
+        return [
+            timestamp: Instant.now().toString(),
+            budgetStatus: budgetStatus,
+            alerts: alerts
+        ] as Map<String, Object>
     }
-    
+
     /**
      * Tracks costs by team/project/pipeline.
      */
     Map<String, Object> trackCostAllocation() {
-        def allocations = [
-            byTeam: [:],
-            byProject: [:],
-            byPipeline: [:],
-            unallocated: 0.0
-        ]
-        
-        jenkins.computers.each { computer ->
-            if (computer.node && isCloudNode(computer.node)) {
-                def cost = getHourlyCost(computer.node)
-                def labels = computer.node.labelString
-                
-                // Extract team from labels
-                def team = extractLabelValue(labels, 'team')
+        Map<String, Double> byTeam = [:]
+        Map<String, Double> byProject = [:]
+        Map<String, Double> byPipeline = [:]
+        double unallocated = 0.0d
+
+        jenkins.computers.each { Computer computer ->
+            Node node = computer?.node
+            if (node != null && isCloudNode(node)) {
+                double cost = getHourlyCost(node)
+                String labels = node.labelString ?: ''
+
+                String team = extractLabelValue(labels, 'team')
                 if (team) {
-                    allocations.byTeam[team] = (allocations.byTeam[team] ?: 0.0) + cost
+                    byTeam[team] = (byTeam[team] ?: 0.0d) + cost
                 }
-                
-                // Extract project from labels
-                def project = extractLabelValue(labels, 'project')
+
+                String project = extractLabelValue(labels, 'project')
                 if (project) {
-                    allocations.byProject[project] = (allocations.byProject[project] ?: 0.0) + cost
+                    byProject[project] = (byProject[project] ?: 0.0d) + cost
                 }
-                
-                // Track by current build
-                def executor = computer.executors.find { it.isBusy() }
-                if (executor?.currentExecutable) {
-                    def build = executor.currentExecutable
-                    def pipeline = build.parent.fullName
-                    allocations.byPipeline[pipeline] = (allocations.byPipeline[pipeline] ?: 0.0) + cost
+
+                def executor = computer.executors?.find { it.isBusy() }
+                if (executor?.currentExecutable instanceof hudson.model.Run) {
+                    hudson.model.Run build = (hudson.model.Run) executor.currentExecutable
+                    String pipeline = build.parent.fullName
+                    byPipeline[pipeline] = (byPipeline[pipeline] ?: 0.0d) + cost
                 }
-                
-                // Track unallocated
+
                 if (!team && !project) {
-                    allocations.unallocated += cost
+                    unallocated += cost
                 }
             }
         }
-        
-        return allocations
+
+        return [
+            byTeam: byTeam,
+            byProject: byProject,
+            byPipeline: byPipeline,
+            unallocated: unallocated
+        ] as Map<String, Object>
     }
-    
+
     /**
      * Analyzes a single cloud provider.
      */
-    private Map analyzeProvider(CloudProvider provider) {
-        def analysis = [
-            name: provider.name,
-            activeAgents: 0,
-            totalCost: 0.0,
-            instances: []
-        ]
-        
-        jenkins.computers.each { computer ->
-            if (computer.node && isProviderNode(computer.node, provider)) {
-                def instance = analyzeInstance(computer, provider)
-                analysis.instances << instance
-                analysis.activeAgents++
-                analysis.totalCost += instance.hourlyCost
+    private Map<String, Object> analyzeProvider(CloudProvider provider) {
+        int activeAgents = 0
+        double totalCost = 0.0d
+        List<Map<String, Object>> instances = []
+
+        jenkins.computers.each { Computer computer ->
+            if (computer?.node != null && isProviderNode(computer.node, provider)) {
+                Map<String, Object> instance = analyzeInstance(computer, provider)
+                instances.add(instance)
+                activeAgents++
+                totalCost += ((Number) instance.hourlyCost).doubleValue()
             }
         }
-        
-        analysis.monthlyCost = analysis.totalCost * 24 * 30
-        
-        return analysis
+
+        return [
+            name: provider.name,
+            activeAgents: activeAgents,
+            totalCost: totalCost,
+            monthlyCost: totalCost * 24.0d * 30.0d,
+            instances: instances
+        ] as Map<String, Object>
     }
-    
+
     /**
      * Analyzes a single instance.
      */
-    private Map analyzeInstance(Computer computer, CloudProvider provider) {
-        def node = computer.node
-        def instance = [
+    private Map<String, Object> analyzeInstance(Computer computer, CloudProvider provider) {
+        Node node = computer.node
+        String instanceType = getInstanceType(node)
+        Map<String, Object> instance = [
             name: computer.name,
-            type: getInstanceType(node),
+            type: instanceType,
             provider: provider.name,
-            hourlyCost: provider.getHourlyCost(getInstanceType(node)),
+            hourlyCost: provider.getHourlyCost(instanceType),
             isSpot: isSpotInstance(node),
-            labels: node.labelString,
+            labels: node.labelString ?: '',
             uptime: getUptime(computer),
             idleTime: getIdleTime(computer),
             utilization: calculateUtilization(computer)
-        ]
-        
-        // Track usage data
+        ] as Map<String, Object>
+
         updateUsageData(computer.name, instance)
-        
+
         return instance
     }
-    
+
     /**
      * Finds idle agents that can be terminated.
      */
-    private List<Map> findIdleAgents() {
-        def idleAgents = []
-        
-        usageData.each { name, data ->
-            if (data.idleMinutes > IDLE_TIME_THRESHOLD && 
+    private List<Map<String, Object>> findIdleAgents() {
+        List<Map<String, Object>> idleAgents = []
+
+        usageData.each { String name, AgentUsageData data ->
+            if (data.idleMinutes > IDLE_TIME_THRESHOLD &&
                 data.hourlyCost > IDLE_COST_THRESHOLD) {
-                idleAgents << [
+                idleAgents.add([
                     name: name,
                     provider: data.provider,
                     idleMinutes: data.idleMinutes,
                     hourlyCost: data.hourlyCost
-                ]
+                ] as Map<String, Object>)
             }
         }
-        
+
         return idleAgents
     }
-    
+
     /**
-     * Finds opportunities to use spot instances.
+     * Finds opportunities to use spot instances, skipping excluded agents.
      */
-    private List<Map> findSpotOpportunities() {
-        def opportunities = []
-        
-        jenkins.computers.each { computer ->
-            if (computer.node && isCloudNode(computer.node) && !isSpotInstance(computer, computer.node)) {
-                def provider = getProvider(computer.node)
-                def instanceType = getInstanceType(computer, computer.node)
-                def currentCost = provider.getHourlyCost(instanceType)
-                def spotCost = provider.getSpotPrice(instanceType)
-                
-                if (spotCost < currentCost * (1 - SPOT_SAVINGS_THRESHOLD)) {
-                    opportunities << [
+    private List<Map<String, Object>> findSpotOpportunities(Set<String> excludedAgents = Collections.emptySet()) {
+        List<Map<String, Object>> opportunities = []
+
+        jenkins.computers.each { Computer computer ->
+            Node node = computer?.node
+            if (node != null && !excludedAgents.contains(computer.name)
+                    && isCloudNode(node) && !isSpotInstance(node)) {
+                CloudProvider provider = getProvider(node)
+                String instanceType = getInstanceType(node)
+                double currentCost = provider.getHourlyCost(instanceType)
+                double spotCost = provider.getSpotPrice(instanceType)
+
+                if (currentCost > 0.0d && spotCost < currentCost * (1.0d - SPOT_SAVINGS_THRESHOLD)) {
+                    opportunities.add([
                         agent: computer.name,
                         provider: provider.name,
                         instanceType: instanceType,
                         currentCost: currentCost,
                         spotCost: spotCost,
                         savingsPercent: (currentCost - spotCost) / currentCost
-                    ]
+                    ] as Map<String, Object>)
                 }
             }
         }
-        
+
         return opportunities
     }
-    
+
     /**
-     * Finds opportunities to rightsize instances.
+     * Finds opportunities to rightsize instances, skipping excluded agents.
      */
-    private List<Map> findRightsizeOpportunities() {
-        def opportunities = []
-        
-        usageData.each { name, data ->
-            if (data.avgUtilization < 30) {
-                def computer = jenkins.getComputer(name)
-                if (computer?.node) {
-                    def provider = getProvider(computer.node)
-                    def currentType = getInstanceType(computer, computer.node)
-                    def recommendedType = provider.recommendInstanceType(data.avgUtilization, currentType)
-                    
+    private List<Map<String, Object>> findRightsizeOpportunities(Set<String> excludedAgents = Collections.emptySet()) {
+        List<Map<String, Object>> opportunities = []
+
+        usageData.each { String name, AgentUsageData data ->
+            if (!excludedAgents.contains(name) && data.avgUtilization < 30.0d) {
+                Computer computer = jenkins.getComputer(name)
+                if (computer?.node != null) {
+                    CloudProvider provider = getProvider(computer.node)
+                    String currentType = getInstanceType(computer.node)
+                    String recommendedType = provider.recommendInstanceType(data.avgUtilization, currentType)
+
                     if (recommendedType != currentType) {
-                        opportunities << [
+                        opportunities.add([
                             agent: name,
                             currentType: currentType,
                             recommendedType: recommendedType,
                             currentCost: provider.getHourlyCost(currentType),
                             newCost: provider.getHourlyCost(recommendedType),
                             utilization: data.avgUtilization
-                        ]
+                        ] as Map<String, Object>)
                     }
                 }
             }
         }
-        
+
         return opportunities
     }
-    
+
     /**
      * Calculates total costs across providers.
      */
-    private Map calculateTotalCosts(Map providers) {
-        def total = [
-            hourly: 0.0,
-            daily: 0.0,
-            monthly: 0.0,
-            yearly: 0.0
-        ]
-        
-        providers.each { name, provider ->
-            total.hourly += provider.totalCost
+    private Map<String, Double> calculateTotalCosts(Map<String, Object> providersMap) {
+        double hourly = 0.0d
+
+        providersMap.each { String name, Object providerObj ->
+            Map<String, Object> provider = (Map<String, Object>) providerObj
+            hourly += ((Number) provider.totalCost).doubleValue()
         }
-        
-        total.daily = total.hourly * 24
-        total.monthly = total.daily * 30
-        total.yearly = total.monthly * 12
-        
-        return total
+
+        double daily = hourly * 24.0d
+        double monthly = daily * 30.0d
+        double yearly = monthly * 12.0d
+
+        return [
+            hourly: hourly,
+            daily: daily,
+            monthly: monthly,
+            yearly: yearly
+        ]
     }
-    
+
     /**
-     * Identifies potential savings.
+     * Identifies potential savings without double-counting idle agents.
      */
-    private Map identifySavings(Map providers) {
-        def savings = [
-            idleAgents: 0.0,
-            spotInstances: 0.0,
-            rightsizing: 0.0,
-            total: 0.0
+    private Map<String, Double> identifySavings(Map<String, Object> providersMap) {
+        double idleAgentsSavings = 0.0d
+        double spotSavings = 0.0d
+        double rightsizingSavings = 0.0d
+        Set<String> idleAgentNames = new HashSet<>()
+
+        findIdleAgents().each { Map<String, Object> agent ->
+            idleAgentNames.add(agent.name as String)
+            idleAgentsSavings += ((Number) agent.hourlyCost).doubleValue()
+        }
+
+        findSpotOpportunities(idleAgentNames).each { Map<String, Object> opp ->
+            spotSavings += ((Number) opp.currentCost).doubleValue() - ((Number) opp.spotCost).doubleValue()
+        }
+
+        findRightsizeOpportunities(idleAgentNames).each { Map<String, Object> opp ->
+            rightsizingSavings += ((Number) opp.currentCost).doubleValue() - ((Number) opp.newCost).doubleValue()
+        }
+
+        double total = idleAgentsSavings + spotSavings + rightsizingSavings
+        return [
+            idleAgents: idleAgentsSavings,
+            spotInstances: spotSavings,
+            rightsizing: rightsizingSavings,
+            total: total,
+            monthlyTotal: total * 24.0d * 30.0d
         ]
-        
-        // Calculate idle agent savings
-        findIdleAgents().each { agent ->
-            savings.idleAgents += agent.hourlyCost
-        }
-        
-        // Calculate spot instance savings
-        findSpotOpportunities().each { opp ->
-            savings.spotInstances += (opp.currentCost - opp.spotCost)
-        }
-        
-        // Calculate rightsizing savings
-        findRightsizeOpportunities().each { opp ->
-            savings.rightsizing += (opp.currentCost - opp.newCost)
-        }
-        
-        savings.total = savings.idleAgents + savings.spotInstances + savings.rightsizing
-        savings.monthlyTotal = savings.total * 24 * 30
-        
-        return savings
     }
-    
+
     /**
      * Generates cost optimization recommendations.
      */
-    private List<Map> generateRecommendations(Map analysis) {
-        def recommendations = []
-        def savings = analysis.savings as Map
-        
-        if (savings.idleAgents > 0) {
-            recommendations << [
+    private List<Map<String, Object>> generateRecommendations(Map<String, Object> analysis) {
+        List<Map<String, Object>> recommendations = []
+        Map<String, Double> savings = (Map<String, Double>) analysis.savings
+
+        double idleSavings = savings.idleAgents ?: 0.0d
+        if (idleSavings > 0.0d) {
+            recommendations.add([
                 type: 'IDLE_AGENTS',
                 priority: 'HIGH',
-                message: "Terminate idle agents to save \$${savings.idleAgents.round(2)}/hour",
+                message: "Terminate idle agents to save \$${String.format('%.2f', idleSavings)}/hour",
                 impact: 'Immediate cost reduction with no impact on active builds'
-            ]
+            ] as Map<String, Object>)
         }
-        
-        if (savings.spotInstances > 0) {
-            recommendations << [
+
+        double spotSavings = savings.spotInstances ?: 0.0d
+        if (spotSavings > 0.0d) {
+            recommendations.add([
                 type: 'SPOT_INSTANCES',
                 priority: 'MEDIUM',
-                message: "Convert to spot instances to save \$${savings.spotInstances.round(2)}/hour",
+                message: "Convert to spot instances to save \$${String.format('%.2f', spotSavings)}/hour",
                 impact: 'Significant savings with minimal risk for non-critical workloads'
-            ]
+            ] as Map<String, Object>)
         }
-        
-        if (savings.rightsizing > 0) {
-            recommendations << [
+
+        double rightsizeSavings = savings.rightsizing ?: 0.0d
+        if (rightsizeSavings > 0.0d) {
+            recommendations.add([
                 type: 'RIGHTSIZING',
                 priority: 'MEDIUM',
-                message: "Rightsize underutilized instances to save \$${savings.rightsizing.round(2)}/hour",
+                message: "Rightsize underutilized instances to save \$${String.format('%.2f', rightsizeSavings)}/hour",
                 impact: 'Optimize resource allocation based on actual usage'
-            ]
+            ] as Map<String, Object>)
         }
-        
-        // Add provider-specific recommendations
-        analysis.providers.each { name, provider ->
-            if (provider.instances.size() > 10) {
-                recommendations << [
+
+        Map<String, Object> providersMap = (Map<String, Object>) analysis.providers
+        providersMap?.each { String name, Object providerObj ->
+            Map<String, Object> provider = (Map<String, Object>) providerObj
+            List instances = (List) provider.instances
+            if (instances != null && instances.size() > 10) {
+                recommendations.add([
                     type: 'RESERVED_INSTANCES',
                     priority: 'LOW',
                     message: "Consider reserved instances for ${name} to save up to 40%",
                     impact: 'Long-term savings for predictable workloads'
-                ]
+                ] as Map<String, Object>)
             }
         }
-        
+
         return recommendations
     }
-    
+
     /**
      * Calculates cost allocations.
      */
-    private Map calculateCostAllocations() {
+    private Map<String, Object> calculateCostAllocations() {
         return trackCostAllocation()
     }
-    
+
     /**
-     * Gets current monthly costs.
+     * Gets current monthly costs in a single pass over active cloud computers so total is never double-counted.
      */
     private Map<String, Double> getCurrentMonthlyCosts() {
-        def costs = [:]
-        def allocations = trackCostAllocation()
-        
-        // By team
-        allocations.byTeam.each { team, hourlyCost ->
-            costs["team:${team}"] = hourlyCost * 24 * 30
+        Map<String, Double> costs = [:]
+        double totalHourly = 0.0d
+        double monthlyFactor = 24.0d * 30.0d
+
+        jenkins.computers.each { Computer computer ->
+            Node node = computer?.node
+            if (node != null && isCloudNode(node)) {
+                double hourlyCost = getHourlyCost(node)
+                totalHourly += hourlyCost
+                String labels = node.labelString ?: ''
+
+                String team = extractLabelValue(labels, 'team')
+                if (team) {
+                    String key = "team:${team}"
+                    costs[key] = (costs[key] ?: 0.0d) + (hourlyCost * monthlyFactor)
+                }
+
+                String project = extractLabelValue(labels, 'project')
+                if (project) {
+                    String key = "project:${project}"
+                    costs[key] = (costs[key] ?: 0.0d) + (hourlyCost * monthlyFactor)
+                }
+            }
         }
-        
-        // By project
-        allocations.byProject.each { project, hourlyCost ->
-            costs["project:${project}"] = hourlyCost * 24 * 30
-        }
-        
-        // Total
-        costs['total'] = allocations.values().flatten().sum { it instanceof Number ? it : 0 } * 24 * 30
-        
+
+        costs['total'] = totalHourly * monthlyFactor
         return costs
     }
-    
+
     /**
-     * Updates usage data for an instance.
+     * Updates usage data atomically for an instance.
      */
-    private void updateUsageData(String name, Map instance) {
-        def data = usageData.get(name, new AgentUsageData())
-        data.name = name
-        data.provider = instance.provider
-        data.hourlyCost = instance.hourlyCost
-        data.idleMinutes = instance.idleTime
-        data.totalMinutes += 1
-        data.utilizationSum += instance.utilization
-        data.avgUtilization = data.utilizationSum / data.totalMinutes
-        usageData[name] = data
+    private void updateUsageData(String name, Map<String, Object> instance) {
+        usageData.compute(name) { String key, AgentUsageData existing ->
+            AgentUsageData data = existing ?: new AgentUsageData()
+            data.name = name
+            data.provider = instance.provider as String
+            data.hourlyCost = ((Number) instance.hourlyCost).doubleValue()
+            data.idleMinutes = ((Number) instance.idleTime).intValue()
+            data.totalMinutes += 1
+            data.utilizationSum += ((Number) instance.utilization).doubleValue()
+            data.avgUtilization = data.utilizationSum / data.totalMinutes
+            return data
+        }
+    }
+
+    /**
+     * Gets hourly cost for a cloud node.
+     */
+    private double getHourlyCost(Node node) {
+        CloudProvider provider = getProvider(node)
+        return provider.getHourlyCost(getInstanceType(node))
     }
     
     /**
@@ -585,80 +632,88 @@ class CloudCostOptimizer {
      * Checks if node is a cloud node.
      */
     private boolean isCloudNode(Node node) {
-        return node.class.name.contains('Cloud') || 
-               node.labelString.contains('cloud') ||
-               providers.any { name, provider -> isProviderNode(node, provider) }
+        String labels = node.labelString ?: ''
+        return node.class.name.contains('Cloud') ||
+               labels.contains('cloud') ||
+               providers.any { String name, CloudProvider provider -> isProviderNode(node, provider) }
     }
-    
+
     /**
      * Checks if node belongs to a specific provider.
      */
     private boolean isProviderNode(Node node, CloudProvider provider) {
+        String labels = node.labelString ?: ''
         return node.class.name.contains(provider.identifier) ||
-               node.labelString.toLowerCase().contains(provider.name.toLowerCase())
+               labels.toLowerCase().contains(provider.name.toLowerCase())
     }
-    
+
     /**
      * Gets the provider for a node.
      */
     private CloudProvider getProvider(Node node) {
-        providers.values().find { provider -> isProviderNode(node, provider) } ?: providers['AWS']
+        return providers.values().find { CloudProvider provider -> isProviderNode(node, provider) } ?: providers['AWS']
     }
-    
+
     /**
      * Gets instance type from node.
      */
     private String getInstanceType(Node node) {
-        extractLabelValue(node.labelString, 'instance-type') ?: 'm5.large'
+        return extractLabelValue(node.labelString ?: '', 'instance-type') ?: 'm5.large'
     }
-    
+
     /**
      * Checks if node is a spot instance.
      */
     private boolean isSpotInstance(Node node) {
-        node.labelString.contains('spot') || node.labelString.contains('preemptible')
+        String labels = node.labelString ?: ''
+        return labels.contains('spot') || labels.contains('preemptible')
     }
-    
+
     /**
      * Gets computer uptime in minutes.
      */
     private int getUptime(Computer computer) {
-        def connectTime = computer.connectTime
-        if (connectTime > 0) {
-            return Duration.between(Instant.ofEpochMilli(connectTime), Instant.now()).toMinutes()
+        long connectTime = computer.connectTime
+        if (connectTime > 0L) {
+            return Duration.between(Instant.ofEpochMilli(connectTime), Instant.now()).toMinutes().intValue()
         }
         return 0
     }
-    
+
     /**
      * Gets idle time in minutes.
      */
     private int getIdleTime(Computer computer) {
         if (computer.isIdle()) {
-            def lastBusyTime = computer.idleStartMilliseconds
-            if (lastBusyTime > 0) {
-                return Duration.between(Instant.ofEpochMilli(lastBusyTime), Instant.now()).toMinutes()
+            long lastBusyTime = computer.idleStartMilliseconds
+            if (lastBusyTime > 0L) {
+                return Duration.between(Instant.ofEpochMilli(lastBusyTime), Instant.now()).toMinutes().intValue()
             }
         }
         return 0
     }
-    
+
     /**
      * Calculates utilization percentage.
      */
     private double calculateUtilization(Computer computer) {
         def executors = computer.executors
-        def busyExecutors = executors.count { it.isBusy() }
-        return executors.size() > 0 ? (busyExecutors / executors.size() * 100) : 0
+        if (!executors) {
+            return 0.0d
+        }
+        int busyExecutors = executors.count { it.isBusy() }.intValue()
+        return (busyExecutors * 100.0d) / executors.size()
     }
-    
+
     /**
      * Extracts label value.
      */
     private String extractLabelValue(String labels, String key) {
-        def pattern = ~/${key}=([^\s]+)/
-        def matcher = labels =~ pattern
-        return matcher ? matcher[0][1] : null
+        if (!labels) {
+            return null
+        }
+        def matcher = (labels =~ /${java.util.regex.Pattern.quote(key)}=([^\s]+)/)
+        return matcher.find() ? matcher.group(1) : null
     }
     
     /**

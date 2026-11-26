@@ -20,6 +20,8 @@ import jenkins.model.Jenkins
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.ThreadFactory
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.logging.Level
@@ -33,6 +35,7 @@ import java.util.logging.Logger
 class SelfHealingAgentManager {
 
     private static final Logger LOGGER = Logger.getLogger(SelfHealingAgentManager.class.name)
+    private static final AtomicInteger THREAD_COUNTER = new AtomicInteger(1)
 
     // Configuration
     private final int maxRetryAttempts
@@ -41,39 +44,71 @@ class SelfHealingAgentManager {
     private final boolean enableAutoReconnect
     private final boolean enableAutoRestart
     private final boolean enableAutoReplace
+    private final Jenkins injectedJenkins
 
     // State tracking
     private final ConcurrentHashMap<String, AgentHealthState> agentStates = new ConcurrentHashMap<>()
     private final ConcurrentHashMap<String, AtomicInteger> retryCounters = new ConcurrentHashMap<>()
-    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2)
+    private final ConcurrentHashMap<String, ScheduledFuture<?>> pendingRecoveries = new ConcurrentHashMap<>()
+    private ScheduledExecutorService scheduler
+    private ScheduledFuture<?> healthCheckFuture
 
     // Healing statistics
     private final AtomicInteger totalRecoveryAttempts = new AtomicInteger(0)
     private final AtomicInteger successfulRecoveries = new AtomicInteger(0)
     private final AtomicInteger failedRecoveries = new AtomicInteger(0)
 
-    // Callbacks
-    private Closure onRecoveryStart
-    private Closure onRecoverySuccess
-    private Closure onRecoveryFailure
-    private Closure onAgentReplaced
+    // Callbacks (volatile for safe cross-thread publication)
+    private volatile Closure onRecoveryStart
+    private volatile Closure onRecoverySuccess
+    private volatile Closure onRecoveryFailure
+    private volatile Closure onAgentReplaced
 
-    SelfHealingAgentManager(Map<String, Object> config = [:]) {
+    SelfHealingAgentManager(Map<String, Object> config = [:], Jenkins jenkins = null) {
         this.maxRetryAttempts = (config.maxRetryAttempts as Integer) ?: 3
         this.retryDelayMs = (config.retryDelayMs as Long) ?: 30000L
         this.healthCheckIntervalMs = (config.healthCheckIntervalMs as Long) ?: 60000L
         this.enableAutoReconnect = config.enableAutoReconnect != false
         this.enableAutoRestart = config.enableAutoRestart != false
-        this.enableAutoReplace = config.enableAutoReplace ?: false
+        this.enableAutoReplace = (config.enableAutoReplace as Boolean) ?: false
+        this.injectedJenkins = jenkins
+    }
+
+    private Jenkins resolveJenkins() {
+        return injectedJenkins ?: Jenkins.getInstanceOrNull()
+    }
+
+    private synchronized ScheduledExecutorService getOrCreateScheduler() {
+        if (scheduler == null || scheduler.isShutdown()) {
+            scheduler = Executors.newScheduledThreadPool(2, new ThreadFactory() {
+                @Override
+                Thread newThread(Runnable r) {
+                    Thread t = new Thread(r, "self-healing-agent-manager-${THREAD_COUNTER.getAndIncrement()}")
+                    t.setDaemon(true)
+                    return t
+                }
+            })
+        }
+        return scheduler
+    }
+
+    synchronized boolean isRunning() {
+        return scheduler != null && !scheduler.isShutdown() && healthCheckFuture != null && !healthCheckFuture.isCancelled()
     }
 
     /**
      * Start the self-healing monitor.
      */
-    void start() {
+    synchronized void start() {
+        if (isRunning()) {
+            LOGGER.info("Self-healing agent manager is already running")
+            return
+        }
+
         LOGGER.info("Starting self-healing agent manager with ${healthCheckIntervalMs}ms interval")
 
-        scheduler.scheduleAtFixedRate({
+        ScheduledExecutorService exec = getOrCreateScheduler()
+        healthCheckFuture = exec.scheduleAtFixedRate({
             try {
                 performHealthCheck()
             } catch (Exception e) {
@@ -87,25 +122,36 @@ class SelfHealingAgentManager {
     /**
      * Stop the self-healing monitor.
      */
-    void stop() {
+    synchronized void stop() {
         LOGGER.info("Stopping self-healing agent manager")
-        scheduler.shutdown()
-        try {
-            if (!scheduler.awaitTermination(30, TimeUnit.SECONDS)) {
+        if (healthCheckFuture != null) {
+            healthCheckFuture.cancel(false)
+            healthCheckFuture = null
+        }
+        pendingRecoveries.values().each { ScheduledFuture<?> f -> f.cancel(false) }
+        pendingRecoveries.clear()
+
+        if (scheduler != null) {
+            scheduler.shutdown()
+            try {
+                if (!scheduler.awaitTermination(30, TimeUnit.SECONDS)) {
+                    scheduler.shutdownNow()
+                }
+            } catch (InterruptedException e) {
                 scheduler.shutdownNow()
+                Thread.currentThread().interrupt()
+            } finally {
+                scheduler = null
             }
-        } catch (InterruptedException e) {
-            scheduler.shutdownNow()
-            Thread.currentThread().interrupt()
         }
         LOGGER.info("Self-healing agent manager stopped")
     }
 
     /**
-     * Perform health check on all agents.
+     * Perform health check on all agents and prune state for removed ephemeral computers.
      */
     void performHealthCheck() {
-        Jenkins jenkins = Jenkins.getInstanceOrNull()
+        Jenkins jenkins = resolveJenkins()
         if (jenkins == null) {
             LOGGER.warning("Jenkins instance not available")
             return
@@ -113,13 +159,17 @@ class SelfHealingAgentManager {
 
         LOGGER.fine("Performing agent health check")
 
+        Computer controllerComputer = jenkins.toComputer()
+        Set<String> activeAgentNames = new HashSet<>()
+
         jenkins.computers.each { Computer computer ->
-            if (computer == jenkins.toComputer()) {
-                // Skip master node
+            if (computer == controllerComputer) {
+                // Skip controller node
                 return
             }
 
             String agentName = computer.name
+            activeAgentNames.add(agentName)
             AgentHealthState state = getOrCreateState(agentName)
 
             try {
@@ -127,6 +177,20 @@ class SelfHealingAgentManager {
             } catch (Exception e) {
                 LOGGER.log(Level.WARNING, "Error checking agent ${agentName}", e)
             }
+        }
+
+        pruneRemovedAgents(activeAgentNames)
+    }
+
+    private void pruneRemovedAgents(Set<String> activeAgentNames) {
+        agentStates.keySet().removeIf { String name -> !activeAgentNames.contains(name) }
+        retryCounters.keySet().removeIf { String name -> !activeAgentNames.contains(name) }
+        pendingRecoveries.entrySet().removeIf { Map.Entry<String, ScheduledFuture<?>> entry ->
+            if (!activeAgentNames.contains(entry.key)) {
+                entry.value?.cancel(false)
+                return true
+            }
+            return false
         }
     }
 
@@ -139,15 +203,21 @@ class SelfHealingAgentManager {
         if (computer.isOffline()) {
             handleOfflineAgent(computer, state)
         } else if (computer.isOnline()) {
-            // Agent is online - check for other health issues
-            if (state.status == AgentStatus.RECOVERING) {
-                // Recovery was successful
+            AgentStatus previousStatus = state.status
+            if (previousStatus == AgentStatus.RECOVERING || previousStatus == AgentStatus.FAILED
+                    || previousStatus == AgentStatus.REPLACING) {
                 state.status = AgentStatus.HEALTHY
                 state.lastHealthyTime = System.currentTimeMillis()
+                state.addRecoveryEvent("Agent recovered and is online")
                 resetRetryCounter(agentName)
+                cancelPendingRecovery(agentName)
                 successfulRecoveries.incrementAndGet()
                 onRecoverySuccess?.call(agentName)
                 LOGGER.info("Agent ${agentName} recovered successfully")
+            } else if (previousStatus == AgentStatus.UNKNOWN || previousStatus == AgentStatus.MANUALLY_OFFLINE) {
+                state.status = AgentStatus.HEALTHY
+                state.lastHealthyTime = System.currentTimeMillis()
+                resetRetryCounter(agentName)
             }
 
             // Check for resource issues
@@ -173,11 +243,26 @@ class SelfHealingAgentManager {
             return
         }
 
+        // Transition once into FAILED/REPLACING per outage episode
+        if (state.status == AgentStatus.FAILED || state.status == AgentStatus.REPLACING) {
+            LOGGER.fine("Agent ${agentName} already in terminal outage state ${state.status}, skipping duplicate failure handling")
+            return
+        }
+
+        // Deduplicate while a delayed recovery task is already in flight
+        ScheduledFuture<?> inFlight = pendingRecoveries.get(agentName)
+        if (inFlight != null && !inFlight.isDone()) {
+            LOGGER.fine("Recovery task already in flight for agent ${agentName}, skipping duplicate attempt")
+            return
+        }
+
         // Check retry limit
         int retries = getRetryCount(agentName)
         if (retries >= maxRetryAttempts) {
             LOGGER.warning("Agent ${agentName} exceeded max retry attempts (${maxRetryAttempts})")
             state.status = AgentStatus.FAILED
+            state.lastFailureTime = System.currentTimeMillis()
+            state.addRecoveryEvent("Exceeded max retry attempts (${maxRetryAttempts})")
             failedRecoveries.incrementAndGet()
             onRecoveryFailure?.call(agentName, "Max retries exceeded")
 
@@ -189,9 +274,11 @@ class SelfHealingAgentManager {
 
         // Attempt recovery
         state.status = AgentStatus.RECOVERING
+        state.lastFailureTime = System.currentTimeMillis()
         totalRecoveryAttempts.incrementAndGet()
-        incrementRetryCounter(agentName)
-        onRecoveryStart?.call(agentName, retries + 1)
+        int attemptNumber = retryCounters.computeIfAbsent(agentName) { new AtomicInteger(0) }.incrementAndGet()
+        state.addRecoveryEvent("Starting recovery attempt #${attemptNumber}")
+        onRecoveryStart?.call(agentName, attemptNumber)
 
         attemptRecovery(computer, state)
     }
@@ -209,18 +296,16 @@ class SelfHealingAgentManager {
                 LOGGER.info("Attempting to reconnect agent ${agentName}")
                 computer.connect(true)
 
-                // Schedule a delayed check to verify reconnection
-                scheduler.schedule({
+                scheduleRecoveryTask(agentName, retryDelayMs) {
                     if (computer.isOnline()) {
                         LOGGER.info("Agent ${agentName} reconnected successfully")
                     } else {
                         LOGGER.warning("Agent ${agentName} reconnection failed")
-                        // Try restart if available
                         if (enableAutoRestart) {
                             attemptRestart(computer, state)
                         }
                     }
-                }, retryDelayMs, TimeUnit.MILLISECONDS)
+                }
 
                 return
             } catch (Exception e) {
@@ -231,6 +316,34 @@ class SelfHealingAgentManager {
         // Strategy 2: Try to restart (if supported)
         if (enableAutoRestart) {
             attemptRestart(computer, state)
+        }
+    }
+
+    private void scheduleRecoveryTask(String agentName, long delayMs, Runnable task) {
+        ScheduledExecutorService exec = getOrCreateScheduler()
+        ScheduledFuture<?>[] holder = new ScheduledFuture<?>[1]
+        ScheduledFuture<?> future = exec.schedule({
+            try {
+                task.run()
+            } finally {
+                if (holder[0] != null) {
+                    pendingRecoveries.remove(agentName, holder[0])
+                } else {
+                    pendingRecoveries.remove(agentName)
+                }
+            }
+        }, delayMs, TimeUnit.MILLISECONDS)
+        holder[0] = future
+        ScheduledFuture<?> previous = pendingRecoveries.put(agentName, future)
+        if (previous != null && !previous.isDone()) {
+            previous.cancel(false)
+        }
+    }
+
+    private void cancelPendingRecovery(String agentName) {
+        ScheduledFuture<?> future = pendingRecoveries.remove(agentName)
+        if (future != null && !future.isDone()) {
+            future.cancel(false)
         }
     }
 
@@ -248,18 +361,16 @@ class SelfHealingAgentManager {
                 Node node = slaveComputer.node
 
                 if (node != null) {
-                    // Disconnect
                     slaveComputer.disconnect(new OfflineCause.ByCLI("Self-healing restart"))
 
-                    // Schedule reconnection
-                    scheduler.schedule({
+                    scheduleRecoveryTask(agentName, 5000L) {
                         try {
                             slaveComputer.connect(true)
                             LOGGER.info("Restart initiated for agent ${agentName}")
                         } catch (Exception e) {
                             LOGGER.log(Level.WARNING, "Failed to restart agent ${agentName}", e)
                         }
-                    }, 5000, TimeUnit.MILLISECONDS)
+                    }
                 }
             }
         } catch (Exception e) {
@@ -274,9 +385,8 @@ class SelfHealingAgentManager {
         String agentName = computer.name
         LOGGER.warning("Attempting to replace failed agent ${agentName}")
 
-        // This would integrate with cloud providers to provision a new agent
-        // For now, log the event and notify
         state.status = AgentStatus.REPLACING
+        state.addRecoveryEvent("Agent replacement requested")
         onAgentReplaced?.call(agentName)
 
         LOGGER.info("Agent replacement requested for ${agentName}")
@@ -294,8 +404,8 @@ class SelfHealingAgentManager {
             def diskSpace = monitorData?.get('hudson.node_monitors.DiskSpaceMonitor')
 
             if (diskSpace?.hasProperty('freeSize')) {
-                long freeBytes = diskSpace.freeSize as long
-                long freeMB = freeBytes / (1024 * 1024)
+                long freeBytes = (org.codehaus.groovy.runtime.InvokerHelper.getProperty(diskSpace, 'freeSize') as Number).longValue()
+                long freeMB = freeBytes.intdiv(1024L * 1024L).longValue()
 
                 if (freeMB < 1024) {  // Less than 1GB
                     LOGGER.warning("Agent ${agentName} has low disk space: ${freeMB}MB")
@@ -306,7 +416,7 @@ class SelfHealingAgentManager {
             // Check response time
             def responseTime = monitorData?.get('hudson.node_monitors.ResponseTimeMonitor')
             if (responseTime?.hasProperty('average')) {
-                long avgMs = responseTime.average as long
+                long avgMs = (org.codehaus.groovy.runtime.InvokerHelper.getProperty(responseTime, 'average') as Number).longValue()
 
                 if (avgMs > 5000) {  // More than 5 seconds
                     LOGGER.warning("Agent ${agentName} has slow response time: ${avgMs}ms")
@@ -333,13 +443,6 @@ class SelfHealingAgentManager {
     }
 
     /**
-     * Increment retry counter.
-     */
-    private void incrementRetryCounter(String agentName) {
-        retryCounters.computeIfAbsent(agentName) { new AtomicInteger(0) }.incrementAndGet()
-    }
-
-    /**
      * Reset retry counter.
      */
     private void resetRetryCounter(String agentName) {
@@ -354,7 +457,7 @@ class SelfHealingAgentManager {
                 totalAttempts: totalRecoveryAttempts.get(),
                 successful   : successfulRecoveries.get(),
                 failed       : failedRecoveries.get(),
-                agents       : agentStates.collectEntries { name, state ->
+                agents       : agentStates.collectEntries { String name, AgentHealthState state ->
                     [name, state.toMap()]
                 }
         ]
@@ -364,7 +467,7 @@ class SelfHealingAgentManager {
      * Get status of all agents.
      */
     List<Map<String, Object>> getAgentStatuses() {
-        return agentStates.collect { name, state -> state.toMap() }
+        return agentStates.collect { String name, AgentHealthState state -> state.toMap() }
     }
 
     // Callback setters
@@ -390,10 +493,10 @@ class SelfHealingAgentManager {
      */
     static class AgentHealthState {
         final String agentName
-        AgentStatus status = AgentStatus.UNKNOWN
-        long lastCheckTime = 0
-        long lastHealthyTime = 0
-        long lastFailureTime = 0
+        volatile AgentStatus status = AgentStatus.UNKNOWN
+        volatile long lastCheckTime = 0
+        volatile long lastHealthyTime = 0
+        volatile long lastFailureTime = 0
         final List<String> warnings = []
         final List<String> recoveryHistory = []
 
@@ -403,7 +506,7 @@ class SelfHealingAgentManager {
 
         void addWarning(String warning) {
             synchronized (warnings) {
-                warnings.add("[${new Date()}] ${warning}")
+                warnings.add("[${new Date()}] ${warning}".toString())
                 if (warnings.size() > 10) {
                     warnings.remove(0)
                 }
@@ -412,7 +515,7 @@ class SelfHealingAgentManager {
 
         void addRecoveryEvent(String event) {
             synchronized (recoveryHistory) {
-                recoveryHistory.add("[${new Date()}] ${event}")
+                recoveryHistory.add("[${new Date()}] ${event}".toString())
                 if (recoveryHistory.size() > 20) {
                     recoveryHistory.remove(0)
                 }
@@ -420,14 +523,22 @@ class SelfHealingAgentManager {
         }
 
         Map<String, Object> toMap() {
+            List<String> warningsSnapshot
+            synchronized (warnings) {
+                warningsSnapshot = new ArrayList<>(warnings)
+            }
+            List<String> historySnapshot
+            synchronized (recoveryHistory) {
+                historySnapshot = new ArrayList<>(recoveryHistory)
+            }
             return [
                     agentName      : agentName,
                     status         : status.name(),
                     lastCheckTime  : lastCheckTime,
                     lastHealthyTime: lastHealthyTime,
                     lastFailureTime: lastFailureTime,
-                    warnings       : new ArrayList<>(warnings),
-                    recoveryHistory: new ArrayList<>(recoveryHistory)
+                    warnings       : warningsSnapshot,
+                    recoveryHistory: historySnapshot
             ]
         }
     }

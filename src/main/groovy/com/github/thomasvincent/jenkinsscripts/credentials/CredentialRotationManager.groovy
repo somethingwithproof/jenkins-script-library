@@ -32,11 +32,12 @@ import com.cloudbees.plugins.credentials.CredentialsStore
 import com.cloudbees.plugins.credentials.SystemCredentialsProvider
 import com.cloudbees.plugins.credentials.common.StandardCredentials
 import com.cloudbees.plugins.credentials.impl.UsernamePasswordCredentialsImpl
-import com.cloudbees.plugins.credentials.impl.StringCredentialsImpl
 import com.cloudbees.plugins.credentials.domains.Domain
+import org.jenkinsci.plugins.plaincredentials.impl.StringCredentialsImpl
 import hudson.Extension
+import hudson.model.AbstractDescribableImpl
 import hudson.model.Item
-import hudson.model.ItemGroup
+import hudson.model.Job
 import hudson.model.PeriodicWork
 import hudson.security.ACL
 import hudson.security.ACLContext
@@ -45,8 +46,6 @@ import jenkins.model.Jenkins
 import org.kohsuke.stapler.DataBoundConstructor
 import groovy.transform.CompileStatic
 import java.time.Instant
-import java.time.LocalDateTime
-import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import java.security.SecureRandom
 import java.util.concurrent.TimeUnit
@@ -70,7 +69,7 @@ import com.github.thomasvincent.jenkinsscripts.utils.ErrorHandler
  * @since 1.4.0
  */
 @CompileStatic
-class CredentialRotationManager {
+class CredentialRotationManager extends AbstractDescribableImpl<CredentialRotationManager> {
     
     private static final Logger LOGGER = Logger.getLogger(CredentialRotationManager.class.name)
     private static final SecureRandom SECURE_RANDOM = new SecureRandom()
@@ -94,7 +93,14 @@ class CredentialRotationManager {
         this.errorHandler = new ErrorHandler(LOGGER)
         loadCredentialMetadata()
     }
-    
+
+    /**
+     * Constructor with provided Jenkins instance and default ErrorHandler.
+     */
+    CredentialRotationManager(Jenkins jenkins) {
+        this(jenkins, new ErrorHandler(LOGGER))
+    }
+
     /**
      * Constructor for testing with dependency injection.
      */
@@ -103,112 +109,109 @@ class CredentialRotationManager {
         this.errorHandler = errorHandler
         loadCredentialMetadata()
     }
-    
+
     /**
-     * Analyzes all credentials and returns a comprehensive report.
+     * Analyzes all credentials and returns a report.
      * Requires Jenkins/Read permission.
      */
     Map<String, Object> analyzeCredentials(boolean includeUsageAnalysis = true) {
         return errorHandler.withErrorHandling("Failed to analyze credentials") {
-            // Security check
             jenkins.checkPermission(VIEW_PERMISSION)
-            
-            def report = [
-                analysisTimestamp: Instant.now().toString(),
-                summary: [:],
-                credentials: [],
-                compliance: [:],
-                recommendations: []
-            ]
-            
-            def allCredentials = getAllCredentials()
-            
-            // Analyze each credential
-            allCredentials.each { cred ->
-                def analysis = analyzeCredential(cred, includeUsageAnalysis)
-                report.credentials << analysis
+
+            List<StandardCredentials> allCredentials = getAllCredentials()
+
+            // Compute usage map once before iterating credentials (O(C + I))
+            Map<String, Map<String, Object>> usageByCredId = includeUsageAnalysis
+                    ? (Map<String, Map<String, Object>>) trackCredentialUsage()
+                    : [:]
+
+            List<Map<String, Object>> analyzedCredentials = []
+            allCredentials.each { StandardCredentials cred ->
+                analyzedCredentials.add(analyzeCredential(cred, includeUsageAnalysis, usageByCredId))
             }
-            
-            // Generate summary
-            report.summary = generateSummary(report.credentials as List)
-            
-            // Check compliance
-            report.compliance = checkCompliance(report.credentials as List)
-            
-            // Generate recommendations
-            report.recommendations = generateRecommendations(report.credentials as List, report.compliance as Map)
-            
-            return report
+
+            Map<String, Object> summary = generateSummary(analyzedCredentials)
+            Map<String, Object> compliance = checkCompliance(analyzedCredentials)
+            List<Map<String, Object>> recommendations = generateRecommendations(analyzedCredentials, compliance)
+
+            return [
+                analysisTimestamp: Instant.now().toString(),
+                summary: summary,
+                credentials: analyzedCredentials,
+                compliance: compliance,
+                recommendations: recommendations
+            ] as Map<String, Object>
         }
     }
-    
+
     /**
      * Rotates credentials that are due for rotation.
      * Requires Jenkins/Administer permission.
      */
-    Map<String, Object> rotateCredentials(boolean dryRun = true, Map<String, String> rotationPolicy = [:]) {
+    Map<String, Object> rotateCredentials(boolean dryRun = true, Map<String, ?> rotationPolicy = [:]) {
         return errorHandler.withErrorHandling("Failed to rotate credentials") {
-            // Security check - credential rotation requires admin permission
             jenkins.checkPermission(ROTATE_PERMISSION)
-            
-            def results = [
-                timestamp: Instant.now().toString(),
-                dryRun: dryRun,
-                rotated: [],
-                failed: [],
-                skipped: []
-            ]
-        
-        def policy = mergeWithDefaultPolicy(rotationPolicy)
-        def credentials = getAllCredentials()
-        
-        credentials.each { cred ->
-            try {
-                def metadata = getCredentialMetadata(cred.id)
-                if (shouldRotate(cred, metadata, policy)) {
-                    if (dryRun) {
-                        results.rotated << [
-                            id: cred.id,
-                            type: getCredentialType(cred),
-                            lastRotated: metadata?.lastRotated,
-                            reason: getRotationReason(cred, metadata, policy)
-                        ]
-                    } else {
-                        def rotated = performRotation(cred)
-                        if (rotated) {
-                            results.rotated << [
+
+            List<Map<String, Object>> rotatedList = []
+            List<Map<String, Object>> failedList = []
+            List<Map<String, Object>> skippedList = []
+
+            Map<String, Integer> policy = mergeWithDefaultPolicy(rotationPolicy)
+            List<StandardCredentials> credentials = getAllCredentials()
+
+            credentials.each { StandardCredentials cred ->
+                try {
+                    CredentialMetadata metadata = getCredentialMetadata(cred.id)
+                    if (shouldRotate(cred, metadata, policy)) {
+                        if (dryRun) {
+                            rotatedList.add([
                                 id: cred.id,
                                 type: getCredentialType(cred),
-                                oldLastRotated: metadata?.lastRotated,
-                                newLastRotated: Instant.now().toString()
-                            ]
+                                lastRotated: metadata?.lastRotated,
+                                reason: getRotationReason(cred, metadata, policy)
+                            ] as Map<String, Object>)
                         } else {
-                            results.failed << [
-                                id: cred.id,
-                                reason: 'Rotation failed'
-                            ]
+                            boolean rotated = performRotation(cred)
+                            if (rotated) {
+                                rotatedList.add([
+                                    id: cred.id,
+                                    type: getCredentialType(cred),
+                                    oldLastRotated: metadata?.lastRotated,
+                                    newLastRotated: Instant.now().toString()
+                                ] as Map<String, Object>)
+                            } else {
+                                failedList.add([
+                                    id: cred.id,
+                                    reason: 'Rotation failed'
+                                ] as Map<String, Object>)
+                            }
                         }
+                    } else {
+                        skippedList.add([
+                            id: cred.id,
+                            type: getCredentialType(cred),
+                            reason: 'Not due for rotation'
+                        ] as Map<String, Object>)
                     }
-                } else {
-                    results.skipped << [
+                } catch (Exception e) {
+                    failedList.add([
                         id: cred.id,
-                        type: getCredentialType(cred),
-                        reason: 'Not due for rotation'
-                    ]
+                        reason: e.message
+                    ] as Map<String, Object>)
+                    LOGGER.warning("Failed to process credential ${cred.id}: ${e.message}")
                 }
-            } catch (Exception e) {
-                results.failed << [
-                    id: cred.id,
-                    reason: e.message
-                ]
-                LOGGER.warning("Failed to process credential ${cred.id}: ${e.message}")
             }
-        }
-        
-            return results
+
+            return [
+                timestamp: Instant.now().toString(),
+                dryRun: dryRun,
+                rotated: rotatedList,
+                failed: failedList,
+                skipped: skippedList
+            ] as Map<String, Object>
         }
     }
-    
+
     /**
      * Tracks credential usage across jobs and pipelines.
      * Requires Jenkins/Read permission.
@@ -216,283 +219,299 @@ class CredentialRotationManager {
     Map<String, Object> trackCredentialUsage() {
         return errorHandler.withErrorHandling("Failed to track credential usage") {
             jenkins.checkPermission(VIEW_PERMISSION)
-            
-            def usage = [:]
-            
-            // Use ACL context to access items with proper permissions
+
+            Map<String, Object> usage = [:]
+
             try (ACLContext ctx = ACL.as(ACL.SYSTEM)) {
-                jenkins.allItems.each { item ->
-                    if (item instanceof Item && item.hasPermission(Item.READ)) {
-                        def usedCredentials = findCredentialsInItem(item)
-                        usedCredentials.each { credId ->
-                    if (!usage[credId]) {
-                        usage[credId] = [
-                            jobs: [],
-                            lastUsed: null,
-                            totalUses: 0
-                        ]
-                    }
-                    usage[credId].jobs << item.fullName
-                    usage[credId].totalUses++
-                    
-                    // Try to determine last use from build history
-                    def lastBuild = item.lastBuild
-                    if (lastBuild) {
-                        def buildTime = Instant.ofEpochMilli(lastBuild.timeInMillis)
-                        if (!usage[credId].lastUsed || buildTime.isAfter(Instant.parse(usage[credId].lastUsed as String))) {
-                            usage[credId].lastUsed = buildTime.toString()
-                        }
-                    }
+                jenkins.allItems.each { Item item ->
+                    if (item != null && item.hasPermission(Item.READ)) {
+                        List<String> usedCredentials = findCredentialsInItem(item)
+                        usedCredentials.each { String credId ->
+                            Map<String, Object> entry = (Map<String, Object>) usage[credId]
+                            if (entry == null) {
+                                entry = [
+                                    jobs: new ArrayList<String>(),
+                                    lastUsed: null,
+                                    totalUses: 0
+                                ] as Map<String, Object>
+                                usage[credId] = entry
+                            }
+                            ((List<String>) entry.jobs).add(item.fullName)
+                            entry.totalUses = ((Integer) entry.totalUses) + 1
+
+                            if (item instanceof Job) {
+                                def lastBuild = ((Job) item).lastBuild
+                                if (lastBuild != null) {
+                                    Instant buildTime = Instant.ofEpochMilli(lastBuild.timeInMillis)
+                                    String currentLast = entry.lastUsed as String
+                                    if (!currentLast || buildTime.isAfter(Instant.parse(currentLast))) {
+                                        entry.lastUsed = buildTime.toString()
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
-            
+
             return usage
         }
     }
-    
+
     /**
      * Identifies unused credentials.
      */
-    List<Map> findUnusedCredentials(int daysUnused = 90) {
-        def usage = trackCredentialUsage()
-        def unusedCredentials = []
-        def cutoffTime = Instant.now().minus(daysUnused, ChronoUnit.DAYS)
-        
-        getAllCredentials().each { cred ->
-            def credUsage = usage[cred.id]
-            if (!credUsage || !credUsage.lastUsed || 
-                Instant.parse(credUsage.lastUsed as String).isBefore(cutoffTime)) {
-                unusedCredentials << [
+    List<Map<String, Object>> findUnusedCredentials(int daysUnused = 90) {
+        Map<String, Object> usage = trackCredentialUsage()
+        List<Map<String, Object>> unusedCredentials = []
+        Instant cutoffTime = Instant.now().minus(daysUnused, ChronoUnit.DAYS)
+
+        getAllCredentials().each { StandardCredentials cred ->
+            Map<String, Object> credUsage = (Map<String, Object>) usage[cred.id]
+            String lastUsedStr = credUsage?.lastUsed as String
+            if (!credUsage || !lastUsedStr || Instant.parse(lastUsedStr).isBefore(cutoffTime)) {
+                unusedCredentials.add([
                     id: cred.id,
                     type: getCredentialType(cred),
                     description: cred.description,
-                    lastUsed: credUsage?.lastUsed,
-                    usedInJobs: credUsage?.jobs ?: []
-                ]
+                    lastUsed: lastUsedStr,
+                    usedInJobs: (credUsage?.jobs ?: [])
+                ] as Map<String, Object>)
             }
         }
-        
+
         return unusedCredentials
     }
-    
+
     /**
      * Generates a compliance report for various standards.
      */
-    private Map<String, Object> checkCompliance(List<Map> credentialAnalysis) {
-        def compliance = [
-            sox: checkSOXCompliance(credentialAnalysis),
-            hipaa: checkHIPAACompliance(credentialAnalysis),
-            pciDss: checkPCIDSSCompliance(credentialAnalysis),
-            overall: 'UNKNOWN'
-        ]
-        
-        // Determine overall compliance
-        def allCompliant = compliance.sox.compliant && compliance.hipaa.compliant && compliance.pciDss.compliant
-        compliance.overall = allCompliant ? 'COMPLIANT' : 'NON_COMPLIANT'
-        
-        return compliance
+    private Map<String, Object> checkCompliance(List<Map<String, Object>> credentialAnalysis) {
+        Map<String, Object> sox = checkSOXCompliance(credentialAnalysis)
+        Map<String, Object> hipaa = checkHIPAACompliance(credentialAnalysis)
+        Map<String, Object> pciDss = checkPCIDSSCompliance(credentialAnalysis)
+
+        boolean allCompliant = (sox.compliant as boolean) && (hipaa.compliant as boolean) && (pciDss.compliant as boolean)
+        return [
+            sox: sox,
+            hipaa: hipaa,
+            pciDss: pciDss,
+            overall: allCompliant ? 'COMPLIANT' : 'NON_COMPLIANT'
+        ] as Map<String, Object>
     }
-    
+
     /**
      * Checks SOX compliance.
      */
-    private Map checkSOXCompliance(List<Map> credentialAnalysis) {
-        def violations = []
-        
-        credentialAnalysis.each { cred ->
-            // SOX requires regular rotation
-            if (cred.daysSinceRotation > 180) {
-                violations << "Credential '${cred.id}' not rotated in ${cred.daysSinceRotation} days"
+    private Map<String, Object> checkSOXCompliance(List<Map<String, Object>> credentialAnalysis) {
+        List<String> violations = []
+
+        credentialAnalysis.each { Map<String, Object> cred ->
+            long days = ((Number) cred.daysSinceRotation).longValue()
+            if (days > 180L) {
+                violations.add("Credential '${cred.id}' not rotated in ${days} days".toString())
             }
-            
-            // SOX requires access tracking
-            if (!cred.usage || cred.usage.totalUses == 0) {
-                violations << "Credential '${cred.id}' has no tracked usage"
+
+            Map<String, Object> credUsage = (Map<String, Object>) cred.usage
+            int totalUses = credUsage ? ((Number) (credUsage.totalUses ?: 0)).intValue() : 0
+            if (totalUses == 0) {
+                violations.add("Credential '${cred.id}' has no tracked usage".toString())
             }
         }
-        
+
         return [
             compliant: violations.isEmpty(),
             violations: violations
-        ]
+        ] as Map<String, Object>
     }
-    
+
     /**
      * Checks HIPAA compliance.
      */
-    private Map checkHIPAACompliance(List<Map> credentialAnalysis) {
-        def violations = []
-        
-        credentialAnalysis.each { cred ->
-            // HIPAA requires encryption and regular rotation
-            if (cred.type == 'PASSWORD' && cred.daysSinceRotation > 90) {
-                violations << "Password credential '${cred.id}' not rotated in ${cred.daysSinceRotation} days"
+    private Map<String, Object> checkHIPAACompliance(List<Map<String, Object>> credentialAnalysis) {
+        List<String> violations = []
+
+        credentialAnalysis.each { Map<String, Object> cred ->
+            long days = ((Number) cred.daysSinceRotation).longValue()
+            if (cred.type == 'PASSWORD' && days > 90L) {
+                violations.add("Password credential '${cred.id}' not rotated in ${days} days".toString())
             }
-            
-            // Check for weak credentials
+
             if (cred.strength == 'WEAK') {
-                violations << "Credential '${cred.id}' has weak security strength"
+                violations.add("Credential '${cred.id}' has weak security strength".toString())
             }
         }
-        
+
         return [
             compliant: violations.isEmpty(),
             violations: violations
-        ]
+        ] as Map<String, Object>
     }
-    
+
     /**
      * Checks PCI-DSS compliance.
      */
-    private Map checkPCIDSSCompliance(List<Map> credentialAnalysis) {
-        def violations = []
-        
-        credentialAnalysis.each { cred ->
-            // PCI-DSS requires 90-day rotation for passwords
-            if (cred.type == 'PASSWORD' && cred.daysSinceRotation > 90) {
-                violations << "Password credential '${cred.id}' exceeds 90-day rotation requirement"
+    private Map<String, Object> checkPCIDSSCompliance(List<Map<String, Object>> credentialAnalysis) {
+        List<String> violations = []
+
+        credentialAnalysis.each { Map<String, Object> cred ->
+            long days = ((Number) cred.daysSinceRotation).longValue()
+            if (cred.type == 'PASSWORD' && days > 90L) {
+                violations.add("Password credential '${cred.id}' exceeds 90-day rotation requirement".toString())
             }
-            
-            // Check for default or weak credentials
+
             if (cred.strength in ['WEAK', 'DEFAULT']) {
-                violations << "Credential '${cred.id}' does not meet PCI-DSS strength requirements"
+                violations.add("Credential '${cred.id}' does not meet PCI-DSS strength requirements".toString())
             }
         }
-        
+
         return [
             compliant: violations.isEmpty(),
             violations: violations
-        ]
+        ] as Map<String, Object>
     }
-    
+
     /**
-     * Analyzes a single credential.
+     * Analyzes a single credential using a precomputed usage map.
      */
-    private Map analyzeCredential(StandardCredentials credential, boolean includeUsage) {
-        def metadata = getCredentialMetadata(credential.id)
-        def now = Instant.now()
-        
-        def analysis = [
+    private Map<String, Object> analyzeCredential(StandardCredentials credential, boolean includeUsage,
+                                                  Map<String, Map<String, Object>> usageByCredId = [:]) {
+        CredentialMetadata metadata = getCredentialMetadata(credential.id)
+        Instant now = Instant.now()
+
+        long daysSinceRotation
+        if (metadata?.lastRotated) {
+            daysSinceRotation = ChronoUnit.DAYS.between(Instant.parse(metadata.lastRotated), now)
+        } else if (metadata?.created) {
+            daysSinceRotation = ChronoUnit.DAYS.between(Instant.parse(metadata.created), now)
+        } else {
+            daysSinceRotation = 999L
+        }
+
+        Map<String, Object> analysis = [
             id: credential.id,
             type: getCredentialType(credential),
             description: credential.description,
             created: metadata?.created ?: 'UNKNOWN',
             lastRotated: metadata?.lastRotated ?: metadata?.created ?: 'UNKNOWN',
-            daysSinceRotation: 0,
+            daysSinceRotation: daysSinceRotation,
             strength: assessCredentialStrength(credential),
             scope: credential.scope?.toString() ?: 'GLOBAL'
-        ]
-        
-        // Calculate days since rotation
-        if (metadata?.lastRotated) {
-            def lastRotated = Instant.parse(metadata.lastRotated)
-            analysis.daysSinceRotation = ChronoUnit.DAYS.between(lastRotated, now)
-        } else if (metadata?.created) {
-            def created = Instant.parse(metadata.created)
-            analysis.daysSinceRotation = ChronoUnit.DAYS.between(created, now)
-        } else {
-            analysis.daysSinceRotation = 999 // Unknown age, assume old
-        }
-        
-        // Include usage if requested
+        ] as Map<String, Object>
+
         if (includeUsage) {
-            def usage = trackCredentialUsage()[credential.id]
-            analysis.usage = usage ?: [jobs: [], lastUsed: null, totalUses: 0]
+            Map<String, Object> credUsage = usageByCredId[credential.id]
+            analysis.usage = credUsage ?: ([jobs: [], lastUsed: null, totalUses: 0] as Map<String, Object>)
         }
-        
+
         return analysis
     }
-    
+
     /**
      * Generates a summary of credential analysis.
      */
-    private Map generateSummary(List<Map> credentialAnalysis) {
-        def total = credentialAnalysis.size()
-        def needRotation = credentialAnalysis.count { it.daysSinceRotation > 90 }
-        def unused = credentialAnalysis.count { !it.usage || it.usage.totalUses == 0 }
-        def weak = credentialAnalysis.count { it.strength == 'WEAK' }
-        
+    private Map<String, Object> generateSummary(List<Map<String, Object>> credentialAnalysis) {
+        int total = credentialAnalysis.size()
+        int needRotation = credentialAnalysis.count { Map<String, Object> c ->
+            ((Number) c.daysSinceRotation).longValue() > 90L
+        }.intValue()
+        int unused = credentialAnalysis.count { Map<String, Object> c ->
+            Map<String, Object> u = (Map<String, Object>) c.usage
+            !u || ((Number) (u.totalUses ?: 0)).intValue() == 0
+        }.intValue()
+        int weak = credentialAnalysis.count { Map<String, Object> c -> c.strength == 'WEAK' }.intValue()
+
+        double ageSum = 0.0d
+        for (Map<String, Object> c : credentialAnalysis) {
+            ageSum += ((Number) c.daysSinceRotation).doubleValue()
+        }
+        double averageAge = total > 0 ? (ageSum / total) : 0.0d
+
         return [
             totalCredentials: total,
             needingRotation: needRotation,
             unusedCredentials: unused,
             weakCredentials: weak,
-            averageAge: credentialAnalysis.collect { it.daysSinceRotation }.sum() / total
-        ]
+            averageAge: averageAge
+        ] as Map<String, Object>
     }
-    
+
     /**
      * Generates recommendations based on analysis.
      */
-    private List<Map> generateRecommendations(List<Map> credentialAnalysis, Map compliance) {
-        def recommendations = []
-        
-        // Check for old credentials
-        def oldCredentials = credentialAnalysis.findAll { it.daysSinceRotation > 180 }
+    private List<Map<String, Object>> generateRecommendations(List<Map<String, Object>> credentialAnalysis,
+                                                              Map<String, Object> compliance) {
+        List<Map<String, Object>> recommendations = []
+
+        List<Map<String, Object>> oldCredentials = credentialAnalysis.findAll { Map<String, Object> c ->
+            ((Number) c.daysSinceRotation).longValue() > 180L
+        }
         if (oldCredentials) {
-            recommendations << [
+            recommendations.add([
                 type: 'ROTATION',
                 priority: 'HIGH',
                 message: "${oldCredentials.size()} credentials haven't been rotated in over 180 days",
-                credentialIds: oldCredentials.collect { it.id }
-            ]
+                credentialIds: oldCredentials.collect { Map<String, Object> c -> c.id }
+            ] as Map<String, Object>)
         }
-        
-        // Check for unused credentials
-        def unused = credentialAnalysis.findAll { !it.usage || it.usage.totalUses == 0 }
+
+        List<Map<String, Object>> unused = credentialAnalysis.findAll { Map<String, Object> c ->
+            Map<String, Object> u = (Map<String, Object>) c.usage
+            !u || ((Number) (u.totalUses ?: 0)).intValue() == 0
+        }
         if (unused) {
-            recommendations << [
+            recommendations.add([
                 type: 'CLEANUP',
                 priority: 'MEDIUM',
                 message: "${unused.size()} credentials appear to be unused and should be reviewed for removal",
-                credentialIds: unused.collect { it.id }
-            ]
+                credentialIds: unused.collect { Map<String, Object> c -> c.id }
+            ] as Map<String, Object>)
         }
-        
-        // Check compliance
-        if (!compliance.overall == 'COMPLIANT') {
-            recommendations << [
+
+        if (compliance.overall != 'COMPLIANT') {
+            recommendations.add([
                 type: 'COMPLIANCE',
                 priority: 'HIGH',
                 message: 'Credential management is not compliant with security standards',
                 details: compliance
-            ]
+            ] as Map<String, Object>)
         }
-        
-        // Check for weak credentials
-        def weak = credentialAnalysis.findAll { it.strength == 'WEAK' }
+
+        List<Map<String, Object>> weak = credentialAnalysis.findAll { Map<String, Object> c -> c.strength == 'WEAK' }
         if (weak) {
-            recommendations << [
+            recommendations.add([
                 type: 'SECURITY',
                 priority: 'HIGH',
                 message: "${weak.size()} credentials have weak security strength",
-                credentialIds: weak.collect { it.id }
-            ]
+                credentialIds: weak.collect { Map<String, Object> c -> c.id }
+            ] as Map<String, Object>)
         }
-        
+
         return recommendations
     }
-    
+
     /**
      * Gets all credentials from Jenkins.
      * Uses proper ACL context for system access.
      */
-    private List<StandardCredentials> getAllCredentials() {
-        def allCredentials = []
-        
-        // Use system ACL context to access credentials
+    protected List<StandardCredentials> getAllCredentials() {
+        List<StandardCredentials> allCredentials = []
+
         try (ACLContext ctx = ACL.as(ACL.SYSTEM)) {
-            def providers = CredentialsProvider.allCredentialsProviders()
-            providers.each { provider ->
-                if (provider instanceof SystemCredentialsProvider) {
-                    def store = provider.getStore()
-                    allCredentials.addAll(store.getCredentials(Domain.global()))
+            Iterable<CredentialsStore> stores = CredentialsProvider.lookupStores(jenkins)
+            if (stores != null) {
+                for (CredentialsStore store : stores) {
+                    if (store?.provider instanceof SystemCredentialsProvider) {
+                        store.getCredentials(Domain.global()).each { cred ->
+                            if (cred instanceof StandardCredentials) {
+                                allCredentials.add((StandardCredentials) cred)
+                            }
+                        }
+                    }
                 }
             }
         }
-        
+
         return allCredentials
     }
     
@@ -581,8 +600,7 @@ class CredentialRotationManager {
                 LOGGER.info("Rotating credential: ${credential.id}")
                 
                 // Log audit event
-                jenkins.getSecurityRealm().createSecurityComponents().manager
-                    .getACL(jenkins).checkPermission(ROTATE_PERMISSION)
+                jenkins.getAuthorizationStrategy().getACL(jenkins).checkPermission(ROTATE_PERMISSION)
                 
                 // Update metadata
                 def metadata = credentialMetadata[credential.id]
@@ -696,8 +714,8 @@ class CredentialRotationManager {
     /**
      * Merges custom policy with defaults.
      */
-    private Map<String, Integer> mergeWithDefaultPolicy(Map<String, String> customPolicy) {
-        def policy = [
+    private Map<String, Integer> mergeWithDefaultPolicy(Map<String, ?> customPolicy) {
+        Map<String, Integer> policy = [
             'PASSWORD': DEFAULT_PASSWORD_ROTATION_DAYS,
             'API_KEY': DEFAULT_API_KEY_ROTATION_DAYS,
             'SSH_KEY': DEFAULT_SSH_KEY_ROTATION_DAYS,
@@ -705,11 +723,15 @@ class CredentialRotationManager {
             'CERTIFICATE': 365,
             'OTHER': 180
         ]
-        
-        customPolicy.each { k, v ->
-            policy[k] = Integer.parseInt(v)
+
+        customPolicy?.each { String k, Object v ->
+            if (v instanceof Number) {
+                policy[k] = ((Number) v).intValue()
+            } else if (v != null) {
+                policy[k] = Integer.parseInt(v.toString())
+            }
         }
-        
+
         return policy
     }
     
@@ -741,22 +763,22 @@ class CredentialRotationManager {
                 def manager = new CredentialRotationManager()
                 
                 // Analyze credentials
-                def analysis = manager.analyzeCredentials(false)
-                def needsRotation = analysis.credentials.findAll { 
-                    it.daysSinceRotation > DEFAULT_PASSWORD_ROTATION_DAYS 
+                Map<String, Object> analysis = manager.analyzeCredentials(false)
+                List<Map<String, Object>> creds = (List<Map<String, Object>>) analysis.credentials
+                List<Map<String, Object>> needsRotation = creds.findAll { Map<String, Object> c ->
+                    ((Number) c.daysSinceRotation).longValue() > DEFAULT_PASSWORD_ROTATION_DAYS
                 }
-                
+
                 if (needsRotation) {
-                    WORK_LOGGER.log(Level.INFO, 
+                    WORK_LOGGER.log(Level.INFO,
                         "Found {0} credentials needing rotation", needsRotation.size())
-                    
-                    // Perform rotation in dry-run mode by default
-                    // Real rotation would need to be triggered manually or configured
-                    def results = manager.rotateCredentials(true)
-                    
-                    WORK_LOGGER.log(Level.INFO, 
-                        "Rotation analysis complete: {0} would be rotated", 
-                        results.rotated.size())
+
+                    Map<String, Object> results = manager.rotateCredentials(true)
+                    List rotated = (List) results.rotated
+
+                    WORK_LOGGER.log(Level.INFO,
+                        "Rotation analysis complete: {0} would be rotated",
+                        rotated.size())
                 }
             } catch (Exception e) {
                 WORK_LOGGER.log(Level.WARNING, "Failed to run credential rotation work", e)

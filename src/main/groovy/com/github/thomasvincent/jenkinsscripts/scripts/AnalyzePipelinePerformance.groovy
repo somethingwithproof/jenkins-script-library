@@ -35,8 +35,10 @@ import hudson.model.Job
 import hudson.model.Run
 import org.jenkinsci.plugins.workflow.job.WorkflowJob
 import org.jenkinsci.plugins.workflow.job.WorkflowRun
+import org.jenkinsci.plugins.workflow.graph.BlockEndNode
 import org.jenkinsci.plugins.workflow.graph.FlowNode
 import org.jenkinsci.plugins.workflow.graph.FlowGraphWalker
+import org.jenkinsci.plugins.workflow.actions.ErrorAction
 import org.jenkinsci.plugins.workflow.actions.TimingAction
 import org.jenkinsci.plugins.workflow.actions.LabelAction
 import groovy.cli.commons.CliBuilder
@@ -74,7 +76,8 @@ import java.util.logging.Logger
 /**
  * Logger for this script.
  */
-private static final Logger LOGGER = Logger.getLogger("AnalyzePipelinePerformance.groovy")
+@groovy.transform.Field
+final Logger LOGGER = Logger.getLogger("AnalyzePipelinePerformance.groovy")
 
 /**
  * Creates a command-line argument parser for the script.
@@ -86,7 +89,7 @@ def cli = new CliBuilder(usage: 'groovy AnalyzePipelinePerformance [options]',
                         header: 'Options:')
 cli.with {
     h(longOpt: 'help', 'Show usage information')
-    j(longOpt: 'json', 'Output in JSON format')
+    J(longOpt: 'json', 'Output in JSON format')
     j(longOpt: 'job', args: 1, argName: 'name', 'Pipeline job name to analyze')
     p(longOpt: 'pattern', args: 1, argName: 'pattern', 'Pattern to match pipeline job names')
     b(longOpt: 'builds', args: 1, argName: 'count', 'Number of recent builds to analyze (default: 5)')
@@ -269,62 +272,75 @@ def analyzeBuild(WorkflowRun build, int thresholdSeconds) {
             stages: []
         ]
         
-        // Extract stage information
+        // Extract stage information and matching BlockEndNodes in one graph pass
         def stageNodes = []
+        Map<String, FlowNode> endNodesByStartId = [:]
         def walker = new FlowGraphWalker(build.execution)
-        
+
         walker.forEach { FlowNode node ->
+            if (node instanceof BlockEndNode) {
+                def startNode = ((BlockEndNode) node).getStartNode()
+                if (startNode != null) {
+                    endNodesByStartId[startNode.id] = node
+                }
+            }
             def stageAction = node.getAction(LabelAction.class)
-            if (stageAction && stageAction.displayName.startsWith("Stage: ")) {
+            if (stageAction && stageAction.displayName?.startsWith("Stage: ")) {
                 stageNodes.add(node)
             }
         }
-        
-        stageNodes.each { node ->
+
+        // FlowGraphWalker traverses newest-to-oldest; sort ascending by startTime
+        stageNodes.sort { FlowNode n -> n.getAction(TimingAction.class)?.startTime ?: 0L }
+
+        stageNodes.eachWithIndex { FlowNode node, int idx ->
             def stageName = node.getAction(LabelAction.class).displayName - "Stage: "
             def timingAction = node.getAction(TimingAction.class)
-            
+
             if (timingAction) {
-                def startTime = timingAction.startTime
-                
-                // Find the end time (either from the next stage or the end of the build)
-                def endTime = build.startTimeInMillis + build.duration
-                def nextStageIndex = stageNodes.indexOf(node) + 1
-                if (nextStageIndex < stageNodes.size()) {
-                    def nextNode = stageNodes[nextStageIndex]
-                    def nextTimingAction = nextNode.getAction(TimingAction.class)
+                long startTime = timingAction.startTime
+
+                // Prefer matching BlockEndNode timing, otherwise next sorted stage or build end
+                long endTime = build.startTimeInMillis + build.duration
+                FlowNode endNode = endNodesByStartId[node.id]
+                def endTiming = endNode?.getAction(TimingAction.class)
+                if (endTiming) {
+                    endTime = endTiming.startTime
+                } else if (idx + 1 < stageNodes.size()) {
+                    def nextTimingAction = stageNodes[idx + 1].getAction(TimingAction.class)
                     if (nextTimingAction) {
                         endTime = nextTimingAction.startTime
                     }
                 }
-                
-                def stageDuration = endTime - startTime
-                
+
+                long stageDuration = Math.max(0L, endTime - startTime)
+
                 // Only include stages longer than threshold
-                if (stageDuration >= thresholdSeconds * 1000) {
+                if (stageDuration >= thresholdSeconds * 1000L) {
                     buildData.stages.add([
                         name: stageName,
                         duration: stageDuration,
-                        status: getStageStatus(node, build)
+                        status: getStageStatus(node, endNode)
                     ])
                 }
             }
         }
-        
+
         return buildData
     }, LOGGER, null)
 }
 
 /**
  * Determines the status of a pipeline stage.
- * 
+ *
  * @param stageNode The stage FlowNode
- * @param build The WorkflowRun containing the stage
- * @return Status string (SUCCESS, FAILURE, UNSTABLE, etc.)
+ * @param endNode Optional matching BlockEndNode
+ * @return Status string (SUCCESS or FAILURE)
  */
-def getStageStatus(FlowNode stageNode, WorkflowRun build) {
-    // A simplified approach - in a real implementation, you would need to analyze
-    // the nodes more thoroughly to determine if a specific stage failed
+def getStageStatus(FlowNode stageNode, FlowNode endNode = null) {
+    if (stageNode?.getAction(ErrorAction.class) != null || endNode?.getAction(ErrorAction.class) != null) {
+        return "FAILURE"
+    }
     return "SUCCESS"
 }
 
@@ -358,9 +374,9 @@ def calculateTrends(List<Map> builds) {
             def sortedDurations = stageDurations.sort { it.buildNumber }
             def first = sortedDurations.first().duration
             def last = sortedDurations.last().duration
-            
-            def changePercent = ((last - first) / first) * 100
-            
+
+            def changePercent = first > 0 ? ((last - first) / first) * 100 : 0.0
+
             trends[stageName] = [
                 first: first,
                 last: last,
@@ -381,15 +397,22 @@ def calculateTrends(List<Map> builds) {
  */
 def calculateJobStats(List<Map> builds) {
     def stats = [:]
-    
+    if (!builds) {
+        stats.avgDuration = 0
+        stats.successRate = 0.0
+        stats.slowestStage = [name: "N/A", avgDuration: 0]
+        stats.unstableStage = [name: "N/A", failureRate: 0.0]
+        return stats
+    }
+
     // Calculate average build duration
     def totalDuration = builds.sum { it.duration } ?: 0
     stats.avgDuration = totalDuration / builds.size()
-    
+
     // Calculate success rate
     def successfulBuilds = builds.count { it.result == "SUCCESS" }
     stats.successRate = successfulBuilds / builds.size()
-    
+
     // Find slowest stage
     def stageStats = [:]
     builds.each { build ->
@@ -403,11 +426,12 @@ def calculateJobStats(List<Map> builds) {
             }
         }
     }
-    
-    // Calculate stage stats
+
+    // Calculate stage stats using stage execution count (not total build count)
     stageStats.each { stageName, data ->
-        data.avgDuration = data.durations.sum() / data.durations.size()
-        data.failureRate = data.failures / builds.size()
+        int executions = data.durations.size()
+        data.avgDuration = executions > 0 ? (data.durations.sum() / executions) : 0
+        data.failureRate = executions > 0 ? (data.failures / executions) : 0.0
         data.name = stageName
     }
     

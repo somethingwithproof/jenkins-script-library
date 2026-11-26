@@ -41,6 +41,7 @@ import com.github.thomasvincent.jenkinsscripts.util.ErrorHandler
 
 import java.util.logging.Level
 import java.util.logging.Logger
+import java.util.regex.Pattern
 
 /**
  * Manages and visualizes Jenkins job dependencies.
@@ -114,18 +115,36 @@ class JobDependencyManager {
      */
     CompleteDependencyGraph getCompleteDependencyGraph() {
         CompleteDependencyGraph completeGraph = new CompleteDependencyGraph()
-        
-        // Get all jobs
+
         List<Job> allJobs = jenkins.getAllItems(Job.class)
-        
-        // Build individual graphs for each job
-        allJobs.each { job ->
-            JobDependencyGraph jobGraph = getJobDependencyGraph(job.fullName)
-            if (jobGraph) {
-                completeGraph.addJobGraph(jobGraph)
+
+        // First pass: register every job node
+        allJobs.each { Job job ->
+            completeGraph.addJobGraph(new JobDependencyGraph(job.fullName))
+        }
+
+        // Second pass: populate downstream edges and reversed upstream edges in O(V + E)
+        allJobs.each { Job job ->
+            if (job instanceof AbstractProject) {
+                AbstractProject project = (AbstractProject) job
+                hudson.tasks.BuildTrigger trigger = project.getPublishersList().get(hudson.tasks.BuildTrigger.class)
+                String childProjectsValue = trigger?.getChildProjectsValue()
+                if (childProjectsValue) {
+                    JobDependencyGraph upstreamGraph = completeGraph.jobGraphs[job.fullName]
+                    childProjectsValue.split(',').each { String rawChild ->
+                        String childName = rawChild.trim()
+                        if (childName) {
+                            upstreamGraph.downstreamJobs.add(childName)
+                            JobDependencyGraph downstreamGraph = completeGraph.jobGraphs[childName]
+                            if (downstreamGraph != null) {
+                                downstreamGraph.upstreamJobs.add(job.fullName)
+                            }
+                        }
+                    }
+                }
             }
         }
-        
+
         LOGGER.info("Created complete dependency graph for ${allJobs.size()} jobs")
         return completeGraph
     }
@@ -162,10 +181,22 @@ class JobDependencyManager {
                 return true
             }
             
-            // Add downstream project
-            upstreamJob.addProperty(
-                new hudson.tasks.BuildTrigger(downstreamJob.fullName, true)
-            )
+            // Add or update BuildTrigger publisher
+            hudson.tasks.BuildTrigger existingTrigger = upstreamJob.getPublishersList().get(hudson.tasks.BuildTrigger.class)
+            String existingChildren = existingTrigger?.getChildProjectsValue()
+            if (existingTrigger && existingChildren) {
+                List<String> children = existingChildren.split(',')
+                        .collect { it.trim() }
+                        .findAll { it }
+                children.add(downstreamJob.fullName)
+                upstreamJob.getPublishersList().replace(
+                    new hudson.tasks.BuildTrigger(children.join(','), existingTrigger.threshold)
+                )
+            } else {
+                upstreamJob.getPublishersList().add(
+                    new hudson.tasks.BuildTrigger(downstreamJob.fullName, hudson.model.Result.SUCCESS)
+                )
+            }
             
             upstreamJob.save()
             jenkins.rebuildDependencyGraph()
@@ -206,14 +237,15 @@ class JobDependencyManager {
                 return true
             }
             
-            // Remove downstream project from all BuildTrigger properties
+            // Remove downstream project from BuildTrigger publisher
             boolean modified = false
             hudson.tasks.BuildTrigger triggerProperty = upstreamJob.getPublishersList().get(hudson.tasks.BuildTrigger.class)
             
             if (triggerProperty) {
                 // Get the current configuration
-                def childProjects = triggerProperty.childProjects.split(',')
-                def newChildProjects = childProjects.findAll { it != downstreamJob.fullName }.join(',')
+                String rawChildren = triggerProperty.getChildProjectsValue() ?: ''
+                def childProjects = rawChildren.split(',').collect { it.trim() }
+                def newChildProjects = childProjects.findAll { it && it != downstreamJob.fullName }.join(',')
                 
                 // Update with new configuration
                 if (newChildProjects) {
@@ -305,18 +337,18 @@ class JobDependencyManager {
         // Check if job is AbstractProject to access downstream projects
         if (job instanceof AbstractProject) {
             AbstractProject project = (AbstractProject) job
-            
+
             // Get downstream projects from build triggers
             hudson.tasks.BuildTrigger trigger = project.getPublishersList().get(hudson.tasks.BuildTrigger.class)
-            if (trigger && trigger.childProjects) {
-                trigger.childProjects.split(',').each { childName ->
-                    // Add to graph
-                    graph.downstreamJobs.add(childName.trim())
+            String childProjectsValue = trigger?.getChildProjectsValue()
+            if (childProjectsValue) {
+                childProjectsValue.split(',').each { String childName ->
+                    String trimmed = childName.trim()
+                    if (trimmed) {
+                        graph.downstreamJobs.add(trimmed)
+                    }
                 }
             }
-            
-            // Other downstream dependencies might come from pipeline jobs or other plugins
-            // In a real implementation, we would check more sources
         }
     }
     
@@ -329,13 +361,14 @@ class JobDependencyManager {
      */
     private boolean hasDownstreamDependency(AbstractProject upstreamJob, Job downstreamJob) {
         hudson.tasks.BuildTrigger trigger = upstreamJob.getPublishersList().get(hudson.tasks.BuildTrigger.class)
-        
-        if (trigger && trigger.childProjects) {
-            return trigger.childProjects.split(',').any { childName ->
+        String childProjectsValue = trigger?.getChildProjectsValue()
+
+        if (childProjectsValue) {
+            return childProjectsValue.split(',').any { childName ->
                 childName.trim() == downstreamJob.fullName
             }
         }
-        
+
         return false
     }
 }
@@ -396,89 +429,85 @@ class CompleteDependencyGraph {
      */
     List<List<String>> findCircularDependencies() {
         List<List<String>> cycles = []
-        
-        // For each job, check for cycles
-        jobGraphs.keySet().each { startJob ->
-            findCycles(startJob, [], [], cycles)
+
+        // For each job, explore reachable cycles
+        jobGraphs.keySet().each { String startJob ->
+            findCycles(startJob, [], [:], new HashSet<String>(), cycles)
         }
-        
+
         // Remove duplicates (same cycle can be detected from different starting points)
         return removeDuplicateCycles(cycles)
     }
-    
+
     /**
      * Recursively finds cycles starting from a job.
-     * 
+     *
      * @param currentJob Current job being checked
-     * @param path Current path being explored
-     * @param visited Set of already visited jobs
+     * @param path Current DFS stack
+     * @param pathIndex Map from job name to its index in path for O(1) cycle detection
+     * @param visited Set of already visited jobs for O(1) lookup
      * @param cycles List to store found cycles
      */
-    private void findCycles(String currentJob, List<String> path, List<String> visited, List<List<String>> cycles) {
-        // Skip if job does not exist in graph
+    private void findCycles(String currentJob, List<String> path, Map<String, Integer> pathIndex,
+                            Set<String> visited, List<List<String>> cycles) {
         if (!jobGraphs.containsKey(currentJob)) {
             return
         }
-        
-        // Check if we've found a cycle
-        int index = path.indexOf(currentJob)
-        if (index != -1) {
-            // Extract the cycle
-            List<String> cycle = path.subList(index, path.size())
-            cycle.add(currentJob)
-            cycles.add(cycle)
+
+        Integer index = pathIndex.get(currentJob)
+        if (index != null) {
+            // Copy slice without mutating path or appending a closing duplicate
+            cycles.add(new ArrayList<>(path.subList(index, path.size())))
             return
         }
-        
-        // Skip if already visited
-        if (visited.contains(currentJob)) {
+
+        if (!visited.add(currentJob)) {
             return
         }
-        
-        // Add to visited
-        visited.add(currentJob)
-        
-        // Add to current path
+
+        pathIndex.put(currentJob, path.size())
         path.add(currentJob)
-        
-        // Check downstream dependencies
+
         JobDependencyGraph graph = jobGraphs[currentJob]
-        graph.downstreamJobs.each { downstream ->
-            findCycles(downstream, path, visited, cycles)
+        graph.downstreamJobs.each { String downstream ->
+            findCycles(downstream, path, pathIndex, visited, cycles)
         }
-        
-        // Remove from current path when backtracking
+
         path.remove(path.size() - 1)
+        pathIndex.remove(currentJob)
     }
-    
+
     /**
-     * Removes duplicate cycles from the list.
-     * 
+     * Removes duplicate cycles from the list by rotating each cycle to start at its lexicographically smallest job.
+     *
      * @param cycles List of cycles to deduplicate
      * @return Deduplicated list of cycles
      */
     private List<List<String>> removeDuplicateCycles(List<List<String>> cycles) {
-        // Convert cycles to canonical form for comparison
-        Map<String, List<String>> canonicalCycles = [:]
-        
-        cycles.each { cycle ->
-            // Find smallest job name to normalize cycle representation
-            String minJob = cycle.min()
-            int minIndex = cycle.indexOf(minJob)
-            
-            // Create normalized cycle starting with minJob
-            List<String> normalizedCycle = []
-            for (int i = 0; i < cycle.size(); i++) {
-                normalizedCycle.add(cycle[(minIndex + i) % cycle.size()])
+        Map<String, List<String>> canonicalCycles = new LinkedHashMap<>()
+
+        cycles.each { List<String> cycle ->
+            if (!cycle) {
+                return
             }
-            
-            // Convert to string for easy comparison
-            String key = normalizedCycle.join("→")
+            int size = cycle.size()
+            int minIndex = 0
+            for (int i = 1; i < size; i++) {
+                if (cycle[i] < cycle[minIndex]) {
+                    minIndex = i
+                }
+            }
+
+            List<String> normalizedCycle = new ArrayList<>(size)
+            for (int i = 0; i < size; i++) {
+                normalizedCycle.add(cycle[(minIndex + i) % size])
+            }
+
+            String key = normalizedCycle.join("\u0000")
             canonicalCycles[key] = normalizedCycle
         }
-        
-        // Return deduplicated cycles
-        return canonicalCycles.values().toList()
+
+        return new ArrayList<>(canonicalCycles.values())
     }
     
     /**

@@ -78,7 +78,7 @@ String command = cli[0]
 def options = parseOptions(cli.drop(1))
 
 // Main execution
-ErrorHandler.withErrorHandling('optimize cloud costs', logger) {
+ErrorHandler.withErrorHandling('optimize cloud costs', {
     def jenkins = Jenkins.get()
     def optimizer = new CloudCostOptimizer(jenkins)
     
@@ -104,7 +104,7 @@ ErrorHandler.withErrorHandling('optimize cloud costs', logger) {
             showHelp(logger)
             System.exit(1)
     }
-}
+}, logger)
 
 /**
  * Shows help message.
