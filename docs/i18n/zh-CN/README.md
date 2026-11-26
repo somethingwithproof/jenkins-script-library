@@ -1,0 +1,423 @@
+<!-- translations:start -->
+**Languages:** [English](../../../README.md) · [Deutsch](../de/README.md) · [Español](../es/README.md) · [Français](../fr/README.md) · [Português (BR)](../pt-BR/README.md) · [Русский](../ru/README.md) · [日本語](../ja/README.md) · [한국어](../ko/README.md) · **简体中文** · [العربية](../ar/README.md) · [हिन्दी](../hi/README.md)
+
+<details>
+<summary>All 45 languages (Tier 1, Africa, Asia)</summary>
+
+- **Tier 1:** [English](../../../README.md) · [Deutsch](../de/README.md) · [Español](../es/README.md) · [Français](../fr/README.md) · [Italiano](../it/README.md) · [Português (BR)](../pt-BR/README.md) · [Nederlands](../nl/README.md) · [Русский](../ru/README.md) · [Українська](../uk/README.md) · [日本語](../ja/README.md) · [한국어](../ko/README.md) · **简体中文** · [繁體中文](../zh-TW/README.md) · [العربية](../ar/README.md) · [हिन्दी](../hi/README.md) · [Polski](../pl/README.md) · [Türkçe](../tr/README.md) · [Svenska](../sv/README.md) · [Tiếng Việt](../vi/README.md) · [Bahasa Indonesia](../id/README.md)
+- **Africa:** [Afrikaans](../af-ZA/README.md) · [አማርኛ](../am-ET/README.md) · [العربية (مصر)](../ar-EG/README.md) · [العربية (المغرب)](../ar-MA/README.md) · [Français (Maroc)](../fr-MA/README.md) · [Français (Sénégal)](../fr-SN/README.md) · [Hausa](../ha-NG/README.md) · [Igbo](../ig-NG/README.md) · [Malagasy](../mg-MG/README.md) · [Kinyarwanda](../rw-RW/README.md) · [Soomaali](../so-SO/README.md) · [Kiswahili](../sw-KE/README.md) · [isiXhosa](../xh-ZA/README.md) · [Yorùbá](../yo-NG/README.md) · [isiZulu](../zu-ZA/README.md)
+- **Asia:** [বাংলা](../bn/README.md) · [فارسی](../fa/README.md) · [עברית](../he/README.md) · [मराठी](../mr/README.md) · [தமிழ்](../ta/README.md) · [తెలుగు](../te/README.md) · [ไทย](../th/README.md) · [اردو](../ur/README.md) · [Bahasa Melayu](../ms/README.md) · [Filipino](../fil/README.md)
+
+</details>
+<!-- translations:end -->
+
+# Jenkins Script Library
+
+[![CI](https://github.com/somethingwithproof/jenkins-script-library/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/somethingwithproof/jenkins-script-library/actions/workflows/ci.yml)
+[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=somethingwithproof_jenkins-script-library&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=somethingwithproof_jenkins-script-library)
+[![Release](https://img.shields.io/github/v/release/somethingwithproof/jenkins-script-library)](https://github.com/somethingwithproof/jenkins-script-library/releases)
+[![License](https://img.shields.io/badge/license-MIT-blue)](../../../LICENSE)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/somethingwithproof/jenkins-script-library/badge)](https://scorecard.dev/viewer/?uri=github.com/somethingwithproof/jenkins-script-library)
+
+一组用于自动化并简化 Jenkins 环境中各类操作的 Groovy 工具和脚本集合。本库遵循与 Jenkins 兼容的实践，并包含单元测试和集成测试，支持现代环境下的 Jenkins 自动化。
+
+## 功能特性
+
+- **任务管理**：启用/禁用、清理、迁移和模板化 Jenkins 任务
+- **云集成**：在 AWS、Azure 和 Kubernetes 上管理 Jenkins 代理
+- **安全**：审计并加固 Jenkins 实例
+- **性能优化**：监控并提升 Jenkins 性能
+- **配置管理**：备份和恢复 Jenkins 配置
+- **流水线生成**：基于可复用模板创建 Jenkins 流水线
+
+## 项目结构
+
+本项目遵循标准的 Groovy 项目结构：
+
+```text
+jenkins-script-library/
+├── src/
+│   ├── main/groovy/            # Main source code
+│   │   └── com/github/thomasvincent/jenkinsscripts/
+│   │       ├── cloud/          # Cloud provider integrations
+│   │       ├── config/         # Configuration management
+│   │       ├── helm/           # Helm management
+│   │       ├── jobs/           # Job management
+│   │       ├── nodes/          # Node management
+│   │       ├── scripts/        # Command-line script entry points
+│   │       ├── security/       # Security utilities
+│   │       └── util/           # Common utilities
+│   ├── test/groovy/            # Unit tests
+│   └── integration-test/groovy/ # Integration tests
+├── build.gradle                # Gradle build configuration
+├── config/                     # Configuration files
+│   └── codenarc/               # CodeNarc rules for code quality
+├── gradle/wrapper/            # Gradle wrapper files
+├── gradlew                     # Gradle wrapper script
+├── LICENSE                     # MIT License
+├── README.md                   # This file
+└── SECURITY.md                 # Security policy
+```
+
+## 安装
+
+本库支持两种使用方式：
+
+1. **作为 Gradle/Maven 项目的依赖**：
+
+   ```groovy
+   // In your build.gradle
+   dependencies {
+       implementation 'com.github.thomasvincent:jenkins-script-library:1.0.0'
+   }
+   ```
+
+2. **作为独立脚本直接在 Jenkins 中运行**：
+
+   `src/main/groovy/com/github/thomasvincent/jenkinsscripts/scripts/` 中的脚本可直接在 Jenkins 脚本控制台或通过 Jenkins CLI 执行。
+
+## 使用说明
+
+### 命令行脚本
+
+所有命令行脚本均支持 `--help` 选项以显示用法信息。
+
+#### 任务管理
+
+##### 任务清理
+
+```bash
+# Clean build history for a job with limit of 50 builds and reset build number
+groovy CleanBuildHistory.groovy --limit 50 --reset my-jenkins-job
+```
+
+##### 任务启用/禁用
+
+```bash
+# Disable a specific job
+groovy DisableJobs.groovy my-jenkins-job
+
+# Disable all buildable jobs
+groovy DisableJobs.groovy --all
+
+# Enable a specific job
+groovy EnableJobs.groovy my-jenkins-job
+```
+
+##### 任务迁移
+
+```bash
+# Migrate a specific job
+groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job
+
+# Migrate all jobs matching a pattern
+groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --pattern "frontend-.*"
+
+# Use a replacement config file to modify properties during migration
+groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job --replacements-file replacements.json
+```
+
+##### 任务模板化
+
+```bash
+# Create a job from a template
+groovy CreateJobFromTemplate.groovy --template-job template-job --target-job new-job --params-file params.json
+```
+
+##### 流水线生成
+
+```groovy
+// Generate a Jenkinsfile from template
+generatePipeline(
+    template: 'templates/basic-pipeline.jenkinsfile',
+    parameters: [project: 'my-app'],
+    destination: 'Jenkinsfile'
+)
+```
+
+##### 任务分析
+
+```bash
+# Analyze job health
+groovy AnalyzeJobHealth.groovy --job my-jenkins-job
+
+# Analyze pipeline performance
+groovy AnalyzePipelinePerformance.groovy --job my-pipeline-job --builds 10
+
+# Audit job configurations
+groovy AuditJobConfigurations.groovy --pattern "*.xml" --output audit-report.json
+```
+
+#### 节点管理
+
+##### 列出节点
+
+```bash
+# List all slave nodes
+groovy ListSlaveNodes.groovy --all
+
+# List a specific slave node with detailed information
+groovy ListSlaveNodes.groovy my-slave-node
+
+# List cloud-based nodes
+groovy ListCloudNodes.groovy --cloud-type aws
+```
+
+##### 节点操作
+
+```bash
+# Start all offline slave nodes
+groovy StartOfflineSlaveNodes.groovy --all
+
+# Start a specific offline slave node
+groovy StartOfflineSlaveNodes.groovy my-slave-node
+```
+
+#### 云服务商管理
+
+##### AWS 管理
+
+```bash
+# List EC2 instances used as Jenkins agents
+groovy ManageEC2Agents.groovy --list
+
+# Provision a new EC2 instance from template
+groovy ManageEC2Agents.groovy --provision --template "my-ec2-template"
+
+# Terminate an EC2 instance
+groovy ManageEC2Agents.groovy --terminate --instance-id i-1234567890abcdef0
+```
+
+##### Azure 管理
+
+```bash
+# List Azure VMs used as Jenkins agents
+groovy ManageAzureVMAgents.groovy --list
+
+# Provision a new Azure VM from template
+groovy ManageAzureVMAgents.groovy --provision --template "my-azure-template"
+
+# Clean up an Azure VM
+groovy ManageAzureVMAgents.groovy --cleanup --node-name azure-agent-01
+```
+
+##### Kubernetes 管理
+
+```bash
+# List Kubernetes pods used as Jenkins agents
+groovy ManageKubernetesAgents.groovy --list
+
+# Provision a new Kubernetes pod from template
+groovy ManageKubernetesAgents.groovy --provision --template "my-k8s-template"
+
+# Delete a Kubernetes pod
+groovy ManageKubernetesAgents.groovy --delete --pod-name k8s-agent-xyz123
+```
+
+#### Jenkins 实例管理
+
+##### 健康状况与安全
+
+```bash
+# Perform a Jenkins instance health check
+groovy JenkinsInstanceHealthCheck.groovy
+
+# Audit Jenkins security settings
+groovy AuditJenkinsSecurity.groovy --detailed
+
+# Scan for security vulnerabilities
+groovy SecurityVulnerabilityScan.groovy --critical-only
+```
+
+##### 配置管理
+
+```bash
+# Backup Jenkins configuration
+groovy BackupJenkinsConfig.groovy --output jenkins-backup.tar.gz
+
+# Optimize agent resources
+groovy OptimizeAgentResources.groovy --reclaim-idle
+
+# Optimize job scheduling
+groovy OptimizeJobScheduling.groovy --balance-load
+```
+
+### 编程 API
+
+本库还提供编程 API，供你在自己的 Groovy 脚本中使用：
+
+#### 任务管理
+
+```groovy
+import com.github.thomasvincent.jenkinsscripts.jobs.JobCleaner
+import com.github.thomasvincent.jenkinsscripts.jobs.JobMigrator
+import com.github.thomasvincent.jenkinsscripts.jobs.JobTemplate
+import jenkins.model.Jenkins
+
+// Clean build history for a job
+def jenkins = Jenkins.get()
+def cleaner = new JobCleaner(jenkins, "my-job", true, 100)
+cleaner.clean()
+
+// Create a job from a template
+def template = new JobTemplate(
+    jenkins: jenkins,
+    templateJobName: "template-job",
+    parameters: [
+        'PROJECT_NAME': 'frontend-app',
+        'GIT_URL': 'https://github.com/myorg/frontend-app.git'
+    ]
+)
+template.applyTemplate("new-job")
+
+// Migrate a job between Jenkins instances with JenkinsAccessor
+def localAccessor = new LocalJenkinsAccessor(jenkins)
+def migrator = new JobMigrator(localAccessor, localAccessor)
+migrator.migrateJob("source-job", "target-job")
+```
+
+#### 云管理
+
+```groovy
+import com.github.thomasvincent.jenkinsscripts.cloud.AWSNodeManager
+import com.github.thomasvincent.jenkinsscripts.cloud.AzureNodeManager
+import com.github.thomasvincent.jenkinsscripts.cloud.KubernetesNodeManager
+import com.github.thomasvincent.jenkinsscripts.cloud.OracleCloudNodeManager
+import com.github.thomasvincent.jenkinsscripts.cloud.DigitalOceanNodeManager
+import jenkins.model.Jenkins
+
+// Manage EC2 instances
+def awsManager = new AWSNodeManager(Jenkins.get())
+def templates = awsManager.getEC2Templates()
+def nodes = awsManager.getEC2Nodes()
+awsManager.provisionNewInstance("my-ec2-template")
+
+// Manage Azure VMs
+def azureManager = new AzureNodeManager(Jenkins.get())
+def azureNodes = azureManager.getAzureNodesInfo()
+azureManager.provisionNewVM("my-azure-template")
+
+// Manage Kubernetes agents
+def k8sManager = new KubernetesNodeManager(Jenkins.get())
+def k8sNodes = k8sManager.getKubernetesNodes()
+k8sManager.provisionNewPod("my-k8s-template")
+
+// Manage Oracle Cloud instances
+def ociManager = new OracleCloudNodeManager(Jenkins.get())
+def ociNodes = ociManager.getOCIComputeInstances()
+ociManager.provisionNewInstance("my-oci-template")
+
+// Manage DigitalOcean droplets
+def doManager = new DigitalOceanNodeManager(Jenkins.get())
+def doNodes = doManager.getDigitalOceanNodes()
+doManager.provisionNewDroplet("my-do-template")
+```
+
+## 开发
+
+### 构建项目
+
+```bash
+./gradlew build
+```
+
+### 运行测试
+
+```bash
+# Run unit tests
+./gradlew test
+
+# Run integration tests
+./gradlew integrationTest
+
+# Run all tests
+./gradlew check
+```
+
+> **注意**：JFFI 原生依赖（jffi-1.2.17-native.jar）存在已知问题，可能导致测试失败。如果遇到此问题，可以使用以下命令跳过测试：
+>
+> ```bash
+> ./gradlew build -PskipTests
+> ```
+>
+> GitHub Actions 测试当前已配置为跳过存在问题的测试。
+
+#### Docker 测试环境
+
+项目包含基于 Docker 的测试环境，用于验证不同 Java 版本的兼容性：
+
+```bash
+# Run tests in Java 8 (default)
+./run-tests.sh java8
+
+# Run tests in Java 11 with longer timeout
+./run-tests.sh java11 30m
+
+# Run tests in Java 17 with longer timeout
+./run-tests.sh java17 30m
+
+# Run all Java versions
+./run-tests.sh all 1h
+
+# Run tests with different scopes
+./run-tests.sh java8 30m false minimal  # Run minimal test set (core utilities only)
+./run-tests.sh java8 30m false default  # Run default test set
+./run-tests.sh java8 30m false all      # Run all tests including integration tests
+```
+
+Docker 测试环境包含以下特性：
+
+- 预下载依赖项以加快测试执行速度
+- 为 Gradle 和 Maven 依赖项提供卷缓存
+- 共享基础配置以确保一致的环境
+- 支持不同的测试范围（minimal、default、all）
+- 为 Docker 容器配置内存限制和健康检查
+
+#### Java 兼容性
+
+本库支持以下 Java 版本：
+
+- Java 8 (LTS)
+- Java 11 (LTS)
+- Java 17 (LTS)
+
+我们保持对 Java 8 的向后兼容，以支持旧版 Jenkins 部署。本库默认使用 Java 8 兼容选项进行编译。
+
+集成测试使用 JenkinsRule 创建临时 Jenkins 实例进行测试，因此无需运行中的 Jenkins 服务器。这些测试验证脚本是否能与真实的 Jenkins API 和数据结构正常工作。详情请参阅[集成测试文档](../../../src/integration-test/README.md)。
+
+### 代码质量
+
+本项目使用 CodeNarc 进行 Groovy 代码质量检查：
+
+```bash
+./gradlew codenarcMain codenarcTest
+```
+
+## 可用的云集成
+
+本库支持以下云服务商：
+
+- **AWS EC2**：将 EC2 实例作为 Jenkins 代理进行管理
+- **Azure VMs**：将 Azure 虚拟机作为 Jenkins 代理进行管理
+- **Kubernetes**：将 Kubernetes Pod 作为 Jenkins 代理进行管理
+- **Oracle Cloud**：将 Oracle Cloud Infrastructure (OCI) 实例作为 Jenkins 代理进行管理
+- **DigitalOcean**：将 DigitalOcean Droplet 作为 Jenkins 代理进行管理
+
+## 计划中的功能
+
+- **Google Cloud 集成**：在 Google Cloud Platform 上管理 Jenkins 代理
+- **AWS ECS/Fargate 支持**：支持 AWS 中基于容器的代理
+- **多 Jenkins 管理**：增强的多个 Jenkins 实例管理工具
+- **跨云迁移**：用于在不同云服务商之间迁移代理的工具
+
+## 贡献
+
+欢迎贡献！请遵循我们的[贡献指南](../../../CONTRIBUTING.md)。
+
+## 安全
+
+如有安全相关问题，请参阅我们的[安全策略](../../../SECURITY.md)。
+
+## 许可证
+
+本项目采用 MIT 许可证授权——详情请参阅 [LICENSE](../../../LICENSE) 文件。
