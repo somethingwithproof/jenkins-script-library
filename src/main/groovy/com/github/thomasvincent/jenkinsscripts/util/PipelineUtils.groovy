@@ -49,8 +49,8 @@ class PipelineUtils implements Serializable {
     private static final String ARCH_386 = "386"
     private static final String OS_LINUX = "linux"
 
-    /** Reference to the pipeline script context */
-    private transient def pipeline
+    /** Reference to the pipeline script context (Serializable in Jenkins CPS) */
+    private final def pipeline
 
     /**
      * Initializes a new PipelineUtils instance.
@@ -66,6 +66,13 @@ class PipelineUtils implements Serializable {
         this.pipeline = pipeline
     }
 
+    private def requirePipeline() {
+        if (pipeline == null) {
+            throw new IllegalStateException("Pipeline script context is not initialized")
+        }
+        return pipeline
+    }
+
     /**
      * Determines the current operating system.
      * 
@@ -77,11 +84,15 @@ class PipelineUtils implements Serializable {
      * ```
      */
     String currentOS() {
-        if (pipeline.isUnix()) {
+        def script = requirePipeline()
+        if (script.isUnix()) {
             try {
-                def osName = pipeline.sh(script: 'uname', returnStdout: true).trim().toLowerCase()
+                def osName = script.sh(script: 'uname', returnStdout: true).trim().toLowerCase()
                 return osName == 'darwin' ? 'darwin' : OS_LINUX
-            } catch (IOException | InterruptedException e) {
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt()
+                throw e
+            } catch (IOException e) {
                 return OS_LINUX // Default to Linux if we can't determine
             }
         } else {
@@ -100,17 +111,21 @@ class PipelineUtils implements Serializable {
      * ```
      */
     String currentArchitecture() {
+        def script = requirePipeline()
         try {
-            if (pipeline.isUnix()) {
-                def arch = pipeline.sh(script: 'uname -m', returnStdout: true).trim()
+            if (script.isUnix()) {
+                def arch = script.sh(script: 'uname -m', returnStdout: true).trim()
                 return mapArchitecture(arch)
             } else {
-                def arch = pipeline.powershell(
-                        script: '(Get-WmiObject Win32_Processor).Architecture', 
+                def arch = script.powershell(
+                        script: '(Get-WmiObject Win32_Processor).Architecture',
                         returnStdout: true).trim()
                 return mapWindowsArchitecture(arch)
             }
-        } catch (IOException | InterruptedException e) {
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt()
+            throw e
+        } catch (IOException e) {
             return ARCH_AMD64 // Default to amd64 if we can't determine
         }
     }

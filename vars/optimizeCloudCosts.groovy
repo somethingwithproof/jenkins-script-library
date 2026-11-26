@@ -25,8 +25,8 @@
  * SOFTWARE.
  */
 
+import com.cloudbees.groovy.cps.NonCPS
 import com.github.thomasvincent.jenkinsscripts.cost.CloudCostOptimizer
-import com.github.thomasvincent.jenkinsscripts.util.JenkinsLogger
 import jenkins.model.Jenkins
 
 /**
@@ -94,98 +94,102 @@ import jenkins.model.Jenkins
  * }
  */
 def call(Map args = [:]) {
-    def action = args.action ?: 'analyze'
-    def jenkins = Jenkins.get()
-    def logger = new JenkinsLogger(currentBuild.rawBuild.getListener(), 'optimizeCloudCosts')
-    
+    String action = (args.action ?: 'analyze') as String
+
     try {
-        def optimizer = new CloudCostOptimizer(jenkins)
-        
         switch (action.toLowerCase()) {
             case 'analyze':
-                logger.info("Analyzing cloud costs across all providers...")
-                def analysis = optimizer.analyzeCosts(args)
-                
-                // Log summary
-                logger.info("Cost analysis summary:")
-                logger.info("  Total hourly cost: \$${formatCurrency(analysis.totalCost.hourly)}")
-                logger.info("  Total monthly cost: \$${formatCurrency(analysis.totalCost.monthly)}")
-                logger.info("  Potential monthly savings: \$${formatCurrency(analysis.savings.monthlyTotal)}")
-                
-                // Add Pipeline-friendly methods
-                analysis.metaClass.hasSavingsOpportunity = { threshold = 100 ->
-                    analysis.savings.monthlyTotal >= threshold
-                }
-                
-                analysis.metaClass.getCostByProvider = { provider ->
-                    analysis.providers[provider]?.monthlyCost ?: 0
-                }
-                
-                analysis.metaClass.getTopRecommendations = { count = 3 ->
-                    analysis.recommendations.take(count)
-                }
-                
+                echo "[optimizeCloudCosts] Analyzing cloud costs across all providers..."
+                Map analysis = analyzeCostsNonCps(args)
+
+                echo "[optimizeCloudCosts] Cost analysis summary:"
+                echo "  Total hourly cost: \$${formatCurrency(analysis.totalCost.hourly)}"
+                echo "  Total monthly cost: \$${formatCurrency(analysis.totalCost.monthly)}"
+                echo "  Potential monthly savings: \$${formatCurrency(analysis.savings.monthlyTotal)}"
+
                 return analysis
-                
+
             case 'optimize':
-                def dryRun = args.dryRun != false  // Default to dry run for safety
-                
-                logger.info("${dryRun ? 'Finding' : 'Applying'} cost optimizations...")
-                def results = optimizer.optimizeResources(dryRun)
-                
-                logger.info("Optimization results:")
-                logger.info("  Actions: ${results.actions.size()}")
-                logger.info("  Estimated savings: \$${formatCurrency(results.estimatedMonthlySavings)}/month")
-                
+                boolean dryRun = args.dryRun != false
+
+                echo "[optimizeCloudCosts] ${dryRun ? 'Finding' : 'Applying'} cost optimizations..."
+                Map results = optimizeResourcesNonCps(dryRun)
+
+                echo "[optimizeCloudCosts] Optimization results:"
+                echo "  Actions: ${results.actions.size()}"
+                echo "  Estimated savings: \$${formatCurrency(results.estimatedMonthlySavings)}/month"
+
                 if (!dryRun) {
-                    // Add to build description
                     currentBuild.description = "Saved \$${formatCurrency(results.estimatedMonthlySavings)}/month"
                 }
-                
+
                 return results
-                
+
             case 'allocate':
-                logger.info("Calculating cost allocations...")
-                def allocations = optimizer.trackCostAllocation()
-                
-                // Log top consumers
+                echo "[optimizeCloudCosts] Calculating cost allocations..."
+                Map allocations = trackCostAllocationNonCps()
+
                 if (allocations.byTeam) {
-                    logger.info("Top teams by cost:")
+                    echo "[optimizeCloudCosts] Top teams by cost:"
                     allocations.byTeam.sort { -it.value }.take(5).each { team, cost ->
-                        logger.info("  ${team}: \$${formatCurrency(cost * 24 * 30)}/month")
+                        echo "  ${team}: \$${formatCurrency(cost * 24 * 30)}/month"
                     }
                 }
-                
+
                 return allocations
-                
+
             case 'budget':
-                def budgets = args.budgets ?: [:]
+                Map budgets = (args.budgets ?: [:]) as Map
                 if (budgets.isEmpty()) {
                     error "Budget monitoring requires budget configuration"
                 }
-                
-                logger.info("Monitoring budget status...")
-                def monitoring = optimizer.monitorBudget(budgets)
-                
-                // Log alerts
+
+                echo "[optimizeCloudCosts] Monitoring budget status..."
+                Map monitoring = monitorBudgetNonCps(budgets)
+
                 monitoring.alerts.each { alert ->
                     if (alert.severity == 'HIGH') {
-                        logger.error(alert.message)
+                        echo "[optimizeCloudCosts] ERROR: ${alert.message}"
                     } else {
-                        logger.warning(alert.message)
+                        echo "[optimizeCloudCosts] WARNING: ${alert.message}"
                     }
                 }
-                
+
                 return monitoring
-                
+
             default:
                 error "Unknown cost action: ${action}. Valid actions: analyze, optimize, allocate, budget"
         }
-        
+
     } catch (Exception e) {
-        logger.error("Cloud cost optimization failed: ${e.message}")
+        echo "[optimizeCloudCosts] ERROR: Cloud cost optimization failed: ${e.message}"
         throw e
     }
+}
+
+@NonCPS
+private Map analyzeCostsNonCps(Map args) {
+    def optimizer = new CloudCostOptimizer(Jenkins.get())
+    return optimizer.analyzeCosts(args)
+}
+
+@NonCPS
+private Map optimizeResourcesNonCps(boolean dryRun) {
+    def optimizer = new CloudCostOptimizer(Jenkins.get())
+    return optimizer.optimizeResources(dryRun)
+}
+
+@NonCPS
+private Map trackCostAllocationNonCps() {
+    def optimizer = new CloudCostOptimizer(Jenkins.get())
+    return optimizer.trackCostAllocation()
+}
+
+@NonCPS
+private Map monitorBudgetNonCps(Map budgets) {
+    def optimizer = new CloudCostOptimizer(Jenkins.get())
+    Map<String, Double> typedBudgets = budgets.collectEntries { k, v -> [k.toString(), (v as Number).doubleValue()] }
+    return optimizer.monitorBudget(typedBudgets)
 }
 
 /**
@@ -259,9 +263,10 @@ def generateReport(Map args = [:]) {
 /**
  * Format currency for display.
  */
+@NonCPS
 private String formatCurrency(def value) {
     if (value instanceof Number) {
-        return String.format("%.2f", value)
+        return String.format("%.2f", value.doubleValue())
     }
     return "0.00"
 }

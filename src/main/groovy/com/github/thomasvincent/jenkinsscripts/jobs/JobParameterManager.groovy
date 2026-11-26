@@ -45,6 +45,7 @@ import com.github.thomasvincent.jenkinsscripts.util.ErrorHandler
 
 import java.util.logging.Level
 import java.util.logging.Logger
+import java.util.regex.Matcher
 import java.util.regex.Pattern
 
 /**
@@ -101,22 +102,24 @@ class JobParameterManager {
             // Update inventory
             params.each { param ->
                 String name = param.name
-                
+                String typeSimpleName = param.getClass().simpleName
+
                 if (!inventory.containsKey(name)) {
-                    inventory[name] = new ParameterUsage(name, param.type.simpleName)
+                    inventory[name] = new ParameterUsage(name, typeSimpleName)
                 }
-                
+
                 ParameterUsage usage = inventory[name]
                 usage.addJob(job.fullName)
-                
+
                 // Record parameter type
-                usage.addType(param.type.simpleName)
-                
+                usage.addType(typeSimpleName)
+
                 // Record default value
-                if (param.defaultValue != null) {
-                    usage.addDefaultValue(param.defaultValue.toString())
+                Object defaultVal = param.hasProperty('defaultValue') ? param.defaultValue : param.defaultParameterValue?.value
+                if (defaultVal != null) {
+                    usage.addDefaultValue(defaultVal.toString())
                 }
-                
+
                 // Record additional type-specific info
                 if (param instanceof ChoiceParameterDefinition) {
                     usage.addChoices(param.choices)
@@ -476,32 +479,35 @@ class JobParameterManager {
         }
         
         Pattern jobPattern = pattern ? Pattern.compile(pattern) : null
+        Pattern paramPattern = Pattern.compile(
+            "(<hudson\\.model\\.\\w+ParameterDefinition>\\s*<name>)" +
+            Pattern.quote(XmlUtil.escapeXml(oldName)) +
+            "(</name>)"
+        )
+        String safeReplacement = '$1' + Matcher.quoteReplacement(XmlUtil.escapeXml(newName)) + '$2'
         int updatedCount = 0
-        
+
         jenkins.getAllItems(Job.class).each { job ->
             // Skip jobs that don't match pattern
             if (jobPattern && !jobPattern.matcher(job.fullName).matches()) {
                 return
             }
-            
+
             boolean updated = ErrorHandler.withErrorHandling("renaming parameter in job ${job.fullName}", {
                 boolean jobUpdated = false
-                
+
                 // Get raw XML config
                 String jobXml = getJobXml(job)
-                
-                // Use regex to rename parameters in XML
-                String paramRx = "(<hudson.model.\\w+ParameterDefinition>\\s*<name>)" + 
-                                Pattern.quote(oldName) + "(</name>)"
-                String newXml = jobXml.replaceAll(paramRx, "\$1${newName}\$2")
-                
+
+                // Use precompiled regex with XML-escaped, quoteReplacement-safe newName
+                String newXml = paramPattern.matcher(jobXml).replaceAll(safeReplacement)
+
                 // Check if anything was changed
                 if (newXml != jobXml) {
-                    // Update job config
                     updateJobFromXml(job, newXml)
                     jobUpdated = true
                 }
-                
+
                 return jobUpdated
             }, LOGGER, false)
             

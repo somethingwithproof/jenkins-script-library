@@ -29,7 +29,9 @@ package com.github.thomasvincent.jenkinsscripts.jobs
 
 import jenkins.model.Jenkins
 import hudson.model.AbstractProject
+import hudson.model.ItemGroup
 import hudson.model.Job
+import hudson.model.Run
 import hudson.model.TopLevelItem
 import org.kohsuke.stapler.DataBoundConstructor
 
@@ -116,10 +118,35 @@ class JobCleaner {
 
         if (item instanceof AbstractProject) {
             return cleanProject((AbstractProject) item)
+        } else if (item instanceof ItemGroup) {
+            return cleanFolder((ItemGroup<?>) item)
         } else {
             LOGGER.warning("Unsupported job type: ${jobName}")
             return false
         }
+    }
+
+    /**
+     * Cleans up to cleanedJobsLimit projects inside a folder/ItemGroup.
+     */
+    private boolean cleanFolder(ItemGroup<?> folder) {
+        int cleanedCount = 0
+        boolean allSucceeded = true
+        for (Object child : (folder.getItems() ?: [])) {
+            if (cleanedCount >= cleanedJobsLimit) {
+                break
+            }
+            if (child instanceof AbstractProject) {
+                boolean ok = cleanProject((AbstractProject<?, ?>) child)
+                if (ok) {
+                    cleanedCount++
+                } else {
+                    allSucceeded = false
+                }
+            }
+        }
+        LOGGER.info("Cleaned ${cleanedCount} jobs in folder ${jobName} (limit: ${cleanedJobsLimit})")
+        return allSucceeded && cleanedCount > 0
     }
 
     /**
@@ -141,29 +168,31 @@ class JobCleaner {
     }
     
     /**
-     * Deletes builds from a project up to the specified limit.
-     * 
-     * Uses Groovy's each() for iterating through builds.
+     * Deletes builds from a project oldest-first up to buildTotal, breaking early at the limit.
      * 
      * @param project Project to delete builds from
      */
     private void deleteBuilds(AbstractProject<?, ?> project) {
         int deletedCount = 0
-        
-        project.getBuilds().each { build ->
-            if (deletedCount < buildTotal) {
-                boolean deleted = ErrorHandler.withErrorHandling("deleting build ${build.number} for job ${project.name}", {
-                    build.delete()
-                    return true
-                }, LOGGER, false)
-                
-                if (deleted) {
-                    deletedCount++
-                    LOGGER.fine("Deleted build ${build.number} for job ${project.name}")
-                }
+        List<Run> builds = new ArrayList<>(project.getBuilds() ?: [])
+        // Jenkins getBuilds() is newest-first; reverse to remove oldest builds first
+        Collections.reverse(builds)
+
+        for (Run build : builds) {
+            if (deletedCount >= buildTotal) {
+                break
+            }
+            boolean deleted = ErrorHandler.withErrorHandling("deleting build ${build.number} for job ${project.name}", {
+                build.delete()
+                return true
+            }, LOGGER, false)
+
+            if (deleted) {
+                deletedCount++
+                LOGGER.fine("Deleted build ${build.number} for job ${project.name}")
             }
         }
-        
+
         LOGGER.info("Deleted ${deletedCount} builds from job ${project.name}")
     }
 

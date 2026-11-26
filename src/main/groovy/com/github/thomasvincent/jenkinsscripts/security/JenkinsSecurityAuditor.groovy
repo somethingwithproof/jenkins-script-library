@@ -124,6 +124,30 @@ class JenkinsSecurityAuditor {
         
         return findings
     }
+
+    /**
+     * Runs a full security audit and returns plain serializable maps grouped by category.
+     * Suitable for consumption by Jenkins Pipeline CPS steps.
+     *
+     * @return Map of category name to list of serializable finding maps
+     */
+    Map<String, List<Map<String, String>>> performSecurityAudit() {
+        List<SecurityFinding> auditFindings = runFullAudit()
+        Map<String, List<Map<String, String>>> grouped = new LinkedHashMap<>()
+        auditFindings.each { SecurityFinding finding ->
+            String categoryName = finding.category.name()
+            if (!grouped.containsKey(categoryName)) {
+                grouped[categoryName] = []
+            }
+            grouped[categoryName].add([
+                severity: finding.severity.name(),
+                title: finding.title,
+                description: finding.description,
+                recommendation: ''
+            ])
+        }
+        return grouped
+    }
     
     /**
      * Checks authentication settings for security issues.
@@ -212,14 +236,14 @@ class JenkinsSecurityAuditor {
     void checkUserPermissions() {
         // Look for anonymous permissions
         def strategy = jenkins.getAuthorizationStrategy()
-        if (strategy.getACL(jenkins).hasPermission(ACL.ANONYMOUS, Permission.ADMINISTER)) {
+        if (strategy.getACL(jenkins).hasPermission(ACL.ANONYMOUS, Jenkins.ADMINISTER)) {
             addFinding(
                 FindingCategory.AUTHORIZATION,
                 FindingSeverity.CRITICAL,
                 "Anonymous Admin Access",
                 "Anonymous users have administrator permissions."
             )
-        } else if (strategy.getACL(jenkins).hasPermission(ACL.ANONYMOUS, Permission.READ)) {
+        } else if (strategy.getACL(jenkins).hasPermission(ACL.ANONYMOUS, Jenkins.READ)) {
             addFinding(
                 FindingCategory.AUTHORIZATION,
                 FindingSeverity.MEDIUM,
@@ -231,7 +255,7 @@ class JenkinsSecurityAuditor {
         // Check admin accounts
         int adminCount = 0
         User.getAll().each { user ->
-            if (strategy.getACL(jenkins).hasPermission(user.impersonate(), Permission.ADMINISTER)) {
+            if (strategy.getACL(jenkins).hasPermission(user.impersonate(), Jenkins.ADMINISTER)) {
                 adminCount++
             }
         }

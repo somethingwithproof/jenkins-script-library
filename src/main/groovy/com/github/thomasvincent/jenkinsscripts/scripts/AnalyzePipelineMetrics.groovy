@@ -115,7 +115,7 @@ try {
 }
 
 // Main execution
-ErrorHandler.withErrorHandling('analyze pipeline metrics', logger) {
+ErrorHandler.withErrorHandling('analyze pipeline metrics', {
     def jenkins = Jenkins.get()
     def collector = new PipelineMetricsCollector(jenkins)
     
@@ -136,7 +136,7 @@ ErrorHandler.withErrorHandling('analyze pipeline metrics', logger) {
             outputSummary(metrics)
             break
     }
-}
+}, logger)
 
 /**
  * Outputs metrics in JSON format.

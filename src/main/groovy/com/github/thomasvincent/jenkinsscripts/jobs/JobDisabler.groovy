@@ -28,8 +28,9 @@
 package com.github.thomasvincent.jenkinsscripts.jobs
 
 import jenkins.model.Jenkins
+import hudson.model.Item
+import hudson.model.ItemGroup
 import hudson.model.Job
-import hudson.security.Permission
 
 import com.github.thomasvincent.jenkinsscripts.util.ValidationUtils
 import com.github.thomasvincent.jenkinsscripts.util.ErrorHandler
@@ -51,25 +52,29 @@ class JobDisabler implements Serializable {
 
     private static final long serialVersionUID = 1L
     private static final Logger LOGGER = Logger.getLogger(JobDisabler.class.getName())
-    
-    private final Jenkins jenkins
+
+    private transient Jenkins jenkins
     private List<String> jobNames = []
     private Pattern pattern = null
-    
+
     /**
      * Creates a JobDisabler instance.
      * 
-     * Uses provided Jenkins instance or defaults to Jenkins.get().
+     * Uses provided Jenkins instance or resolves Jenkins.get() lazily.
      * 
      * ```groovy
      * def disabler = new JobDisabler(Jenkins.get())
      * def customDisabler = new JobDisabler(customJenkins)
      * ```
      * 
-     * @param jenkins Jenkins instance to use
+     * @param jenkins Jenkins instance to use (optional; resolved lazily if null)
      */
-    JobDisabler(Jenkins jenkins) {
-        this.jenkins = jenkins ?: Jenkins.get()
+    JobDisabler(Jenkins jenkins = null) {
+        this.jenkins = jenkins
+    }
+
+    private Jenkins getJenkins() {
+        return jenkins ?: Jenkins.get()
     }
     
     /**
@@ -178,22 +183,93 @@ class JobDisabler implements Serializable {
             return ErrorHandler.handleErrorWithDefault("validating job name", e, LOGGER, false)
         }
         
-        Job job = jenkins.getItemByFullName(jobName, Job.class)
+        Job job = getJenkins().getItemByFullName(jobName, Job.class)
         if (job == null) {
             LOGGER.warning("Job not found: ${jobName}")
             return false
         }
-        
+
         return disableJobInternal(job)
     }
-    
+
+    /**
+     * Disables jobs matching a regex pattern (or previews them in dry-run mode).
+     *
+     * @param patternString Regex pattern matching job name or full name
+     * @param dryRun When true, returns matching job full names without disabling them
+     * @return List of disabled (or matching, in dry-run) job full names
+     */
+    List<String> disableJobsByPattern(String patternString, boolean dryRun = false) {
+        if (!hasAdminPermission()) {
+            LOGGER.severe("Operation aborted. User lacks required administrative privileges.")
+            return []
+        }
+
+        ValidationUtils.requireNonEmpty(patternString, "Pattern string")
+        Pattern regex = Pattern.compile(patternString)
+        List<Job> matching = getJenkins().getAllItems(Job.class).findAll { Job job ->
+            regex.matcher(job.getName()).matches() || regex.matcher(job.getFullName()).matches()
+        }
+
+        if (dryRun) {
+            return matching.collect { it.fullName }
+        }
+
+        List<String> disabled = []
+        matching.each { Job job ->
+            if (disableJobInternal(job)) {
+                disabled.add(job.fullName)
+            }
+        }
+        return disabled
+    }
+
+    /**
+     * Disables jobs contained in a folder/item group.
+     *
+     * @param folder Folder or ItemGroup containing jobs
+     * @param recursive Whether to descend into nested folders
+     * @return List of disabled job full names
+     */
+    List<String> disableJobsInFolder(Object folder, boolean recursive = false) {
+        if (!hasAdminPermission()) {
+            LOGGER.severe("Operation aborted. User lacks required administrative privileges.")
+            return []
+        }
+        if (!(folder instanceof ItemGroup)) {
+            LOGGER.warning("Provided folder is not an ItemGroup")
+            return []
+        }
+
+        List<Job> targetJobs = []
+        collectJobsInGroup((ItemGroup<?>) folder, recursive, targetJobs)
+
+        List<String> disabled = []
+        targetJobs.each { Job job ->
+            if (disableJobInternal(job)) {
+                disabled.add(job.fullName)
+            }
+        }
+        return disabled
+    }
+
+    private void collectJobsInGroup(ItemGroup<?> group, boolean recursive, List<Job> target) {
+        group.getItems()?.each { Object item ->
+            if (item instanceof Job) {
+                target.add((Job) item)
+            } else if (recursive && item instanceof ItemGroup) {
+                collectJobsInGroup((ItemGroup<?>) item, true, target)
+            }
+        }
+    }
+
     /**
      * Checks admin permissions for current user.
      * 
      * @return true if user has admin rights, false otherwise
      */
     private boolean hasAdminPermission() {
-        return jenkins.hasPermission(Permission.ADMINISTER)
+        return getJenkins().hasPermission(Jenkins.ADMINISTER)
     }
     
     /**
@@ -202,7 +278,7 @@ class JobDisabler implements Serializable {
      * @return List of Jenkins jobs that match the criteria
      */
     List<Job> findJobsToDisable() {
-        List<Job> allJobs = jenkins.getAllItems(Job.class)
+        List<Job> allJobs = getJenkins().getAllItems(Job.class)
         List<Job> matchingJobs = []
         
         // Filter jobs based on criteria
@@ -233,7 +309,7 @@ class JobDisabler implements Serializable {
      * @return List of buildable jobs
      */
     private List<Job> findBuildableJobs() {
-        return jenkins.getAllItems(Job.class).findAll { it.isBuildable() }
+        return getJenkins().getAllItems(Job.class).findAll { it.isBuildable() }
     }
     
     /**

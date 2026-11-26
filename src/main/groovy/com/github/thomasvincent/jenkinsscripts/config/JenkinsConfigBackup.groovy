@@ -28,15 +28,16 @@
 package com.github.thomasvincent.jenkinsscripts.config
 
 import jenkins.model.Jenkins
-import hudson.security.Permission
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.logging.Level
 import java.util.logging.Logger
 import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
 /**
@@ -116,55 +117,175 @@ class JenkinsConfigBackup {
      */
     String createBackup(String backupDir) throws IOException, SecurityException {
         // Check permissions
-        if (!jenkins.hasPermission(Permission.ADMINISTER)) {
+        if (!jenkins.hasPermission(Jenkins.ADMINISTER)) {
             throw new SecurityException("Administrative privileges required to backup Jenkins configuration")
         }
-        
+
         // Ensure the backup directory exists
         Files.createDirectories(Paths.get(backupDir))
-        
+
         // Create a timestamped directory for this backup
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
         String backupName = "jenkins_backup_${timestamp}"
         Path backupPath = Paths.get(backupDir, backupName)
-        
+
         if (compress) {
             return createCompressedBackup(backupPath)
         } else {
             return createUncompressedBackup(backupPath)
         }
     }
-    
+
+    /**
+     * Performs a backup with explicit inclusion flags to a destination path or directory.
+     */
+    String performBackup(String destination, boolean includeJobs = true, boolean includePlugins = true,
+                         boolean includeNodes = true, boolean compressBackup = true) throws IOException, SecurityException {
+        List<String> selectedFiles = [
+            "config.xml",
+            "credentials.xml",
+            "hudson.plugins.git.GitTool.xml",
+            "jenkins.model.JenkinsLocationConfiguration.xml",
+            "hudson.tasks.Mailer.xml",
+            "users/",
+            "secrets/"
+        ]
+        if (includeJobs) {
+            selectedFiles.add("jobs/")
+        }
+        if (includeNodes) {
+            selectedFiles.add("nodes/")
+        }
+        if (includePlugins) {
+            selectedFiles.add("plugins/")
+        }
+
+        this.configFiles = selectedFiles
+        this.compress = compressBackup
+
+        Path destPath = Paths.get(destination)
+        String backupDir = destPath.parent ? destPath.parent.toString() : destination
+        return createBackup(backupDir)
+    }
+
+    /**
+     * Restores Jenkins configuration from a backup ZIP file or directory.
+     */
+    boolean restoreBackup(String backupFilePath) throws IOException, SecurityException {
+        if (!jenkins.hasPermission(Jenkins.ADMINISTER)) {
+            throw new SecurityException("Administrative privileges required to restore Jenkins configuration")
+        }
+
+        Path backupPath = Paths.get(backupFilePath)
+        if (!Files.exists(backupPath)) {
+            LOGGER.warning("Backup path not found: ${backupFilePath}")
+            return false
+        }
+
+        Path jenkinsHome = jenkins.rootDir.toPath().toAbsolutePath().normalize()
+
+        if (Files.isDirectory(backupPath)) {
+            Files.walk(backupPath).withCloseable { stream ->
+                stream.forEach { Path sourcePath ->
+                    Path relative = backupPath.relativize(sourcePath)
+                    if (relative.toString().isEmpty()) {
+                        return
+                    }
+                    Path targetPath = jenkinsHome.resolve(relative).normalize()
+                    if (!targetPath.startsWith(jenkinsHome)) {
+                        throw new SecurityException("Refusing to restore path outside JENKINS_HOME: ${relative}")
+                    }
+                    if (Files.isDirectory(sourcePath)) {
+                        Files.createDirectories(targetPath)
+                    } else {
+                        Files.createDirectories(targetPath.parent)
+                        Files.copy(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING)
+                    }
+                }
+            }
+            return true
+        }
+
+        new ZipInputStream(Files.newInputStream(backupPath)).withCloseable { ZipInputStream zis ->
+            ZipEntry entry
+            while ((entry = zis.nextEntry) != null) {
+                try {
+                    Path targetPath = jenkinsHome.resolve(entry.name).normalize()
+                    if (!targetPath.startsWith(jenkinsHome)) {
+                        throw new SecurityException("Refusing to extract zip entry outside JENKINS_HOME: ${entry.name}")
+                    }
+                    if (entry.isDirectory()) {
+                        Files.createDirectories(targetPath)
+                    } else {
+                        Files.createDirectories(targetPath.parent)
+                        Files.copy(zis, targetPath, StandardCopyOption.REPLACE_EXISTING)
+                    }
+                } finally {
+                    zis.closeEntry()
+                }
+            }
+        }
+        return true
+    }
+
+    /**
+     * Checks whether a path under jobs/ points to build logs, artifacts, or workspaces that should be excluded.
+     */
+    private static boolean shouldExcludePath(String configFile, Path sourceRoot, Path candidate) {
+        if (!configFile.startsWith("jobs")) {
+            return false
+        }
+        if (Files.isSymbolicLink(candidate)) {
+            return true
+        }
+        Path relative = sourceRoot.relativize(candidate)
+        for (int i = 0; i < relative.getNameCount(); i++) {
+            String segment = relative.getName(i).toString()
+            if (segment == "builds" || segment == "workspace" || segment == "modules"
+                    || segment.startsWith("lastSuccessful") || segment.startsWith("lastStable")
+                    || segment.startsWith("lastFailed") || segment.startsWith("lastUnstable")
+                    || segment.startsWith("lastCompleted")) {
+                return true
+            }
+        }
+        return false
+    }
+
     /**
      * Creates an uncompressed backup.
      */
     private String createUncompressedBackup(Path backupPath) throws IOException {
         Files.createDirectories(backupPath)
-        
+
         String jenkinsHome = jenkins.rootDir.absolutePath
         int filesCopied = 0
-        
+
         for (String configFile : configFiles) {
             Path source = Paths.get(jenkinsHome, configFile)
             if (!Files.exists(source)) {
                 LOGGER.warning("Config file or directory not found: ${source}")
                 continue
             }
-            
+
             Path destination = Paths.get(backupPath.toString(), configFile)
-            
+
             if (Files.isDirectory(source)) {
                 Files.createDirectories(destination)
-                Files.walk(source).forEach { sourcePath ->
-                    Path relativePath = source.relativize(sourcePath)
-                    Path targetPath = Paths.get(destination.toString(), relativePath.toString())
-                    
-                    if (Files.isDirectory(sourcePath)) {
-                        Files.createDirectories(targetPath)
-                    } else {
-                        Files.createDirectories(targetPath.parent)
-                        Files.copy(sourcePath, targetPath)
-                        filesCopied++
+                Files.walk(source).withCloseable { stream ->
+                    stream.forEach { Path sourcePath ->
+                        if (shouldExcludePath(configFile, source, sourcePath)) {
+                            return
+                        }
+                        Path relativePath = source.relativize(sourcePath)
+                        Path targetPath = Paths.get(destination.toString(), relativePath.toString())
+
+                        if (Files.isDirectory(sourcePath)) {
+                            Files.createDirectories(targetPath)
+                        } else {
+                            Files.createDirectories(targetPath.parent)
+                            Files.copy(sourcePath, targetPath)
+                            filesCopied++
+                        }
                     }
                 }
             } else {
@@ -173,67 +294,73 @@ class JenkinsConfigBackup {
                 filesCopied++
             }
         }
-        
+
         LOGGER.info("Backed up ${filesCopied} files to ${backupPath}")
         return backupPath.toString()
     }
-    
+
     /**
      * Creates a compressed backup as a ZIP file.
      */
     private String createCompressedBackup(Path backupPath) throws IOException {
         String zipFilePath = backupPath.toString() + ".zip"
         String jenkinsHome = jenkins.rootDir.absolutePath
+        Path jenkinsHomePath = Paths.get(jenkinsHome)
         int filesCopied = 0
-        
-        ZipOutputStream zipOut = null
-        try {
-            zipOut = new ZipOutputStream(new FileOutputStream(zipFilePath))
+
+        new ZipOutputStream(new FileOutputStream(zipFilePath)).withCloseable { ZipOutputStream zipOut ->
             for (String configFile : configFiles) {
                 Path source = Paths.get(jenkinsHome, configFile)
                 if (!Files.exists(source)) {
                     LOGGER.warning("Config file or directory not found: ${source}")
                     continue
                 }
-                
+
                 if (Files.isDirectory(source)) {
-                    Files.walk(source).forEach { sourcePath ->
-                        if (!Files.isDirectory(sourcePath)) {
-                            Path relativePath = Paths.get(jenkinsHome).relativize(sourcePath)
-                            try {
-                                ZipEntry zipEntry = new ZipEntry(relativePath.toString())
-                                zipOut.putNextEntry(zipEntry)
-                                Files.copy(sourcePath, zipOut)
-                                zipOut.closeEntry()
-                                filesCopied++
-                            } catch (Exception e) {
-                                LOGGER.log(Level.WARNING, "Failed to add file to zip: ${sourcePath}", e)
+                    Files.walk(source).withCloseable { stream ->
+                        stream.forEach { Path sourcePath ->
+                            if (!Files.isDirectory(sourcePath) && !shouldExcludePath(configFile, source, sourcePath)) {
+                                Path relativePath = jenkinsHomePath.relativize(sourcePath)
+                                if (addFileToZip(zipOut, sourcePath, relativePath.toString())) {
+                                    filesCopied++
+                                }
                             }
                         }
                     }
                 } else {
-                    Path relativePath = Paths.get(jenkinsHome).relativize(source)
-                    try {
-                        ZipEntry zipEntry = new ZipEntry(relativePath.toString())
-                        zipOut.putNextEntry(zipEntry)
-                        Files.copy(source, zipOut)
-                        zipOut.closeEntry()
+                    Path relativePath = jenkinsHomePath.relativize(source)
+                    if (addFileToZip(zipOut, source, relativePath.toString())) {
                         filesCopied++
-                    } catch (Exception e) {
-                        LOGGER.log(Level.WARNING, "Failed to add file to zip: ${source}", e)
                     }
                 }
             }
-        } finally {
-            if (zipOut != null) {
-                zipOut.close()
-            }
         }
-        
+
         LOGGER.info("Backed up ${filesCopied} files to ${zipFilePath}")
         return zipFilePath
     }
-    
+
+    private boolean addFileToZip(ZipOutputStream zipOut, Path sourcePath, String entryName) {
+        boolean entryOpened = false
+        try {
+            zipOut.putNextEntry(new ZipEntry(entryName))
+            entryOpened = true
+            Files.copy(sourcePath, zipOut)
+            return true
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "Failed to add file to zip: ${sourcePath}", e)
+            return false
+        } finally {
+            if (entryOpened) {
+                try {
+                    zipOut.closeEntry()
+                } catch (IOException closeEx) {
+                    LOGGER.log(Level.WARNING, "Failed to close zip entry: ${entryName}", closeEx)
+                }
+            }
+        }
+    }
+
     /**
      * Lists all backups in the specified directory.
      * 
@@ -249,35 +376,45 @@ class JenkinsConfigBackup {
     List<Map<String, Object>> listAvailableBackups(String backupDir) {
         List<Map<String, Object>> backups = []
         Path backupPath = Paths.get(backupDir)
-        
+
         if (!Files.exists(backupPath) || !Files.isDirectory(backupPath)) {
             return backups
         }
-        
-        Files.list(backupPath).forEach { path ->
-            String fileName = path.fileName.toString()
-            
-            if ((fileName.startsWith("jenkins_backup_") && Files.isDirectory(path)) ||
-                (fileName.startsWith("jenkins_backup_") && fileName.endsWith(".zip"))) {
-                
-                Map<String, Object> backupInfo = [
-                    path: path.toString(),
-                    name: fileName,
-                    date: Files.getLastModifiedTime(path).toInstant(),
-                    size: Files.isDirectory(path) ? 
-                        Files.walk(path).filter({ p -> !Files.isDirectory(p) })
-                             .mapToLong({ p -> Files.size(p) }).sum() : 
-                        Files.size(path),
-                    compressed: fileName.endsWith(".zip")
-                ]
-                
-                backups.add(backupInfo)
+
+        Files.list(backupPath).withCloseable { stream ->
+            stream.forEach { Path path ->
+                String fileName = path.fileName.toString()
+
+                if ((fileName.startsWith("jenkins_backup_") && Files.isDirectory(path)) ||
+                    (fileName.startsWith("jenkins_backup_") && fileName.endsWith(".zip"))) {
+
+                    long size
+                    if (Files.isDirectory(path)) {
+                        size = Files.walk(path).withCloseable { walkStream ->
+                            walkStream.filter({ Path p -> !Files.isDirectory(p) })
+                                    .mapToLong({ Path p -> Files.size(p) })
+                                    .sum()
+                        }
+                    } else {
+                        size = Files.size(path)
+                    }
+
+                    Map<String, Object> backupInfo = [
+                        path: path.toString(),
+                        name: fileName,
+                        date: Files.getLastModifiedTime(path).toInstant(),
+                        size: size,
+                        compressed: fileName.endsWith(".zip")
+                    ]
+
+                    backups.add(backupInfo)
+                }
             }
         }
-        
+
         return backups.sort { b1, b2 -> b2.date <=> b1.date }
     }
-    
+
     /**
      * Deletes old backups, keeping only the most recent ones.
      * 
@@ -290,31 +427,32 @@ class JenkinsConfigBackup {
      */
     int purgeOldBackups(String backupDir, int keepCount) {
         List<Map<String, Object>> backups = listAvailableBackups(backupDir)
-        
+
         if (backups.size() <= keepCount) {
             return 0
         }
-        
+
         int deletedCount = 0
         backups.drop(keepCount).each { backup ->
             try {
-                Path path = Paths.get(backup.path)
-                
+                Path path = Paths.get(backup.path as String)
+
                 if (Files.isDirectory(path)) {
-                    Files.walk(path)
-                        .sorted(Comparator.reverseOrder())
-                        .forEach({ p -> Files.delete(p) })
+                    Files.walk(path).withCloseable { walkStream ->
+                        walkStream.sorted(Comparator.reverseOrder())
+                                .forEach({ Path p -> Files.delete(p) })
+                    }
                 } else {
                     Files.delete(path)
                 }
-                
+
                 deletedCount++
                 LOGGER.info("Deleted old backup: ${backup.name}")
             } catch (Exception e) {
                 LOGGER.log(Level.WARNING, "Failed to delete backup: ${backup.path}", e)
             }
         }
-        
+
         return deletedCount
     }
 }

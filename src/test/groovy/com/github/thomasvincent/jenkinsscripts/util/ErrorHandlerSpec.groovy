@@ -93,6 +93,32 @@ class ErrorHandlerSpec extends Specification {
         }
     }
 
+    def "withErrorHandling 4-arg overload returns null fallback instead of rethrowing"() {
+        when: "operation throws exception with explicit null default"
+        def result = ErrorHandler.withErrorHandling("Nullable operation", {
+            throw new IllegalStateException("Boom")
+        }, testLogger, null)
+
+        then: "returns null and logs warning"
+        result == null
+        logHandler.records.size() == 1
+        logHandler.records[0].level == Level.WARNING
+        logHandler.records[0].message.contains("Nullable operation")
+    }
+
+    def "withErrorHandling 3-arg overload logs severe and rethrows exception"() {
+        when: "operation throws exception without default value"
+        ErrorHandler.withErrorHandling("Critical operation", {
+            throw new IllegalStateException("Fatal boom")
+        }, testLogger)
+
+        then: "rethrows the original exception and logs severe"
+        def ex = thrown(IllegalStateException)
+        ex.message == "Fatal boom"
+        logHandler.records.size() == 1
+        logHandler.records[0].level == Level.SEVERE
+    }
+
     @Unroll
     def "formatErrorMessage handles #scenario correctly"() {
         when: "formatting error message"

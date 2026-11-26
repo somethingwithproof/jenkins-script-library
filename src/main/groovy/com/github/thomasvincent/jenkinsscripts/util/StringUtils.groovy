@@ -130,20 +130,21 @@ class StringUtils {
      * ```
      */
     static String truncate(String str, int maxLength, String ellipsis = "...") {
-        if (str == null) {
+        if (str == null || maxLength <= 0) {
             return EMPTY_STRING
         }
-        
+
         if (str.length() <= maxLength) {
             return str
         }
-        
-        int truncateIndex = maxLength - ellipsis.length()
-        if (truncateIndex < 0) {
-            truncateIndex = 0
+
+        String effectiveEllipsis = ellipsis ?: EMPTY_STRING
+        int truncateIndex = maxLength - effectiveEllipsis.length()
+        if (truncateIndex <= 0) {
+            return str.substring(0, maxLength)
         }
-        
-        return str.substring(0, truncateIndex) + ellipsis
+
+        return str.substring(0, truncateIndex) + effectiveEllipsis
     }
     
     /**
@@ -270,39 +271,137 @@ class StringUtils {
         if (version1 == version2) {
             return 0
         }
-        
+
         if (version1 == null) {
             return -1
         }
-        
+
         if (version2 == null) {
             return 1
         }
-        
-        def v1Parts = version1.tokenize(DOT)
-        def v2Parts = version2.tokenize(DOT)
-        
-        for (int i = 0; i < Math.min(v1Parts.size(), v2Parts.size()); i++) {
-            def v1Part = parseVersionPart(v1Parts[i])
-            def v2Part = parseVersionPart(v2Parts[i])
-            
-            if (v1Part != v2Part) {
-                return v1Part <=> v2Part
+
+        if (version1.isEmpty() && version2.isEmpty()) {
+            return 0
+        }
+        if (version1.isEmpty()) {
+            return -1
+        }
+        if (version2.isEmpty()) {
+            return 1
+        }
+
+        // Strip SemVer build metadata (+...) before comparing
+        String clean1 = stripBuildMetadata(version1.trim())
+        String clean2 = stripBuildMetadata(version2.trim())
+
+        int dash1 = clean1.indexOf('-')
+        int dash2 = clean2.indexOf('-')
+
+        String core1 = dash1 >= 0 ? clean1.substring(0, dash1) : clean1
+        String core2 = dash2 >= 0 ? clean2.substring(0, dash2) : clean2
+        String qualifier1 = dash1 >= 0 ? clean1.substring(dash1 + 1) : null
+        String qualifier2 = dash2 >= 0 ? clean2.substring(dash2 + 1) : null
+
+        List<String> v1Parts = core1.tokenize(DOT)
+        List<String> v2Parts = core2.tokenize(DOT)
+        int maxLen = Math.max(v1Parts.size(), v2Parts.size())
+
+        for (int i = 0; i < maxLen; i++) {
+            String raw1 = i < v1Parts.size() ? v1Parts[i] : null
+            String raw2 = i < v2Parts.size() ? v2Parts[i] : null
+
+            int cmp = compareVersionSegment(raw1, raw2)
+            if (cmp != 0) {
+                return cmp
             }
         }
-        
-        return v1Parts.size() <=> v2Parts.size()
+
+        // Numeric cores are equal: release > pre-release qualifier
+        if (qualifier1 == null && qualifier2 == null) {
+            return 0
+        }
+        if (qualifier1 == null) {
+            return 1
+        }
+        if (qualifier2 == null) {
+            return -1
+        }
+
+        return compareQualifiers(qualifier1, qualifier2)
     }
-    
-    /**
-     * Helper method to parse version part strings.
-     * 
-     * Handles non-numeric suffixes in version components.
-     */
-    private static int parseVersionPart(String part) {
-        def matcher = part =~ /^(\d+).*/
-        if (matcher.matches()) {
-            return matcher.group(1).toInteger()
+
+    private static String stripBuildMetadata(String version) {
+        int plusIdx = version.indexOf('+')
+        return plusIdx >= 0 ? version.substring(0, plusIdx) : version
+    }
+
+    private static int compareVersionSegment(String seg1, String seg2) {
+        String s1 = seg1 ?: '0'
+        String s2 = seg2 ?: '0'
+
+        def m1 = (s1 =~ /^(\d+)(.*)$/)
+        def m2 = (s2 =~ /^(\d+)(.*)$/)
+        boolean num1 = m1.matches()
+        boolean num2 = m2.matches()
+
+        if (num1 && num2) {
+            BigInteger n1 = new BigInteger(m1.group(1))
+            BigInteger n2 = new BigInteger(m2.group(1))
+            int numCmp = n1.compareTo(n2)
+            if (numCmp != 0) {
+                return numCmp
+            }
+            String rem1 = m1.group(2)
+            String rem2 = m2.group(2)
+            if (rem1 == rem2) {
+                return 0
+            }
+            if (rem1.isEmpty()) {
+                return 1
+            }
+            if (rem2.isEmpty()) {
+                return -1
+            }
+            return rem1.compareToIgnoreCase(rem2) <=> 0
+        }
+
+        // Non-numeric token (e.g. JEP-229 hash token like v1234abcd) compared against missing segment
+        if (seg1 == null && !num2) {
+            return -1
+        }
+        if (seg2 == null && !num1) {
+            return 1
+        }
+        if (num1 != num2) {
+            return num1 ? 1 : -1
+        }
+        return s1.compareToIgnoreCase(s2) <=> 0
+    }
+
+    private static int compareQualifiers(String q1, String q2) {
+        List<String> t1 = q1.tokenize('.-')
+        List<String> t2 = q2.tokenize('.-')
+        int maxLen = Math.max(t1.size(), t2.size())
+        for (int i = 0; i < maxLen; i++) {
+            if (i >= t1.size()) {
+                return -1
+            }
+            if (i >= t2.size()) {
+                return 1
+            }
+            String p1 = t1[i]
+            String p2 = t2[i]
+            if (p1 ==~ /\d+/ && p2 ==~ /\d+/) {
+                int cmp = new BigInteger(p1).compareTo(new BigInteger(p2))
+                if (cmp != 0) {
+                    return cmp
+                }
+            } else {
+                int cmp = p1.compareToIgnoreCase(p2) <=> 0
+                if (cmp != 0) {
+                    return cmp
+                }
+            }
         }
         return 0
     }

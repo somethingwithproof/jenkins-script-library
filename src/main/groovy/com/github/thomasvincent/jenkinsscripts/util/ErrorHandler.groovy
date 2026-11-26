@@ -77,25 +77,38 @@ class ErrorHandler {
     }
 
     /**
-     * Wraps an operation with standard error handling.
+     * Wraps an operation with standard error handling, logging and rethrowing any exception.
      *
      * @param operation Description of the operation
      * @param action The closure to execute
      * @param logger The logger to use
-     * @param defaultValue The default value to return on error (if null, rethrows the exception)
-     * @return The result of the action or defaultValue on error
+     * @return The result of the action
      */
     @SuppressWarnings('CatchException')
-    static <T> T withErrorHandling(String operation, Closure<T> action, Logger logger, T defaultValue = null) {
+    static <T> T withErrorHandling(String operation, Closure<T> action, Logger logger) {
         try {
             return action()
         } catch (Exception e) { // NOSONAR - Generic error handler needs to catch all exceptions
-            if (defaultValue == null) {
-                handleError(operation, e, logger)
-                throw e
-            } else {
-                return handleErrorWithDefault(operation, e, logger, defaultValue)
-            }
+            handleError(operation, e, logger)
+            throw e
+        }
+    }
+
+    /**
+     * Wraps an operation with standard error handling, returning defaultValue on error (including null).
+     *
+     * @param operation Description of the operation
+     * @param action The closure to execute
+     * @param logger The logger to use
+     * @param defaultValue The default value to return on error (may be null)
+     * @return The result of the action or defaultValue on error
+     */
+    @SuppressWarnings('CatchException')
+    static <T> T withErrorHandling(String operation, Closure<T> action, Logger logger, T defaultValue) {
+        try {
+            return action()
+        } catch (Exception e) { // NOSONAR - Generic error handler needs to catch all exceptions
+            return handleErrorWithDefault(operation, e, logger, defaultValue)
         }
     }
 

@@ -77,7 +77,7 @@ String command = cli[0]
 def options = parseOptions(cli.drop(1))
 
 // Main execution
-ErrorHandler.withErrorHandling('manage credentials', logger) {
+ErrorHandler.withErrorHandling('manage credentials', {
     def jenkins = Jenkins.get()
     def manager = new CredentialRotationManager(jenkins)
     
@@ -103,7 +103,7 @@ ErrorHandler.withErrorHandling('manage credentials', logger) {
             showHelp(logger)
             System.exit(1)
     }
-}
+}, logger)
 
 /**
  * Shows help message.

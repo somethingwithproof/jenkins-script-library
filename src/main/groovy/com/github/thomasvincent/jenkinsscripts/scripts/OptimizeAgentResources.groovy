@@ -39,7 +39,9 @@ import hudson.model.Computer
 import hudson.model.Label
 import hudson.model.Node
 import hudson.model.LoadStatistics
-import jenkins.metrics.api.Metrics
+import hudson.plugins.ec2.EC2Computer
+import org.csanchez.jenkins.plugins.kubernetes.KubernetesSlave
+import com.microsoft.azure.vmagent.AzureVMAgent
 import groovy.cli.commons.CliBuilder
 import groovy.json.JsonOutput
 
@@ -80,7 +82,8 @@ import java.text.SimpleDateFormat
 /**
  * Logger for this script.
  */
-private static final Logger LOGGER = Logger.getLogger("OptimizeAgentResources.groovy")
+@groovy.transform.Field
+final Logger LOGGER = Logger.getLogger("OptimizeAgentResources.groovy")
 
 /**
  * Creates a command-line argument parser for the script.
@@ -293,8 +296,9 @@ def analyzeResourceUtilization(Jenkins jenkins) {
             }
         }
         
-        def idleExecutors = totalExecutors - busyExecutors - offlineExecutors
-        def utilizationPercent = totalExecutors > 0 ? (busyExecutors / (totalExecutors - offlineExecutors)) * 100 : 0
+        def onlineExecutors = totalExecutors - offlineExecutors
+        def idleExecutors = onlineExecutors - busyExecutors
+        def utilizationPercent = onlineExecutors > 0 ? (busyExecutors / onlineExecutors) * 100 : 0
         
         result.executors = [
             total: totalExecutors,
@@ -308,8 +312,13 @@ def analyzeResourceUtilization(Jenkins jenkins) {
         def queueItems = jenkins.queue.items
         def queueLength = queueItems.length
         def totalWaitTime = 0
+        Map<String, Integer> queuedByLabel = [:]
         queueItems.each { item ->
             totalWaitTime += System.currentTimeMillis() - item.inQueueSince
+            def assignedLabelName = item.assignedLabel?.name
+            if (assignedLabelName) {
+                queuedByLabel[assignedLabelName] = (queuedByLabel[assignedLabelName] ?: 0) + 1
+            }
         }
         def avgWaitTime = queueLength > 0 ? totalWaitTime / queueLength : 0
         
@@ -340,35 +349,31 @@ def analyzeResourceUtilization(Jenkins jenkins) {
             ]
         }
         
-        // Analyze labels
+        // Analyze labels using pre-bucketed queue counts in O(L + Q)
         def labels = [:]
         jenkins.labels.each { label ->
             def name = label.name
             if (!name) return // Skip empty labels
             
             def nodes = label.nodes
-            def executors = nodes.sum { it.numExecutors } ?: 0
-            def busyExecutors = 0
+            def labelExecutors = nodes.sum { it.numExecutors } ?: 0
+            def labelBusyExecutors = 0
             nodes.each { node ->
                 def computer = node.toComputer()
                 if (computer && !computer.offline) {
-                    busyExecutors += computer.countBusy()
+                    labelBusyExecutors += computer.countBusy()
                 }
             }
             
-            def utilizationPercent = executors > 0 ? (busyExecutors / executors) * 100 : 0
-            
-            // Count queued items for this label
-            def queuedItems = jenkins.queue.items.count { item ->
-                item.assignedLabel == label
-            }
+            def labelUtilizationPercent = labelExecutors > 0 ? (labelBusyExecutors / labelExecutors) * 100 : 0
+            def queuedItems = queuedByLabel[name] ?: 0
             
             labels[name] = [
                 name: name,
                 agentCount: nodes.size(),
-                executors: executors,
-                busyExecutors: busyExecutors,
-                utilizationPercent: utilizationPercent,
+                executors: labelExecutors,
+                busyExecutors: labelBusyExecutors,
+                utilizationPercent: labelUtilizationPercent,
                 queuedItems: queuedItems
             ]
         }
@@ -442,9 +447,10 @@ def determineScalingActions(Jenkins jenkins, String targetLabel, int minAgents, 
                 def idleExecutors = executors - busyExecutors
                 def utilizationPercent = executors > 0 ? (busyExecutors / executors) * 100 : 0
                 
-                if (utilizationPercent < 30 && agentCount > minAgents) {
+                if (executors > 0 && agentCount > 0 && utilizationPercent < 30 && agentCount > minAgents) {
                     // Low utilization - can terminate some agents
-                    def idleAgents = Math.floor(idleExecutors / (executors / agentCount)) as int
+                    def avgExecutorsPerAgent = executors / agentCount
+                    def idleAgents = avgExecutorsPerAgent > 0 ? (Math.floor(idleExecutors / avgExecutorsPerAgent) as int) : 0
                     def newCount = Math.max(agentCount - idleAgents, minAgents)
                     if (newCount < agentCount) {
                         targetAgents = newCount
@@ -648,56 +654,50 @@ def performTermination(String label, int count,
             return false
         }
         
-        // Get nodes with this label, prioritizing idle ones
+        // Only select idle nodes so busy builds are never disrupted
         def labelNodes = labelObj.nodes.collect { node ->
             def computer = node.toComputer()
             def busyExecutors = computer?.countBusy() ?: 0
             def isIdle = computer && !computer.offline && busyExecutors == 0
-            
+
             [
                 node: node,
                 name: node.nodeName,
                 isIdle: isIdle,
                 computer: computer
             ]
-        }.sort { !it.isIdle } // Sort so idle nodes come first
-        
+        }.findAll { it.isIdle }
+
         // Limit to the number we need to terminate
         def nodesToTerminate = labelNodes.take(count)
         def terminatedCount = 0
-        
+
         nodesToTerminate.each { nodeInfo ->
             def success = false
             def nodeName = nodeInfo.name
-            
-            // Attempt to terminate based on node type
-            if (awsManager) {
-                def ec2Nodes = awsManager.getEC2NodesInfo()
-                def ec2Node = ec2Nodes.find { it.name == nodeName }
-                if (ec2Node && ec2Node.ec2?.instanceId) {
-                    println "  Terminating EC2 instance: ${ec2Node.ec2.instanceId} (${nodeName})"
-                    success = awsManager.terminateInstance(ec2Node.ec2.instanceId)
+
+            // Dispatch directly from nodeInfo.computer / nodeInfo.node in O(1) per agent
+            if (awsManager && nodeInfo.computer instanceof EC2Computer) {
+                def instanceId = nodeInfo.computer.describeInstance()?.getInstanceId()
+                if (instanceId) {
+                    println "  Terminating EC2 instance: ${instanceId} (${nodeName})"
+                    success = awsManager.terminateInstance(instanceId)
                 }
             }
-            
-            if (!success && kubeManager) {
-                def k8sNodes = kubeManager.getKubernetesNodesInfo()
-                def k8sNode = k8sNodes.find { it.name == nodeName }
-                if (k8sNode && k8sNode.kubernetes?.podName) {
-                    println "  Terminating Kubernetes pod: ${k8sNode.kubernetes.podName} (${nodeName})"
-                    success = kubeManager.terminatePod(k8sNode.kubernetes.podName)
+
+            if (!success && kubeManager && nodeInfo.node instanceof KubernetesSlave) {
+                def podName = ((KubernetesSlave) nodeInfo.node).getPodName()
+                if (podName) {
+                    println "  Terminating Kubernetes pod: ${podName} (${nodeName})"
+                    success = kubeManager.terminatePod(podName)
                 }
             }
-            
-            if (!success && azureManager) {
-                def azureNodes = azureManager.getAzureNodesInfo()
-                def azureNode = azureNodes.find { it.name == nodeName }
-                if (azureNode) {
-                    println "  Cleaning up Azure VM: ${nodeName}"
-                    success = azureManager.cleanupVM(nodeName)
-                }
+
+            if (!success && azureManager && nodeInfo.node instanceof AzureVMAgent) {
+                println "  Cleaning up Azure VM: ${nodeName}"
+                success = azureManager.cleanupVM(nodeName)
             }
-            
+
             // If cloud-specific termination failed, try generic disconnection
             if (!success && nodeInfo.computer) {
                 println "  Disconnecting node: ${nodeName}"
@@ -705,7 +705,7 @@ def performTermination(String label, int count,
                     null, "Automatically terminated by OptimizeAgentResources script"))
                 success = true
             }
-            
+
             if (success) {
                 terminatedCount++
             }

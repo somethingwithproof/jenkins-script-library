@@ -76,13 +76,17 @@ class StringUtilsSpec extends Specification {
         StringUtils.truncate(text, maxLength, suffix) == expected
         
         where:
-        text         | maxLength | suffix | expected
-        "hello world"| 8         | "..."  | "hello..."
-        "hello"      | 10        | "..."  | "hello"
-        null         | 10        | "..."  | ""
-        "test"       | 4         | "..."  | "test"
-        "testing"    | 4         | "..."  | "t..."
-        ""           | 10        | "..."  | ""
+        text          | maxLength | suffix | expected
+        "hello world" | 8         | "..."  | "hello..."
+        "hello"       | 10        | "..."  | "hello"
+        "hello"       | 2         | "..."  | "he"
+        "hello"       | 3         | "..."  | "hel"
+        "hello"       | 0         | "..."  | ""
+        "hello"       | -1        | "..."  | ""
+        null          | 10        | "..."  | ""
+        "test"        | 4         | "..."  | "test"
+        "testing"     | 4         | "..."  | "t..."
+        ""            | 10        | "..."  | ""
     }
 
     @Unroll
@@ -152,14 +156,32 @@ class StringUtilsSpec extends Specification {
         StringUtils.compareVersions(v1, v2) == expected
         
         where:
-        v1      | v2      | expected
-        "1.0.0" | "1.0.0" | 0
-        "1.0.1" | "1.0.0" | 1
-        "1.0.0" | "1.0.1" | -1
-        "2.0.0" | "1.9.9" | 1
-        "1.10.0"| "1.9.0" | 1
-        ""      | "1.0.0" | -1
-        "1.0.0" | ""      | 1
+        v1                     | v2                     | expected
+        "1.0.0"                | "1.0.0"                | 0
+        "1.0"                  | "1.0.0"                | 0
+        "1.0.1"                | "1.0.0"                | 1
+        "1.0.0"                | "1.0.1"                | -1
+        "2.0.0"                | "1.9.9"                | 1
+        "1.10.0"               | "1.9.0"                | 1
+        "1.0.0-alpha"          | "1.0.0"                | -1
+        "1.0.0"                | "1.0.0-rc1"            | 1
+        "1.0.0-alpha"          | "1.0.0-beta"           | -1
+        "1.0.0-beta.2"         | "1.0.0-beta.10"        | -1
+        "500.v1234abcd"        | "4.0.0"                | 1
+        "4.0.0"                | "500.v1234abcd"        | -1
+        "1413.va_51c53703df1"  | "1413.va_51c53703df1"  | 0
+        "21.0.9+10"            | "21.0.9+99"            | 0
+        "21.0.9"               | "11.0.0"               | 1
+        "1.8.0_362"            | "11.0.0"               | -1
+        ""                     | "1.0.0"                | -1
+        "1.0.0"                | ""                     | 1
+    }
+
+    def "GroovyCompatibilityVerifier delegates version comparisons cleanly"() {
+        expect:
+        GroovyCompatibilityVerifier.compareVersions("500.v1234abcd", "4.0.0") > 0
+        GroovyCompatibilityVerifier.compareVersions("1.0.0-rc1", "1.0.0") < 0
+        GroovyCompatibilityVerifier.compareVersions("21.0.9", "11.0.0") > 0
     }
 
     @Unroll

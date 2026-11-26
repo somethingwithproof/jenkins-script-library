@@ -268,9 +268,18 @@ class PipelineDSL {
             return sb.toString()
         }
 
-        private static String formatValue(Object value) {
+        private static String formatValue(Object value, String indent = '        ') {
+            if (value instanceof Map) {
+                StringBuilder sb = new StringBuilder("{\n")
+                value.each { k, v ->
+                    sb.append("${indent}    ${k} ${formatValue(v, indent + '    ')}\n")
+                }
+                sb.append("${indent}}")
+                return sb.toString()
+            }
             if (value instanceof String) {
-                return "'${value}'"
+                String escaped = ((String) value).replace('\\', '\\\\').replace("'", "\\'")
+                return "'${escaped}'"
             }
             return value.toString()
         }
@@ -287,16 +296,11 @@ class PipelineDSL {
         }
 
         void docker(Map params) {
-            StringBuilder sb = new StringBuilder("{\n")
-            params.each { k, v ->
-                sb.append("            ${k} '${v}'\n")
-            }
-            sb.append("        }")
-            config['docker'] = sb.toString()
+            config['docker'] = new LinkedHashMap(params)
         }
 
         void kubernetes(Map params) {
-            config['kubernetes'] = params
+            config['kubernetes'] = new LinkedHashMap(params)
         }
 
         void label(String label) {
@@ -304,7 +308,7 @@ class PipelineDSL {
         }
 
         void node(Map params) {
-            config['node'] = params
+            config['node'] = new LinkedHashMap(params)
         }
     }
 
@@ -322,8 +326,13 @@ class PipelineDSL {
             vars.add("${name} = credentials('${credentialsId}')")
         }
 
-        Object propertyMissing(String name, Object value) {
-            vars.add("${name} = '${value}'")
+        @Override
+        void setProperty(String name, Object value) {
+            if (name == 'vars') {
+                this.vars = (List<String>) value
+            } else {
+                vars.add("${name} = '${value}'")
+            }
         }
     }
 
@@ -611,7 +620,10 @@ class PipelineDSL {
         }
 
         private static String escapeQuotes(String s) {
-            return s?.replace("'", "\\'") ?: ''
+            if (s == null) {
+                return ''
+            }
+            return s.replace('\\', '\\\\').replace("'", "\\'")
         }
     }
 
@@ -625,8 +637,14 @@ class PipelineDSL {
             lines.add(groovyCode)
         }
 
-        Object methodMissing(String name, Object args) {
-            lines.add("${name}(${(args as Object[]).collect { "'${it}'" }.join(', ')})")
+        @Override
+        Object invokeMethod(String name, Object args) {
+            Object[] argArray = args instanceof Object[] ? (Object[]) args : [args] as Object[]
+            if (metaClass.respondsTo(this, name, argArray)) {
+                return metaClass.invokeMethod(this, name, argArray)
+            }
+            lines.add("${name}(${argArray.collect { "'${it}'" }.join(', ')})")
+            return null
         }
 
         String build() {

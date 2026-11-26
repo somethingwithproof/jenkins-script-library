@@ -37,13 +37,14 @@ import java.io.ByteArrayOutputStream
 import groovy.xml.XmlUtil
 import groovy.xml.XmlParser
 import groovy.xml.XmlSlurper
-import groovy.xml.SlurperConfiguration
 
 import com.github.thomasvincent.jenkinsscripts.util.ValidationUtils
 import com.github.thomasvincent.jenkinsscripts.util.ErrorHandler
 
 import java.util.logging.Level
 import java.util.logging.Logger
+import java.util.regex.Matcher
+import java.util.regex.Pattern
 
 /**
  * Creates and manages Jenkins job templates.
@@ -55,7 +56,8 @@ import java.util.logging.Logger
  */
 class JobTemplate {
     private static final Logger LOGGER = Logger.getLogger(JobTemplate.class.getName())
-    
+    private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile('\\$\\{([^}]+)\\}')
+
     private final Jenkins jenkins
     private final Map<String, String> parameters
     private String templateXml
@@ -108,9 +110,10 @@ class JobTemplate {
      * @param allowOverwrite Whether to overwrite existing job
      * @return true if successful, false otherwise
      */
-    boolean applyTemplate(String jobName, boolean allowOverwrite = false) {
+    boolean applyTemplate(String jobName, boolean allowOverwrite = false, Map<String, String> overrideParameters = null) {
         jobName = ValidationUtils.requireNonEmpty(jobName, "Job name")
-        
+        Map<String, String> effectiveParameters = overrideParameters != null ? overrideParameters : parameters
+
         return ErrorHandler.withErrorHandling("applying template to job ${jobName}", {
             // Check if job already exists
             Job existingJob = jenkins.getItemByFullName(jobName, Job.class)
@@ -118,13 +121,13 @@ class JobTemplate {
                 LOGGER.warning("Job ${jobName} already exists and allowOverwrite is false")
                 return false
             }
-            
-            // Apply parameters to template
-            String jobXml = applyParameters(templateXml)
-            
+
+            // Apply parameters to template without mutating instance state
+            String jobXml = applyParameters(templateXml, effectiveParameters)
+
             // Create or update job
             ByteArrayInputStream inputStream = new ByteArrayInputStream(jobXml.getBytes("UTF-8"))
-            
+
             if (existingJob) {
                 existingJob.updateByXml(inputStream)
                 LOGGER.info("Updated existing job ${jobName} with template")
@@ -132,7 +135,7 @@ class JobTemplate {
                 // Handle possible parent folders
                 String parentPath = getParentPath(jobName)
                 def parent
-                
+
                 if (parentPath) {
                     parent = jenkins.getItemByFullName(parentPath)
                     if (!parent || !parent.hasPermission(com.cloudbees.hudson.plugins.folder.Folder.CREATE)) {
@@ -142,33 +145,19 @@ class JobTemplate {
                 } else {
                     parent = jenkins
                 }
-                
+
                 String jobSimpleName = getSimpleName(jobName)
                 parent.createProjectFromXML(jobSimpleName, inputStream)
                 LOGGER.info("Created new job ${jobName} from template")
             }
-            
+
             return true
         }, LOGGER, false)
     }
-    
+
     /**
      * Creates or updates multiple jobs from the template.
-     * 
-     * ```groovy
-     * // Create jobs with parameters
-     * def parametersList = [
-     *     ['PROJECT_NAME': 'frontend', 'GIT_BRANCH': 'main'],
-     *     ['PROJECT_NAME': 'backend', 'GIT_BRANCH': 'develop']
-     * ]
-     * 
-     * def jobs = template.applyTemplateToJobs(
-     *     ['frontend-pipeline', 'backend-pipeline'],
-     *     parametersList,
-     *     true
-     * )
-     * ```
-     * 
+     *
      * @param jobNames List of job names to create or update
      * @param parametersList List of parameter maps, one per job
      * @param allowOverwrite Whether to overwrite existing jobs
@@ -179,37 +168,22 @@ class JobTemplate {
             LOGGER.warning("No job names provided")
             return []
         }
-        
+
         if (parametersList && jobNames.size() != parametersList.size()) {
             LOGGER.warning("Job names count (${jobNames.size()}) doesn't match parameters list count (${parametersList.size()})")
             return []
         }
-        
+
         List<String> successfulJobs = []
-        
+
         jobNames.eachWithIndex { jobName, index ->
-            // Use job-specific parameters if provided
             Map<String, String> jobParameters = parametersList ? parametersList[index] : parameters
-            
-            // Save original parameters
-            Map<String, String> originalParameters = parameters.clone()
-            
-            // Apply job-specific parameters
-            if (jobParameters) {
-                parameters.clear()
-                parameters.putAll(jobParameters)
-            }
-            
-            boolean success = applyTemplate(jobName, allowOverwrite)
+            boolean success = applyTemplate(jobName, allowOverwrite, jobParameters)
             if (success) {
                 successfulJobs.add(jobName)
             }
-            
-            // Restore original parameters
-            parameters.clear()
-            parameters.putAll(originalParameters)
         }
-        
+
         LOGGER.info("Applied template to ${successfulJobs.size()} of ${jobNames.size()} jobs")
         return successfulJobs
     }
@@ -286,22 +260,29 @@ class JobTemplate {
     }
     
     /**
-     * Applies parameters to the template.
-     * 
+     * Applies parameters to the template in a single regex pass with XML escaping.
+     *
      * @param template XML template
+     * @param effectiveParameters Parameter map to apply
      * @return Processed XML
      */
-    private String applyParameters(String template) {
-        if (!parameters || parameters.isEmpty()) {
+    private String applyParameters(String template, Map<String, String> effectiveParameters = this.parameters) {
+        if (!effectiveParameters || effectiveParameters.isEmpty()) {
             return template
         }
-        
-        String processed = template
-        parameters.each { key, value ->
-            processed = processed.replace('${' + key + '}', value)
+
+        Matcher matcher = PLACEHOLDER_PATTERN.matcher(template)
+        StringBuffer sb = new StringBuffer(template.length())
+        while (matcher.find()) {
+            String key = matcher.group(1)
+            if (effectiveParameters.containsKey(key)) {
+                String value = effectiveParameters[key]
+                String escaped = XmlUtil.escapeXml(value != null ? value : '')
+                matcher.appendReplacement(sb, Matcher.quoteReplacement(escaped))
+            }
         }
-        
-        return processed
+        matcher.appendTail(sb)
+        return sb.toString()
     }
     
     /**

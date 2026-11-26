@@ -225,12 +225,16 @@ class JobArchivalManager {
      */
     List<JobArchive> listArchives() {
         List<JobArchive> archives = []
-        
-        archiveDir.listFiles().findAll { it.name.endsWith(".zip") }.each { file ->
+        File[] files = archiveDir.listFiles()
+        if (files == null) {
+            return archives
+        }
+
+        files.findAll { it.name.endsWith(".zip") }.each { file ->
             try {
-                Map<String, Object> result = extractArchiveContents(file)
+                Map<String, Object> result = extractArchiveContents(file, true)
                 Map<String, Object> metadata = result.metadata
-                
+
                 JobArchive archive = new JobArchive(
                     jobName: metadata.jobName?.toString(),
                     archivePath: file.absolutePath,
@@ -238,16 +242,16 @@ class JobArchivalManager {
                     reason: metadata.reason?.toString(),
                     metadata: metadata.additionalMetadata as Map<String, String>
                 )
-                
+
                 archives.add(archive)
             } catch (Exception e) {
                 LOGGER.warning("Error reading archive ${file}: ${e.message}")
             }
         }
-        
+
         // Sort by timestamp, newest first
         archives.sort { a, b -> b.timestamp <=> a.timestamp }
-        
+
         return archives
     }
     
@@ -468,17 +472,16 @@ class JobArchivalManager {
      * @param archiveFile ZIP archive file
      * @return Map containing jobXml and metadata
      */
-    private Map<String, Object> extractArchiveContents(File archiveFile) {
+    private Map<String, Object> extractArchiveContents(File archiveFile, boolean metadataOnly = false) {
         String jobXml = null
         Map<String, Object> metadata = null
-        
+
         ZipInputStream zipIn = new ZipInputStream(new FileInputStream(archiveFile))
-        
+
         try {
             ZipEntry entry
             while ((entry = zipIn.nextEntry) != null) {
-                if (entry.name == "job.xml") {
-                    // Read job XML
+                if (!metadataOnly && entry.name == "job.xml") {
                     ByteArrayOutputStream baos = new ByteArrayOutputStream()
                     byte[] buffer = new byte[1024]
                     int bytesRead
@@ -487,7 +490,6 @@ class JobArchivalManager {
                     }
                     jobXml = baos.toString("UTF-8")
                 } else if (entry.name == "metadata.json") {
-                    // Read metadata JSON
                     ByteArrayOutputStream baos = new ByteArrayOutputStream()
                     byte[] buffer = new byte[1024]
                     int bytesRead
@@ -496,16 +498,26 @@ class JobArchivalManager {
                     }
                     String metadataJson = baos.toString("UTF-8")
                     metadata = new JsonSlurper().parseText(metadataJson)
+                    if (metadataOnly) {
+                        break
+                    }
                 }
             }
         } finally {
             zipIn.close()
         }
-        
+
+        if (metadataOnly) {
+            if (!metadata) {
+                throw new IllegalArgumentException("Invalid archive file: missing metadata.json")
+            }
+            return [metadata: metadata]
+        }
+
         if (!jobXml || !metadata) {
             throw new IllegalArgumentException("Invalid archive file: missing job.xml or metadata.json")
         }
-        
+
         return [jobXml: jobXml, metadata: metadata]
     }
     

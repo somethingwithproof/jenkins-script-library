@@ -31,42 +31,58 @@ def call(Map args = [:]) {
     if (!args.jobName && !args.pattern && !args.folderPath) {
         error "Must specify either jobName, pattern, or folderPath"
     }
-    
+
+    if (args.jobName) {
+        echo "[disableJobs] Disabling job: ${args.jobName}"
+    } else if (args.pattern) {
+        echo "[disableJobs] Disabling jobs matching pattern: ${args.pattern}"
+    } else if (args.folderPath) {
+        echo "[disableJobs] Disabling jobs in folder: ${args.folderPath}"
+    }
+
+    Map outcome = disableJobsNonCps(
+        args.jobName as String,
+        args.pattern as String,
+        args.folderPath as String,
+        args.dryRun == true,
+        args.recursive == true
+    )
+
+    if (outcome.errorMessage) {
+        error outcome.errorMessage as String
+    }
+
+    List results = outcome.results as List
+    echo "[disableJobs] Disabled ${results.size()} jobs"
+    return results
+}
+
+@NonCPS
+private Map disableJobsNonCps(String jobName, String pattern, String folderPath, boolean dryRun, boolean recursive) {
     def jenkins = Jenkins.get()
     def disabler = new JobDisabler(jenkins)
-    def logger = new com.github.thomasvincent.jenkinsscripts.util.JenkinsLogger(
-        currentBuild.rawBuild.getListener(), 
-        'disableJobs'
-    )
-    
-    def results = []
-    
-    if (args.jobName) {
-        logger.info("Disabling job: ${args.jobName}")
-        def success = disabler.disableJob(args.jobName as String)
-        results.add([job: args.jobName, success: success])
-    } else if (args.pattern) {
-        logger.info("Disabling jobs matching pattern: ${args.pattern}")
-        def dryRun = args.dryRun ?: false
-        def disabledJobs = disabler.disableJobsByPattern(args.pattern as String, dryRun)
-        disabledJobs.each { jobName ->
-            results.add([job: jobName, success: true])
+    List<Map<String, Object>> results = []
+
+    if (jobName) {
+        boolean success = disabler.disableJob(jobName)
+        results.add([job: jobName, success: success])
+    } else if (pattern) {
+        List<String> disabledJobs = disabler.disableJobsByPattern(pattern, dryRun)
+        disabledJobs.each { String name ->
+            results.add([job: name, success: true])
         }
-    } else if (args.folderPath) {
-        logger.info("Disabling jobs in folder: ${args.folderPath}")
-        def recursive = args.recursive ?: false
-        def folder = jenkins.getItemByFullName(args.folderPath as String)
+    } else if (folderPath) {
+        def folder = jenkins.getItemByFullName(folderPath)
         if (!folder) {
-            error "Folder not found: ${args.folderPath}"
+            return [results: [], errorMessage: "Folder not found: ${folderPath}"]
         }
-        def disabledJobs = disabler.disableJobsInFolder(folder, recursive)
-        disabledJobs.each { jobName ->
-            results.add([job: jobName, success: true])
+        List<String> disabledJobs = disabler.disableJobsInFolder(folder, recursive)
+        disabledJobs.each { String name ->
+            results.add([job: name, success: true])
         }
     }
-    
-    logger.info("Disabled ${results.size()} jobs")
-    return results
+
+    return [results: results, errorMessage: null]
 }
 
 @NonCPS

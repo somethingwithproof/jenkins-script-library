@@ -246,7 +246,7 @@ if (options.i) {
     
     Map additionalProps = [:]
     if (options.c && type == "ChoiceParameterDefinition") {
-        additionalProps.choices = options.c.split(",")
+        additionalProps.choices = options.c.split(",").collect { it.trim() }.findAll { it }
     }
     
     println "Defining parameter standard for ${paramName}..."
@@ -313,7 +313,7 @@ if (options.i) {
     
     Map additionalProps = [:]
     if (options.c && type == "ChoiceParameterDefinition") {
-        additionalProps.choices = options.c.split(",")
+        additionalProps.choices = options.c.split(",").collect { it.trim() }.findAll { it }
     }
     
     boolean success = manager.addParameter(
@@ -341,7 +341,7 @@ if (options.i) {
     
     Map additionalProps = [:]
     if (options.c) {
-        additionalProps.choices = options.c.split(",")
+        additionalProps.choices = options.c.split(",").collect { it.trim() }.findAll { it }
     }
     
     boolean success = manager.updateParameter(

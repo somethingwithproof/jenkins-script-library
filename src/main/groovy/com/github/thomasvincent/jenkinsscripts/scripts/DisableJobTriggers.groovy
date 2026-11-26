@@ -30,7 +30,6 @@ package com.github.thomasvincent.jenkinsscripts.scripts
 import com.github.thomasvincent.jenkinsscripts.jobs.JobDisabler
 import jenkins.model.Jenkins
 import groovy.cli.commons.CliBuilder
-import hudson.security.Permission
 import java.util.logging.Logger
 
 /**
@@ -58,7 +57,8 @@ import java.util.logging.Logger
 /**
  * Logger for this script
  */
-private static final Logger LOGGER = Logger.getLogger("DisableJobTriggers.groovy")
+@groovy.transform.Field
+final Logger LOGGER = Logger.getLogger("DisableJobTriggers.groovy")
 
 /**
  * Initialize the command line argument parser with appropriate options
@@ -92,7 +92,7 @@ if (options.h) {
  * Get Jenkins instance and verify admin permissions
  */
 def jenkins = Jenkins.get()
-if (!jenkins.hasPermission(Permission.ADMINISTER)) {
+if (!jenkins.hasPermission(Jenkins.ADMINISTER)) {
     LOGGER.severe("Operation aborted. User lacks required administrative privileges.")
     println "Error: You need administrative privileges to run this script"
     return

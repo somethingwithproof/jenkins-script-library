@@ -31,61 +31,81 @@ import com.cloudbees.groovy.cps.NonCPS
  * ```
  */
 def call(Map args = [:]) {
-    def jenkins = Jenkins.get()
-    def auditor = new JenkinsSecurityAuditor(jenkins)
-    def logger = new com.github.thomasvincent.jenkinsscripts.util.JenkinsLogger(
-        currentBuild.rawBuild.getListener(),
-        'auditSecurity'
-    )
-    
-    logger.info("Starting Jenkins security audit")
-    
-    // Perform audit
-    def findings = auditor.performSecurityAudit()
-    
-    // Process findings
-    def criticalCount = 0
-    def warningCount = 0
-    def infoCount = 0
-    
+    echo "[auditSecurity] Starting Jenkins security audit"
+
+    // Confine Jenkins and auditor objects to @NonCPS so only serializable maps cross CPS steps
+    Map auditResult = runSecurityAuditNonCps()
+    Map findings = auditResult.findings as Map
+    Map summary = auditResult.summary as Map
+
     findings.each { category, categoryFindings ->
         categoryFindings.each { finding ->
-            switch(finding.severity) {
+            switch (finding.severity) {
                 case 'CRITICAL':
-                    criticalCount++
-                    logger.error("CRITICAL: ${finding.description}")
+                    echo "[auditSecurity] CRITICAL: ${finding.description}"
                     break
+                case 'HIGH':
                 case 'WARNING':
-                    warningCount++
-                    logger.warning("WARNING: ${finding.description}")
+                    echo "[auditSecurity] WARNING: ${finding.description}"
                     break
                 default:
-                    infoCount++
-                    logger.info("INFO: ${finding.description}")
+                    echo "[auditSecurity] INFO: ${finding.description}"
             }
         }
     }
-    
-    logger.info("Security audit complete: ${criticalCount} critical, " +
-                "${warningCount} warnings, ${infoCount} info")
-    
-    // Generate report if requested
+
+    echo "[auditSecurity] Security audit complete: ${summary.critical} critical, " +
+         "${summary.warning} warnings, ${summary.info} info"
+
+    // Generate email report if requested (CPS step, must NOT be @NonCPS)
     if (args.emailReport) {
         sendSecurityReport(findings, args.emailReport as String)
     }
-    
-    // Archive report
-    if (args.archive ?: true) {
-        def report = generateHtmlReport(findings)
+
+    // Archive report (default true; preserve explicit false)
+    if (args.archive != false) {
+        String report = generateHtmlReport(findings)
         writeFile file: 'security-audit-report.html', text: report
         archiveArtifacts artifacts: 'security-audit-report.html', fingerprint: true
     }
-    
+
     // Fail build if critical issues found
-    if (args.failOnCritical && criticalCount > 0) {
-        error "Security audit failed: ${criticalCount} critical issues found"
+    if (args.failOnCritical && (summary.critical as int) > 0) {
+        error "Security audit failed: ${summary.critical} critical issues found"
     }
-    
+
+    return [
+        findings: findings,
+        summary: summary
+    ]
+}
+
+@NonCPS
+private Map runSecurityAuditNonCps() {
+    def jenkins = Jenkins.get()
+    def auditor = new JenkinsSecurityAuditor(jenkins)
+    Map<String, List<Map<String, String>>> findings = auditor.performSecurityAudit()
+
+    int criticalCount = 0
+    int warningCount = 0
+    int infoCount = 0
+
+    findings.each { category, categoryFindings ->
+        categoryFindings.each { finding ->
+            switch (finding.severity) {
+                case 'CRITICAL':
+                    criticalCount++
+                    break
+                case 'HIGH':
+                case 'WARNING':
+                    warningCount++
+                    break
+                default:
+                    infoCount++
+            }
+        }
+    }
+
     return [
         findings: findings,
         summary: [
@@ -119,7 +139,7 @@ private String generateHtmlReport(Map findings) {
     <h1>Jenkins Security Audit Report</h1>
     <p>Generated: ${new Date()}</p>
 """)
-    
+
     findings.each { category, categoryFindings ->
         html.append("<h2>${category}</h2>")
         categoryFindings.each { finding ->
@@ -132,16 +152,15 @@ private String generateHtmlReport(Map findings) {
 """)
         }
     }
-    
+
     html.append("</body></html>")
     return html.toString()
 }
 
-@NonCPS
 private void sendSecurityReport(Map findings, String recipient) {
     def subject = "Jenkins Security Audit Report - ${env.JOB_NAME} #${env.BUILD_NUMBER}"
-    def body = generateEmailBody(findings)
-    
+    def body = generateEmailBody(findings, env.BUILD_URL as String)
+
     emailext(
         to: recipient,
         subject: subject,
@@ -151,13 +170,13 @@ private void sendSecurityReport(Map findings, String recipient) {
 }
 
 @NonCPS
-private String generateEmailBody(Map findings) {
+private String generateEmailBody(Map findings, String buildUrl) {
     def criticalCount = findings.values().flatten().count { it.severity == 'CRITICAL' }
-    def warningCount = findings.values().flatten().count { it.severity == 'WARNING' }
-    
+    def warningCount = findings.values().flatten().count { it.severity in ['WARNING', 'HIGH'] }
+
     return """
 <h2>Jenkins Security Audit Results</h2>
-<p>Build: ${env.BUILD_URL}</p>
+<p>Build: ${buildUrl ?: ''}</p>
 <p>Summary: ${criticalCount} critical issues, ${warningCount} warnings</p>
 <p>Please review the attached report for details.</p>
 """

@@ -11,12 +11,10 @@
 package com.github.thomasvincent.jenkinsscripts.monitoring
 
 import groovy.transform.CompileStatic
-import hudson.Extension
+import groovy.transform.EqualsAndHashCode
 import hudson.model.Computer
 import hudson.model.Executor
-import hudson.model.Node
 import hudson.model.Queue
-import hudson.model.Run
 import jenkins.model.Jenkins
 
 import java.util.concurrent.ConcurrentHashMap
@@ -25,12 +23,32 @@ import java.util.logging.Logger
 
 /**
  * Exports Jenkins metrics in Prometheus format.
- * Provides comprehensive metrics for pipelines, agents, queues, and system health.
+ * Provides metrics for pipelines, agents, queues, and system health.
  */
 @CompileStatic
 class PrometheusMetricsExporter {
 
     private static final Logger LOGGER = Logger.getLogger(PrometheusMetricsExporter.class.name)
+    private static final int MAX_DURATION_SAMPLES = 100
+
+    /**
+     * Immutable composite key for stage metrics avoiding delimiter collisions.
+     */
+    @EqualsAndHashCode
+    static final class StageKey {
+        final String jobName
+        final String stageName
+
+        StageKey(String jobName, String stageName) {
+            this.jobName = jobName ?: ''
+            this.stageName = stageName ?: ''
+        }
+
+        @Override
+        String toString() {
+            return "${jobName}:${stageName}"
+        }
+    }
 
     // Metric counters
     private final AtomicLong buildsTotal = new AtomicLong(0)
@@ -39,13 +57,13 @@ class PrometheusMetricsExporter {
     private final AtomicLong buildsUnstable = new AtomicLong(0)
     private final AtomicLong buildsAborted = new AtomicLong(0)
 
-    // Build duration tracking
-    private final ConcurrentHashMap<String, List<Long>> buildDurations = new ConcurrentHashMap<>()
+    // Build duration tracking (bounded deques per job)
+    private final ConcurrentHashMap<String, Deque<Long>> buildDurations = new ConcurrentHashMap<>()
     private final ConcurrentHashMap<String, Long> lastBuildTimestamp = new ConcurrentHashMap<>()
 
-    // Stage metrics
-    private final ConcurrentHashMap<String, AtomicLong> stageExecutionCounts = new ConcurrentHashMap<>()
-    private final ConcurrentHashMap<String, List<Long>> stageDurations = new ConcurrentHashMap<>()
+    // Stage metrics keyed by StageKey(jobName, stageName)
+    private final ConcurrentHashMap<StageKey, AtomicLong> stageExecutionCounts = new ConcurrentHashMap<>()
+    private final ConcurrentHashMap<StageKey, Deque<Long>> stageDurations = new ConcurrentHashMap<>()
 
     // Configuration
     private final String namespace
@@ -79,14 +97,11 @@ class PrometheusMetricsExporter {
                 break
         }
 
-        // Track duration per job
-        buildDurations.computeIfAbsent(jobName) { new ArrayList<Long>() }
-        List<Long> durations = buildDurations.get(jobName)
+        Deque<Long> durations = buildDurations.computeIfAbsent(jobName) { new ArrayDeque<Long>(MAX_DURATION_SAMPLES) }
         synchronized (durations) {
-            durations.add(durationMs)
-            // Keep only last 100 durations
-            if (durations.size() > 100) {
-                durations.remove(0)
+            durations.addLast(durationMs)
+            while (durations.size() > MAX_DURATION_SAMPLES) {
+                durations.pollFirst()
             }
         }
 
@@ -98,17 +113,15 @@ class PrometheusMetricsExporter {
      * Record a stage execution.
      */
     void recordStageExecution(String jobName, String stageName, long durationMs, boolean success) {
-        String key = "${jobName}:${stageName}"
+        StageKey key = new StageKey(jobName, stageName)
 
-        stageExecutionCounts.computeIfAbsent(key) { new AtomicLong(0) }
-        stageExecutionCounts.get(key).incrementAndGet()
+        stageExecutionCounts.computeIfAbsent(key) { new AtomicLong(0) }.incrementAndGet()
 
-        stageDurations.computeIfAbsent(key) { new ArrayList<Long>() }
-        List<Long> durations = stageDurations.get(key)
+        Deque<Long> durations = stageDurations.computeIfAbsent(key) { new ArrayDeque<Long>(MAX_DURATION_SAMPLES) }
         synchronized (durations) {
-            durations.add(durationMs)
-            if (durations.size() > 100) {
-                durations.remove(0)
+            durations.addLast(durationMs)
+            while (durations.size() > MAX_DURATION_SAMPLES) {
+                durations.pollFirst()
             }
         }
     }
@@ -135,32 +148,82 @@ class PrometheusMetricsExporter {
         // JVM metrics
         sb.append(exportJvmMetrics())
 
-        // Per-job duration metrics
-        buildDurations.each { jobName, durations ->
-            if (!durations.isEmpty()) {
-                double avg = durations.sum() / durations.size()
-                double max = durations.max()
-                double min = durations.min()
+        // Per-job duration metrics (single synchronized snapshot and single-pass stats)
+        List<Map<String, Object>> buildAvgSamples = []
+        List<Map<String, Object>> buildMaxSamples = []
+        List<Map<String, Object>> buildMinSamples = []
 
-                sb.append(formatMetricWithLabels('build_duration_seconds_avg', 'gauge',
-                        'Average build duration', avg / 1000.0, [job: jobName]))
-                sb.append(formatMetricWithLabels('build_duration_seconds_max', 'gauge',
-                        'Maximum build duration', max / 1000.0, [job: jobName]))
-                sb.append(formatMetricWithLabels('build_duration_seconds_min', 'gauge',
-                        'Minimum build duration', min / 1000.0, [job: jobName]))
+        buildDurations.each { String jobName, Deque<Long> durations ->
+            double[] stats = computeDurationStats(durations)
+            if (stats != null) {
+                Map<String, String> labels = [job: jobName]
+                buildAvgSamples.add([labels: labels, value: stats[0] / 1000.0d] as Map<String, Object>)
+                buildMaxSamples.add([labels: labels, value: stats[1] / 1000.0d] as Map<String, Object>)
+                buildMinSamples.add([labels: labels, value: stats[2] / 1000.0d] as Map<String, Object>)
             }
         }
 
-        // Stage metrics
-        stageExecutionCounts.each { key, count ->
-            String[] parts = key.split(':')
-            if (parts.length == 2) {
-                sb.append(formatMetricWithLabels('stage_executions_total', 'counter',
-                        'Total stage executions', count.get(), [job: parts[0], stage: parts[1]]))
+        appendMetricFamily(sb, 'build_duration_seconds_avg', 'gauge', 'Average build duration', buildAvgSamples)
+        appendMetricFamily(sb, 'build_duration_seconds_max', 'gauge', 'Maximum build duration', buildMaxSamples)
+        appendMetricFamily(sb, 'build_duration_seconds_min', 'gauge', 'Minimum build duration', buildMinSamples)
+
+        // Stage execution count metrics
+        List<Map<String, Object>> stageCountSamples = []
+        stageExecutionCounts.each { StageKey key, AtomicLong count ->
+            stageCountSamples.add([
+                labels: [job: key.jobName, stage: key.stageName],
+                value: count.get()
+            ] as Map<String, Object>)
+        }
+        appendMetricFamily(sb, 'stage_executions_total', 'counter', 'Total stage executions', stageCountSamples)
+
+        // Stage duration metrics
+        List<Map<String, Object>> stageAvgSamples = []
+        List<Map<String, Object>> stageMaxSamples = []
+        List<Map<String, Object>> stageMinSamples = []
+        stageDurations.each { StageKey key, Deque<Long> durations ->
+            double[] stats = computeDurationStats(durations)
+            if (stats != null) {
+                Map<String, String> labels = [job: key.jobName, stage: key.stageName]
+                stageAvgSamples.add([labels: labels, value: stats[0] / 1000.0d] as Map<String, Object>)
+                stageMaxSamples.add([labels: labels, value: stats[1] / 1000.0d] as Map<String, Object>)
+                stageMinSamples.add([labels: labels, value: stats[2] / 1000.0d] as Map<String, Object>)
             }
         }
+        appendMetricFamily(sb, 'stage_duration_seconds_avg', 'gauge', 'Average stage duration', stageAvgSamples)
+        appendMetricFamily(sb, 'stage_duration_seconds_max', 'gauge', 'Maximum stage duration', stageMaxSamples)
+        appendMetricFamily(sb, 'stage_duration_seconds_min', 'gauge', 'Minimum stage duration', stageMinSamples)
 
         return sb.toString()
+    }
+
+    /**
+     * Snapshots a duration deque under its lock and computes [avg, max, min] in one pass.
+     */
+    private static double[] computeDurationStats(Deque<Long> durations) {
+        List<Long> snapshot
+        synchronized (durations) {
+            if (durations.isEmpty()) {
+                return null
+            }
+            snapshot = new ArrayList<>(durations)
+        }
+
+        long sum = 0L
+        long min = Long.MAX_VALUE
+        long max = Long.MIN_VALUE
+        for (Long d : snapshot) {
+            long val = d.longValue()
+            sum += val
+            if (val < min) {
+                min = val
+            }
+            if (val > max) {
+                max = val
+            }
+        }
+        double avg = (double) sum / snapshot.size()
+        return [avg, (double) max, (double) min] as double[]
     }
 
     /**
@@ -179,40 +242,47 @@ class PrometheusMetricsExporter {
         int busyAgents = 0
         int idleAgents = 0
 
+        List<Map<String, Object>> totalExecSamples = []
+        List<Map<String, Object>> busyExecSamples = []
+        List<Map<String, Object>> idleExecSamples = []
+        List<Map<String, Object>> diskFreeSamples = []
+
         jenkins.computers.each { Computer computer ->
             totalAgents++
 
             if (computer.isOnline()) {
                 onlineAgents++
 
-                int busyExecutors = computer.executors.count { Executor e -> e.isBusy() }
+                int busyExecutors = computer.executors.count { Executor e -> e.isBusy() }.intValue()
                 if (busyExecutors > 0) {
                     busyAgents++
                 } else {
                     idleAgents++
                 }
 
-                // Per-agent metrics
                 String nodeName = computer.name ?: 'master'
-                sb.append(formatMetricWithLabels('agent_executors_total', 'gauge',
-                        'Total executors on agent', computer.numExecutors, [agent: nodeName]))
-                sb.append(formatMetricWithLabels('agent_executors_busy', 'gauge',
-                        'Busy executors on agent', busyExecutors, [agent: nodeName]))
-                sb.append(formatMetricWithLabels('agent_executors_idle', 'gauge',
-                        'Idle executors on agent', computer.numExecutors - busyExecutors, [agent: nodeName]))
+                Map<String, String> labels = [agent: nodeName]
+                totalExecSamples.add([labels: labels, value: computer.numExecutors] as Map<String, Object>)
+                busyExecSamples.add([labels: labels, value: busyExecutors] as Map<String, Object>)
+                idleExecSamples.add([labels: labels, value: computer.numExecutors - busyExecutors] as Map<String, Object>)
 
                 // Disk space (if available)
                 try {
                     def diskSpace = computer.getMonitorData()?.get('hudson.node_monitors.DiskSpaceMonitor')
                     if (diskSpace?.hasProperty('freeSize')) {
-                        sb.append(formatMetricWithLabels('agent_disk_free_bytes', 'gauge',
-                                'Free disk space on agent', diskSpace.freeSize, [agent: nodeName]))
+                        Object freeSize = org.codehaus.groovy.runtime.InvokerHelper.getProperty(diskSpace, 'freeSize')
+                        diskFreeSamples.add([labels: labels, value: freeSize] as Map<String, Object>)
                     }
                 } catch (Exception ignored) {
                     // Monitor data not available
                 }
             }
         }
+
+        appendMetricFamily(sb, 'agent_executors_total', 'gauge', 'Total executors on agent', totalExecSamples)
+        appendMetricFamily(sb, 'agent_executors_busy', 'gauge', 'Busy executors on agent', busyExecSamples)
+        appendMetricFamily(sb, 'agent_executors_idle', 'gauge', 'Idle executors on agent', idleExecSamples)
+        appendMetricFamily(sb, 'agent_disk_free_bytes', 'gauge', 'Free disk space on agent', diskFreeSamples)
 
         sb.append(formatMetric('agents_total', 'gauge', 'Total number of agents', totalAgents))
         sb.append(formatMetric('agents_online', 'gauge', 'Online agents', onlineAgents))
@@ -258,8 +328,8 @@ class PrometheusMetricsExporter {
         }
 
         // Blocked vs buildable
-        int blocked = items.count { it.isBlocked() }
-        int buildable = items.count { it.isBuildable() }
+        int blocked = items.count { it.isBlocked() }.intValue()
+        int buildable = items.count { it.isBuildable() }.intValue()
 
         sb.append(formatMetric('queue_blocked', 'gauge', 'Blocked items in queue', blocked))
         sb.append(formatMetric('queue_buildable', 'gauge', 'Buildable items in queue', buildable))
@@ -306,16 +376,22 @@ ${fullName} ${value}
     }
 
     /**
-     * Format a metric with labels.
+     * Appends a metric family with a single # HELP and # TYPE header followed by all labeled samples.
      */
-    private String formatMetricWithLabels(String name, String type, String help, Number value, Map<String, String> labels) {
+    private void appendMetricFamily(StringBuilder sb, String name, String type, String help,
+                                    List<Map<String, Object>> samples) {
+        if (samples.isEmpty()) {
+            return
+        }
         String fullName = "${namespace}_${subsystem}_${name}"
-        String labelStr = labels.collect { k, v -> "${k}=\"${escapeLabel(v)}\"" }.join(',')
-
-        return """# HELP ${fullName} ${help}
-# TYPE ${fullName} ${type}
-${fullName}{${labelStr}} ${value}
-"""
+        sb.append("# HELP ${fullName} ${help}\n")
+        sb.append("# TYPE ${fullName} ${type}\n")
+        for (Map<String, Object> sample : samples) {
+            Map<String, String> labels = (Map<String, String>) sample.get('labels')
+            Object value = sample.get('value')
+            String labelStr = labels.collect { String k, String v -> "${k}=\"${escapeLabel(v)}\"" }.join(',')
+            sb.append("${fullName}{${labelStr}} ${value}\n")
+        }
     }
 
     /**
@@ -340,7 +416,7 @@ ${fullName}{${labelStr}} ${value}
                         aborted   : buildsAborted.get()
                 ],
                 jobs   : buildDurations.keySet().toList(),
-                stages : stageExecutionCounts.keySet().toList()
+                stages : stageExecutionCounts.keySet().collect { StageKey k -> k.toString() }
         ]
     }
 

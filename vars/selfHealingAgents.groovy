@@ -8,7 +8,10 @@
  * Jenkins Pipeline shared library step for self-healing agent management.
  */
 
+import com.cloudbees.groovy.cps.NonCPS
 import com.github.thomasvincent.jenkinsscripts.healing.SelfHealingAgentManager
+import java.util.concurrent.atomic.AtomicReference
+import java.util.logging.Logger
 
 /**
  * Manage self-healing agents in Jenkins.
@@ -32,7 +35,10 @@ import com.github.thomasvincent.jenkinsscripts.healing.SelfHealingAgentManager
  */
 
 @groovy.transform.Field
-static SelfHealingAgentManager manager
+private static final AtomicReference<SelfHealingAgentManager> MANAGER_REF = new AtomicReference<>()
+
+@groovy.transform.Field
+private static final Logger LOGGER = Logger.getLogger('com.github.thomasvincent.jenkinsscripts.vars.selfHealingAgents')
 
 def call() {
     return statistics()
@@ -42,41 +48,19 @@ def call() {
  * Start the self-healing agent manager.
  */
 def start(Map config = [:]) {
-    if (manager != null) {
+    boolean started = startManagerNonCps(config)
+    if (started) {
+        echo "Self-healing agent manager started"
+    } else {
         echo "Self-healing agent manager already running"
-        return
     }
-
-    manager = new SelfHealingAgentManager(config)
-
-    // Set up callbacks
-    manager.onRecoveryStart { agentName, attempt ->
-        echo "Starting recovery for agent ${agentName} (attempt ${attempt})"
-    }
-
-    manager.onRecoverySuccess { agentName ->
-        echo "Agent ${agentName} recovered successfully"
-    }
-
-    manager.onRecoveryFailure { agentName, reason ->
-        echo "Failed to recover agent ${agentName}: ${reason}"
-    }
-
-    manager.onAgentReplaced { agentName ->
-        echo "Agent ${agentName} has been replaced"
-    }
-
-    manager.start()
-    echo "Self-healing agent manager started"
 }
 
 /**
  * Stop the self-healing agent manager.
  */
 def stop() {
-    if (manager != null) {
-        manager.stop()
-        manager = null
+    if (stopManagerNonCps()) {
         echo "Self-healing agent manager stopped"
     }
 }
@@ -85,9 +69,7 @@ def stop() {
  * Perform an immediate health check.
  */
 def healthCheck() {
-    if (manager != null) {
-        manager.performHealthCheck()
-    } else {
+    if (!performHealthCheckNonCps()) {
         echo "Self-healing agent manager not running"
     }
 }
@@ -96,25 +78,90 @@ def healthCheck() {
  * Get statistics about healing operations.
  */
 def statistics() {
-    if (manager != null) {
-        return manager.getStatistics()
-    }
-    return [error: 'Manager not running']
+    return getStatisticsNonCps()
 }
 
 /**
  * Get status of all agents.
  */
 def agentStatuses() {
-    if (manager != null) {
-        return manager.getAgentStatuses()
-    }
-    return []
+    return getAgentStatusesNonCps()
 }
 
 /**
  * Check if manager is running.
  */
 def isRunning() {
-    return manager != null
+    return isRunningNonCps()
+}
+
+@NonCPS
+private boolean startManagerNonCps(Map config) {
+    // Use plain java.util.logging.Logger callbacks (never CPS echo closures) so completed
+    // WorkflowRun references are never captured or invoked on background scheduler threads.
+    SelfHealingAgentManager candidate = new SelfHealingAgentManager(config ?: [:])
+    if (!MANAGER_REF.compareAndSet(null, candidate)) {
+        return false
+    }
+
+    Logger log = LOGGER
+    candidate.onRecoveryStart { agentName, attempt ->
+        log.info("Starting recovery for agent ${agentName} (attempt ${attempt})")
+    }
+    candidate.onRecoverySuccess { agentName ->
+        log.info("Agent ${agentName} recovered successfully")
+    }
+    candidate.onRecoveryFailure { agentName, reason ->
+        log.warning("Failed to recover agent ${agentName}: ${reason}")
+    }
+    candidate.onAgentReplaced { agentName ->
+        log.info("Agent ${agentName} has been replaced")
+    }
+
+    candidate.start()
+    return true
+}
+
+@NonCPS
+private boolean stopManagerNonCps() {
+    SelfHealingAgentManager current = MANAGER_REF.getAndSet(null)
+    if (current != null) {
+        current.stop()
+        return true
+    }
+    return false
+}
+
+@NonCPS
+private boolean performHealthCheckNonCps() {
+    SelfHealingAgentManager current = MANAGER_REF.get()
+    if (current != null) {
+        current.performHealthCheck()
+        return true
+    }
+    return false
+}
+
+@NonCPS
+private Map getStatisticsNonCps() {
+    SelfHealingAgentManager current = MANAGER_REF.get()
+    if (current != null) {
+        return current.getStatistics()
+    }
+    return [error: 'Manager not running']
+}
+
+@NonCPS
+private List getAgentStatusesNonCps() {
+    SelfHealingAgentManager current = MANAGER_REF.get()
+    if (current != null) {
+        return current.getAgentStatuses()
+    }
+    return []
+}
+
+@NonCPS
+private boolean isRunningNonCps() {
+    SelfHealingAgentManager current = MANAGER_REF.get()
+    return current != null && current.isRunning()
 }
