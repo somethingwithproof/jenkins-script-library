@@ -2,11 +2,12 @@
 **Languages:** [English](../../../README.md) · **Tiếng Việt** · [Deutsch](../de/README.md) · [Español](../es/README.md) · [Français](../fr/README.md) · [Português (BR)](../pt-BR/README.md) · [Русский](../ru/README.md) · [日本語](../ja/README.md) · [한국어](../ko/README.md) · [简体中文](../zh-CN/README.md) · [العربية](../ar/README.md) · [हिन्दी](../hi/README.md)
 
 <details>
-<summary>All 45 languages (Tier 1, Africa, Asia)</summary>
+<summary>All 48 languages (Tier 1, Africa, Asia, Balkans)</summary>
 
 - **Tier 1:** [English](../../../README.md) · [Deutsch](../de/README.md) · [Español](../es/README.md) · [Français](../fr/README.md) · [Italiano](../it/README.md) · [Português (BR)](../pt-BR/README.md) · [Nederlands](../nl/README.md) · [Русский](../ru/README.md) · [Українська](../uk/README.md) · [日本語](../ja/README.md) · [한국어](../ko/README.md) · [简体中文](../zh-CN/README.md) · [繁體中文](../zh-TW/README.md) · [العربية](../ar/README.md) · [हिन्दी](../hi/README.md) · [Polski](../pl/README.md) · [Türkçe](../tr/README.md) · [Svenska](../sv/README.md) · **Tiếng Việt** · [Bahasa Indonesia](../id/README.md)
 - **Africa:** [Afrikaans](../af-ZA/README.md) · [አማርኛ](../am-ET/README.md) · [العربية (مصر)](../ar-EG/README.md) · [العربية (المغرب)](../ar-MA/README.md) · [Français (Maroc)](../fr-MA/README.md) · [Français (Sénégal)](../fr-SN/README.md) · [Hausa](../ha-NG/README.md) · [Igbo](../ig-NG/README.md) · [Malagasy](../mg-MG/README.md) · [Kinyarwanda](../rw-RW/README.md) · [Soomaali](../so-SO/README.md) · [Kiswahili](../sw-KE/README.md) · [isiXhosa](../xh-ZA/README.md) · [Yorùbá](../yo-NG/README.md) · [isiZulu](../zu-ZA/README.md)
 - **Asia:** [বাংলা](../bn/README.md) · [فارسی](../fa/README.md) · [עברית](../he/README.md) · [मराठी](../mr/README.md) · [தமிழ்](../ta/README.md) · [తెలుగు](../te/README.md) · [ไทย](../th/README.md) · [اردو](../ur/README.md) · [Bahasa Melayu](../ms/README.md) · [Filipino](../fil/README.md)
+- **Balkans:** [Bosanski](../bs/README.md) · [Hrvatski](../hr/README.md) · [Српски](../sr/README.md)
 
 </details>
 <!-- translations:end -->
@@ -106,16 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### Di chuyển Job
 
-```bash
-# Migrate a specific job
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job
-
-# Migrate all jobs matching a pattern
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --pattern "frontend-.*"
-
-# Use a replacement config file to modify properties during migration
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job --replacements-file replacements.json
-```
+Chưa hỗ trợ di chuyển sang bộ điều khiển từ xa. Ngay cả khi cung cấp URL đích, tập lệnh vẫn dùng bộ điều khiển Jenkins hiện tại.
 
 ##### Tạo mẫu Job
 
@@ -246,11 +238,14 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 Thư viện cũng cung cấp API lập trình để sử dụng trong các kịch bản Groovy của riêng bạn:
 
+JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
+
+`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
+
 #### Quản lý Job
 
 ```groovy
 import com.github.thomasvincent.jenkinsscripts.jobs.JobCleaner
-import com.github.thomasvincent.jenkinsscripts.jobs.JobMigrator
 import com.github.thomasvincent.jenkinsscripts.jobs.JobTemplate
 import jenkins.model.Jenkins
 
@@ -269,11 +264,6 @@ def template = new JobTemplate(
     ]
 )
 template.applyTemplate("new-job")
-
-// Migrate a job between Jenkins instances with JenkinsAccessor
-def localAccessor = new LocalJenkinsAccessor(jenkins)
-def migrator = new JobMigrator(localAccessor, localAccessor)
-migrator.migrateJob("source-job", "target-job")
 ```
 
 #### Quản lý đám mây
@@ -327,9 +317,6 @@ doManager.provisionNewDroplet("my-do-template")
 # Run unit tests
 ./gradlew test
 
-# Run integration tests
-./gradlew integrationTest
-
 # Run all tests
 ./gradlew check
 ```
@@ -337,21 +324,21 @@ doManager.provisionNewDroplet("my-do-template")
 > **Lưu ý**: Hiện có một lỗi đã biết với thành phần phụ thuộc native JFFI (jffi-1.2.17-native.jar) có thể gây lỗi kiểm thử. Nếu bạn gặp sự cố này, bạn có thể bỏ qua kiểm thử bằng lệnh:
 >
 > ```bash
-> ./gradlew build -PskipTests
+> ./gradlew build -x test
 > ```
 >
 > Các bài kiểm thử trên GitHub Actions hiện được cấu hình để bỏ qua những kiểm thử gặp lỗi này.
 
 #### Môi trường kiểm thử Docker
 
-Dự án đi kèm một môi trường kiểm thử dựa trên Docker để xác minh khả năng tương thích với các phiên bản Java khác nhau:
+[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
 
 ```sh
 docker compose -f docker-compose.test.yml run --rm java17
 docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-Các bài kiểm thử tích hợp sử dụng JenkinsRule để tạo một phiên bản Jenkins tạm thời cho việc kiểm thử, vì vậy bạn không cần một máy chủ Jenkins đang chạy sẵn. Các kiểm thử này xác minh rằng kịch bản hoạt động chính xác với API và cấu trúc dữ liệu thực của Jenkins. Xem [tài liệu kiểm thử tích hợp](../../../src/integration-test/README.md) để biết thêm chi tiết.
 
 ### Chất lượng mã nguồn
 

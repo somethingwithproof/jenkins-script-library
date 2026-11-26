@@ -2,11 +2,12 @@
 **Languages:** [English](../../../README.md) · **Malagasy** · [Deutsch](../de/README.md) · [Español](../es/README.md) · [Français](../fr/README.md) · [Português (BR)](../pt-BR/README.md) · [Русский](../ru/README.md) · [日本語](../ja/README.md) · [한국어](../ko/README.md) · [简体中文](../zh-CN/README.md) · [العربية](../ar/README.md) · [हिन्दी](../hi/README.md)
 
 <details>
-<summary>All 45 languages (Tier 1, Africa, Asia)</summary>
+<summary>All 48 languages (Tier 1, Africa, Asia, Balkans)</summary>
 
 - **Tier 1:** [English](../../../README.md) · [Deutsch](../de/README.md) · [Español](../es/README.md) · [Français](../fr/README.md) · [Italiano](../it/README.md) · [Português (BR)](../pt-BR/README.md) · [Nederlands](../nl/README.md) · [Русский](../ru/README.md) · [Українська](../uk/README.md) · [日本語](../ja/README.md) · [한국어](../ko/README.md) · [简体中文](../zh-CN/README.md) · [繁體中文](../zh-TW/README.md) · [العربية](../ar/README.md) · [हिन्दी](../hi/README.md) · [Polski](../pl/README.md) · [Türkçe](../tr/README.md) · [Svenska](../sv/README.md) · [Tiếng Việt](../vi/README.md) · [Bahasa Indonesia](../id/README.md)
 - **Africa:** [Afrikaans](../af-ZA/README.md) · [አማርኛ](../am-ET/README.md) · [العربية (مصر)](../ar-EG/README.md) · [العربية (المغرب)](../ar-MA/README.md) · [Français (Maroc)](../fr-MA/README.md) · [Français (Sénégal)](../fr-SN/README.md) · [Hausa](../ha-NG/README.md) · [Igbo](../ig-NG/README.md) · **Malagasy** · [Kinyarwanda](../rw-RW/README.md) · [Soomaali](../so-SO/README.md) · [Kiswahili](../sw-KE/README.md) · [isiXhosa](../xh-ZA/README.md) · [Yorùbá](../yo-NG/README.md) · [isiZulu](../zu-ZA/README.md)
 - **Asia:** [বাংলা](../bn/README.md) · [فارسی](../fa/README.md) · [עברית](../he/README.md) · [मराठी](../mr/README.md) · [தமிழ்](../ta/README.md) · [తెలుగు](../te/README.md) · [ไทย](../th/README.md) · [اردو](../ur/README.md) · [Bahasa Melayu](../ms/README.md) · [Filipino](../fil/README.md)
+- **Balkans:** [Bosanski](../bs/README.md) · [Hrvatski](../hr/README.md) · [Српски](../sr/README.md)
 
 </details>
 <!-- translations:end -->
@@ -106,16 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### Famindrana asa
 
-```bash
-# Migrate a specific job
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job
-
-# Migrate all jobs matching a pattern
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --pattern "frontend-.*"
-
-# Use a replacement config file to modify properties during migration
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job --replacements-file replacements.json
-```
+Tsy azo afindra amin’ny mpandrindra lavitra ny asa. Na dia omena URL kendrena aza dia ny mpandrindra Jenkins ankehitriny ihany no ampiasain’ilay script.
 
 ##### Fanaovana modely asa
 
@@ -246,11 +238,14 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 Manome API ara-pandaharana ihany koa ity tranomboky ity mba hampiasaina ao amin'ny soratra Groovy anao manokana:
 
+JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
+
+`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
+
 #### Fitantanana asa
 
 ```groovy
 import com.github.thomasvincent.jenkinsscripts.jobs.JobCleaner
-import com.github.thomasvincent.jenkinsscripts.jobs.JobMigrator
 import com.github.thomasvincent.jenkinsscripts.jobs.JobTemplate
 import jenkins.model.Jenkins
 
@@ -269,11 +264,6 @@ def template = new JobTemplate(
     ]
 )
 template.applyTemplate("new-job")
-
-// Migrate a job between Jenkins instances with JenkinsAccessor
-def localAccessor = new LocalJenkinsAccessor(jenkins)
-def migrator = new JobMigrator(localAccessor, localAccessor)
-migrator.migrateJob("source-job", "target-job")
 ```
 
 #### Fitantanana rahona
@@ -327,9 +317,6 @@ doManager.provisionNewDroplet("my-do-template")
 # Run unit tests
 ./gradlew test
 
-# Run integration tests
-./gradlew integrationTest
-
 # Run all tests
 ./gradlew check
 ```
@@ -337,21 +324,21 @@ doManager.provisionNewDroplet("my-do-template")
 > **Fanamarihana**: Misy olana fantatra amin'ny fiankinan-doha voajanahary JFFI (jffi-1.2.17-native.jar) izay mety hiteraka tsy fahombiazan'ny fitsapana. Raha sendra izany ianao dia afaka mandingana ny fitsapana amin'ny alalan'ny:
 >
 > ```bash
-> ./gradlew build -PskipTests
+> ./gradlew build -x test
 > ```
 >
 > Voarindra handalo ireo fitsapana miteraka olana amin'izao fotoana izao ny fitsapana GitHub Actions.
 
 #### Tontolo fitsapana Docker
 
-Ahitana tontolo fitsapana mifototra amin'ny Docker ity tetikasa ity mba hanamarinana ny fifanarahana amin'ny dika Java samihafa:
+[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
 
 ```sh
 docker compose -f docker-compose.test.yml run --rm java17
 docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-Mampiasa JenkinsRule ny fitsapana fampidirana mba hamoronana tranga Jenkins vonjimaika ho an'ny fitsapana, ka tsy mila mpizara Jenkins mandeha ianao. Manamarina ireo fitsapana ireo fa miasa tsara amin'ny API sy firafitry ny angon-drakitra Jenkins tena izy ireo soratra. Jereo ny [antontan-taratasy fitsapana fampidirana](../../../src/integration-test/README.md) raha mila antsipiriany fanampiny.
 
 ### Kalitaon'ny kaody
 

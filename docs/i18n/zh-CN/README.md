@@ -2,11 +2,12 @@
 **Languages:** [English](../../../README.md) · [Deutsch](../de/README.md) · [Español](../es/README.md) · [Français](../fr/README.md) · [Português (BR)](../pt-BR/README.md) · [Русский](../ru/README.md) · [日本語](../ja/README.md) · [한국어](../ko/README.md) · **简体中文** · [العربية](../ar/README.md) · [हिन्दी](../hi/README.md)
 
 <details>
-<summary>All 45 languages (Tier 1, Africa, Asia)</summary>
+<summary>All 48 languages (Tier 1, Africa, Asia, Balkans)</summary>
 
 - **Tier 1:** [English](../../../README.md) · [Deutsch](../de/README.md) · [Español](../es/README.md) · [Français](../fr/README.md) · [Italiano](../it/README.md) · [Português (BR)](../pt-BR/README.md) · [Nederlands](../nl/README.md) · [Русский](../ru/README.md) · [Українська](../uk/README.md) · [日本語](../ja/README.md) · [한국어](../ko/README.md) · **简体中文** · [繁體中文](../zh-TW/README.md) · [العربية](../ar/README.md) · [हिन्दी](../hi/README.md) · [Polski](../pl/README.md) · [Türkçe](../tr/README.md) · [Svenska](../sv/README.md) · [Tiếng Việt](../vi/README.md) · [Bahasa Indonesia](../id/README.md)
 - **Africa:** [Afrikaans](../af-ZA/README.md) · [አማርኛ](../am-ET/README.md) · [العربية (مصر)](../ar-EG/README.md) · [العربية (المغرب)](../ar-MA/README.md) · [Français (Maroc)](../fr-MA/README.md) · [Français (Sénégal)](../fr-SN/README.md) · [Hausa](../ha-NG/README.md) · [Igbo](../ig-NG/README.md) · [Malagasy](../mg-MG/README.md) · [Kinyarwanda](../rw-RW/README.md) · [Soomaali](../so-SO/README.md) · [Kiswahili](../sw-KE/README.md) · [isiXhosa](../xh-ZA/README.md) · [Yorùbá](../yo-NG/README.md) · [isiZulu](../zu-ZA/README.md)
 - **Asia:** [বাংলা](../bn/README.md) · [فارسی](../fa/README.md) · [עברית](../he/README.md) · [मराठी](../mr/README.md) · [தமிழ்](../ta/README.md) · [తెలుగు](../te/README.md) · [ไทย](../th/README.md) · [اردو](../ur/README.md) · [Bahasa Melayu](../ms/README.md) · [Filipino](../fil/README.md)
+- **Balkans:** [Bosanski](../bs/README.md) · [Hrvatski](../hr/README.md) · [Српски](../sr/README.md)
 
 </details>
 <!-- translations:end -->
@@ -106,16 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### 任务迁移
 
-```bash
-# Migrate a specific job
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job
-
-# Migrate all jobs matching a pattern
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --pattern "frontend-.*"
-
-# Use a replacement config file to modify properties during migration
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job --replacements-file replacements.json
-```
+目前无法迁移到远程控制器。即使指定了目标 URL，脚本仍然使用当前 Jenkins 控制器。
 
 ##### 任务模板化
 
@@ -246,11 +238,14 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 本库还提供编程 API，供你在自己的 Groovy 脚本中使用：
 
+JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
+
+`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
+
 #### 任务管理
 
 ```groovy
 import com.github.thomasvincent.jenkinsscripts.jobs.JobCleaner
-import com.github.thomasvincent.jenkinsscripts.jobs.JobMigrator
 import com.github.thomasvincent.jenkinsscripts.jobs.JobTemplate
 import jenkins.model.Jenkins
 
@@ -269,11 +264,6 @@ def template = new JobTemplate(
     ]
 )
 template.applyTemplate("new-job")
-
-// Migrate a job between Jenkins instances with JenkinsAccessor
-def localAccessor = new LocalJenkinsAccessor(jenkins)
-def migrator = new JobMigrator(localAccessor, localAccessor)
-migrator.migrateJob("source-job", "target-job")
 ```
 
 #### 云管理
@@ -327,9 +317,6 @@ doManager.provisionNewDroplet("my-do-template")
 # Run unit tests
 ./gradlew test
 
-# Run integration tests
-./gradlew integrationTest
-
 # Run all tests
 ./gradlew check
 ```
@@ -337,21 +324,21 @@ doManager.provisionNewDroplet("my-do-template")
 > **注意**：JFFI 原生依赖（jffi-1.2.17-native.jar）存在已知问题，可能导致测试失败。如果遇到此问题，可以使用以下命令跳过测试：
 >
 > ```bash
-> ./gradlew build -PskipTests
+> ./gradlew build -x test
 > ```
 >
 > GitHub Actions 测试当前已配置为跳过存在问题的测试。
 
 #### Docker 测试环境
 
-项目包含基于 Docker 的测试环境，用于验证不同 Java 版本的兼容性：
+[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
 
 ```sh
 docker compose -f docker-compose.test.yml run --rm java17
 docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-集成测试使用 JenkinsRule 创建临时 Jenkins 实例进行测试，因此无需运行中的 Jenkins 服务器。这些测试验证脚本是否能与真实的 Jenkins API 和数据结构正常工作。详情请参阅[集成测试文档](../../../src/integration-test/README.md)。
 
 ### 代码质量
 

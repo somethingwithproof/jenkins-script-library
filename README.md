@@ -2,11 +2,12 @@
 **Languages:** **English** · [Deutsch](docs/i18n/de/README.md) · [Español](docs/i18n/es/README.md) · [Français](docs/i18n/fr/README.md) · [Português (BR)](docs/i18n/pt-BR/README.md) · [Русский](docs/i18n/ru/README.md) · [日本語](docs/i18n/ja/README.md) · [한국어](docs/i18n/ko/README.md) · [简体中文](docs/i18n/zh-CN/README.md) · [العربية](docs/i18n/ar/README.md) · [हिन्दी](docs/i18n/hi/README.md)
 
 <details>
-<summary>All 45 languages (Tier 1, Africa, Asia)</summary>
+<summary>All 48 languages (Tier 1, Africa, Asia, Balkans)</summary>
 
 - **Tier 1:** **English** · [Deutsch](docs/i18n/de/README.md) · [Español](docs/i18n/es/README.md) · [Français](docs/i18n/fr/README.md) · [Italiano](docs/i18n/it/README.md) · [Português (BR)](docs/i18n/pt-BR/README.md) · [Nederlands](docs/i18n/nl/README.md) · [Русский](docs/i18n/ru/README.md) · [Українська](docs/i18n/uk/README.md) · [日本語](docs/i18n/ja/README.md) · [한국어](docs/i18n/ko/README.md) · [简体中文](docs/i18n/zh-CN/README.md) · [繁體中文](docs/i18n/zh-TW/README.md) · [العربية](docs/i18n/ar/README.md) · [हिन्दी](docs/i18n/hi/README.md) · [Polski](docs/i18n/pl/README.md) · [Türkçe](docs/i18n/tr/README.md) · [Svenska](docs/i18n/sv/README.md) · [Tiếng Việt](docs/i18n/vi/README.md) · [Bahasa Indonesia](docs/i18n/id/README.md)
 - **Africa:** [Afrikaans](docs/i18n/af-ZA/README.md) · [አማርኛ](docs/i18n/am-ET/README.md) · [العربية (مصر)](docs/i18n/ar-EG/README.md) · [العربية (المغرب)](docs/i18n/ar-MA/README.md) · [Français (Maroc)](docs/i18n/fr-MA/README.md) · [Français (Sénégal)](docs/i18n/fr-SN/README.md) · [Hausa](docs/i18n/ha-NG/README.md) · [Igbo](docs/i18n/ig-NG/README.md) · [Malagasy](docs/i18n/mg-MG/README.md) · [Kinyarwanda](docs/i18n/rw-RW/README.md) · [Soomaali](docs/i18n/so-SO/README.md) · [Kiswahili](docs/i18n/sw-KE/README.md) · [isiXhosa](docs/i18n/xh-ZA/README.md) · [Yorùbá](docs/i18n/yo-NG/README.md) · [isiZulu](docs/i18n/zu-ZA/README.md)
 - **Asia:** [বাংলা](docs/i18n/bn/README.md) · [فارسی](docs/i18n/fa/README.md) · [עברית](docs/i18n/he/README.md) · [मराठी](docs/i18n/mr/README.md) · [தமிழ்](docs/i18n/ta/README.md) · [తెలుగు](docs/i18n/te/README.md) · [ไทย](docs/i18n/th/README.md) · [اردو](docs/i18n/ur/README.md) · [Bahasa Melayu](docs/i18n/ms/README.md) · [Filipino](docs/i18n/fil/README.md)
+- **Balkans:** [Bosanski](docs/i18n/bs/README.md) · [Hrvatski](docs/i18n/hr/README.md) · [Српски](docs/i18n/sr/README.md)
 
 </details>
 <!-- translations:end -->
@@ -72,6 +73,8 @@ This library can be used in two ways:
    }
    ```
 
+   > **Note**: The published Gradle artifact currently compiles only the `util` and `pipeline` packages (`build.gradle`). Use `jobs`, `cloud`, and `scripts` directly from `src/main/groovy/`.
+
 2. **As individual scripts to run directly in Jenkins**:
 
    The scripts in `src/main/groovy/com/github/thomasvincent/jenkinsscripts/scripts/` can be executed directly in Jenkins Script Console or through the Jenkins CLI.
@@ -106,16 +109,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### Job Migration
 
-```bash
-# Migrate a specific job
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job
-
-# Migrate all jobs matching a pattern
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --pattern "frontend-.*"
-
-# Use a replacement config file to modify properties during migration
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job --replacements-file replacements.json
-```
+Remote migration is unavailable. Even with a target URL, the script uses the current Jenkins controller.
 
 ##### Job Templating
 
@@ -246,11 +240,14 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 The library also provides a programmatic API for use in your own Groovy scripts:
 
+JAR → [`util`](src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
+
+`src/main/groovy` → [`jobs`](src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
+
 #### Job Management
 
 ```groovy
 import com.github.thomasvincent.jenkinsscripts.jobs.JobCleaner
-import com.github.thomasvincent.jenkinsscripts.jobs.JobMigrator
 import com.github.thomasvincent.jenkinsscripts.jobs.JobTemplate
 import jenkins.model.Jenkins
 
@@ -269,11 +266,6 @@ def template = new JobTemplate(
     ]
 )
 template.applyTemplate("new-job")
-
-// Migrate a job between Jenkins instances with JenkinsAccessor
-def localAccessor = new LocalJenkinsAccessor(jenkins)
-def migrator = new JobMigrator(localAccessor, localAccessor)
-migrator.migrateJob("source-job", "target-job")
 ```
 
 #### Cloud Management
@@ -327,33 +319,30 @@ doManager.provisionNewDroplet("my-do-template")
 # Run unit tests
 ./gradlew test
 
-# Run integration tests
-./gradlew integrationTest
-
-# Run all tests
+# Run all configured checks
 ./gradlew check
 ```
 
 > **Note**: There's a known issue with the JFFI native dependency (jffi-1.2.17-native.jar) that may cause test failures. If you encounter this, you can skip tests with:
 >
 > ```bash
-> ./gradlew build -PskipTests
+> ./gradlew build -x test
 > ```
 >
 > The GitHub Actions tests are currently configured to skip problematic tests.
 
 #### Docker Testing Environment
 
-The project includes a Docker-based testing environment to verify compatibility with different Java versions:
+Both Compose services run the Gradle test suite on Java 24.
+
+[`java17`](Dockerfile.test) → `eclipse-temurin:24-jdk`
+
+[`java21`](Dockerfile.java21) → `eclipse-temurin:24-jdk`
 
 ```sh
 docker compose -f docker-compose.test.yml run --rm java17
 docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-The [Compose file](docker-compose.test.yml) defines the Java 17 and 21 test services. Each command above runs one service and removes the container when it exits.
-
-The integration tests use JenkinsRule to create a temporary Jenkins instance for testing, so you don't need a running Jenkins server. These tests verify that the scripts work correctly with real Jenkins APIs and data structures. See the [integration test documentation](src/integration-test/README.md) for more details.
 
 ### Code Quality
 

@@ -1,0 +1,382 @@
+<!-- translations:start -->
+**Languages:** [English](../../../README.md) · **Bosanski** · [Deutsch](../de/README.md) · [Español](../es/README.md) · [Français](../fr/README.md) · [Português (BR)](../pt-BR/README.md) · [Русский](../ru/README.md) · [日本語](../ja/README.md) · [한국어](../ko/README.md) · [简体中文](../zh-CN/README.md) · [العربية](../ar/README.md) · [हिन्दी](../hi/README.md)
+
+<details>
+<summary>All 48 languages (Tier 1, Africa, Asia, Balkans)</summary>
+
+- **Tier 1:** [English](../../../README.md) · [Deutsch](../de/README.md) · [Español](../es/README.md) · [Français](../fr/README.md) · [Italiano](../it/README.md) · [Português (BR)](../pt-BR/README.md) · [Nederlands](../nl/README.md) · [Русский](../ru/README.md) · [Українська](../uk/README.md) · [日本語](../ja/README.md) · [한국어](../ko/README.md) · [简体中文](../zh-CN/README.md) · [繁體中文](../zh-TW/README.md) · [العربية](../ar/README.md) · [हिन्दी](../hi/README.md) · [Polski](../pl/README.md) · [Türkçe](../tr/README.md) · [Svenska](../sv/README.md) · [Tiếng Việt](../vi/README.md) · [Bahasa Indonesia](../id/README.md)
+- **Africa:** [Afrikaans](../af-ZA/README.md) · [አማርኛ](../am-ET/README.md) · [العربية (مصر)](../ar-EG/README.md) · [العربية (المغرب)](../ar-MA/README.md) · [Français (Maroc)](../fr-MA/README.md) · [Français (Sénégal)](../fr-SN/README.md) · [Hausa](../ha-NG/README.md) · [Igbo](../ig-NG/README.md) · [Malagasy](../mg-MG/README.md) · [Kinyarwanda](../rw-RW/README.md) · [Soomaali](../so-SO/README.md) · [Kiswahili](../sw-KE/README.md) · [isiXhosa](../xh-ZA/README.md) · [Yorùbá](../yo-NG/README.md) · [isiZulu](../zu-ZA/README.md)
+- **Asia:** [বাংলা](../bn/README.md) · [فارسی](../fa/README.md) · [עברית](../he/README.md) · [मराठी](../mr/README.md) · [தமிழ்](../ta/README.md) · [తెలుగు](../te/README.md) · [ไทย](../th/README.md) · [اردو](../ur/README.md) · [Bahasa Melayu](../ms/README.md) · [Filipino](../fil/README.md)
+- **Balkans:** **Bosanski** · [Hrvatski](../hr/README.md) · [Српски](../sr/README.md)
+
+</details>
+<!-- translations:end -->
+
+# Jenkins Script Library
+
+[![CI](https://github.com/somethingwithproof/jenkins-script-library/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/somethingwithproof/jenkins-script-library/actions/workflows/ci.yml)
+[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=somethingwithproof_jenkins-script-library&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=somethingwithproof_jenkins-script-library)
+[![Release](https://img.shields.io/github/v/release/somethingwithproof/jenkins-script-library)](https://github.com/somethingwithproof/jenkins-script-library/releases)
+[![License](https://img.shields.io/badge/license-MIT-blue)](../../../LICENSE)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/somethingwithproof/jenkins-script-library/badge)](https://scorecard.dev/viewer/?uri=github.com/somethingwithproof/jenkins-script-library)
+
+Kolekcija Groovy pomoćnih alata i skripti namijenjenih automatizaciji i olakšavanju različitih operacija u Jenkins okruženjima. Ova biblioteka slijedi prakse kompatibilne s Jenkinsom i uključuje jedinične i integracione testove. Podržava Jenkins automatizaciju za moderna okruženja.
+
+## Mogućnosti
+
+- **Upravljanje poslovima (Job Management)**: Omogućavanje/onemogućavanje, čišćenje, migracija i kreiranje Jenkins poslova iz šablona
+- **Integracija s oblakom**: Upravljanje Jenkins agentima na AWS, Azure i Kubernetes platformama
+- **Sigurnost**: Revizija i zaštita Jenkins instanci
+- **Optimizacija performansi**: Nadzor i unapređenje performansi Jenkinsa
+- **Upravljanje konfiguracijom**: Sigurnosno kopiranje i vraćanje Jenkins postavki
+- **Generisanje pipelinea**: Kreiranje Jenkins pipelinea iz višekratno upotrebljivih šablona
+
+## Struktura projekta
+
+Projekat prati standardnu strukturu Groovy projekta:
+
+```text
+jenkins-script-library/
+├── src/
+│   ├── main/groovy/            # Main source code
+│   │   └── com/github/thomasvincent/jenkinsscripts/
+│   │       ├── cloud/          # Cloud provider integrations
+│   │       ├── config/         # Configuration management
+│   │       ├── helm/           # Helm management
+│   │       ├── jobs/           # Job management
+│   │       ├── nodes/          # Node management
+│   │       ├── scripts/        # Command-line script entry points
+│   │       ├── security/       # Security utilities
+│   │       └── util/           # Common utilities
+│   ├── test/groovy/            # Unit tests
+│   └── integration-test/groovy/ # Integration tests
+├── build.gradle                # Gradle build configuration
+├── config/                     # Configuration files
+│   └── codenarc/               # CodeNarc rules for code quality
+├── gradle/wrapper/            # Gradle wrapper files
+├── gradlew                     # Gradle wrapper script
+├── LICENSE                     # MIT License
+├── README.md                   # This file
+└── SECURITY.md                 # Security policy
+```
+
+## Instalacija
+
+Ova biblioteka se može koristiti na dva načina:
+
+1. **Kao zavisnost u vašem Gradle/Maven projektu**:
+
+   ```groovy
+   // In your build.gradle
+   dependencies {
+       implementation 'com.github.thomasvincent:jenkins-script-library:1.0.0'
+   }
+   ```
+
+   > **Napomena**: Objavljeni Gradle artefakt trenutno kompilira samo pakete `util` i `pipeline` (`build.gradle`). Klase iz `jobs`, `cloud` i `scripts` koristite direktno iz `src/main/groovy/`.
+
+2. **Kao pojedinačne skripte koje se pokreću direktno u Jenkinsu**:
+
+   Skripte u `src/main/groovy/com/github/thomasvincent/jenkinsscripts/scripts/` mogu se izvršavati direktno u Jenkins Script Console ili putem Jenkins CLI alata.
+
+## Korištenje
+
+### Skripte za komandnu liniju
+
+Sve skripte za komandnu liniju podržavaju opciju `--help` za prikaz informacija o korištenju.
+
+#### Upravljanje poslovima
+
+##### Čišćenje poslova
+
+```bash
+# Clean build history for a job with limit of 50 builds and reset build number
+groovy CleanBuildHistory.groovy --limit 50 --reset my-jenkins-job
+```
+
+##### Omogućavanje/onemogućavanje poslova
+
+```bash
+# Disable a specific job
+groovy DisableJobs.groovy my-jenkins-job
+
+# Disable all buildable jobs
+groovy DisableJobs.groovy --all
+
+# Enable a specific job
+groovy EnableJobs.groovy my-jenkins-job
+```
+
+##### Migracija poslova
+
+Udaljena migracija nije dostupna. Čak i kada navedete ciljni URL, skripta koristi trenutni Jenkins kontroler.
+
+##### Kreiranje poslova iz šablona
+
+```bash
+# Create a job from a template
+groovy CreateJobFromTemplate.groovy --template-job template-job --target-job new-job --params-file params.json
+```
+
+##### Generisanje pipelinea
+
+```groovy
+// Generate a Jenkinsfile from template
+generatePipeline(
+    template: 'templates/basic-pipeline.jenkinsfile',
+    parameters: [project: 'my-app'],
+    destination: 'Jenkinsfile'
+)
+```
+
+##### Analiza poslova
+
+```bash
+# Analyze job health
+groovy AnalyzeJobHealth.groovy --job my-jenkins-job
+
+# Analyze pipeline performance
+groovy AnalyzePipelinePerformance.groovy --job my-pipeline-job --builds 10
+
+# Audit job configurations
+groovy AuditJobConfigurations.groovy --pattern "*.xml" --output audit-report.json
+```
+
+#### Upravljanje čvorovima
+
+##### Prikaz čvorova
+
+```bash
+# List all slave nodes
+groovy ListSlaveNodes.groovy --all
+
+# List a specific slave node with detailed information
+groovy ListSlaveNodes.groovy my-slave-node
+
+# List cloud-based nodes
+groovy ListCloudNodes.groovy --cloud-type aws
+```
+
+##### Operacije nad čvorovima
+
+```bash
+# Start all offline slave nodes
+groovy StartOfflineSlaveNodes.groovy --all
+
+# Start a specific offline slave node
+groovy StartOfflineSlaveNodes.groovy my-slave-node
+```
+
+#### Upravljanje provajderima oblaka
+
+##### Upravljanje AWS-om
+
+```bash
+# List EC2 instances used as Jenkins agents
+groovy ManageEC2Agents.groovy --list
+
+# Provision a new EC2 instance from template
+groovy ManageEC2Agents.groovy --provision --template "my-ec2-template"
+
+# Terminate an EC2 instance
+groovy ManageEC2Agents.groovy --terminate --instance-id i-1234567890abcdef0
+```
+
+##### Upravljanje Azureom
+
+```bash
+# List Azure VMs used as Jenkins agents
+groovy ManageAzureVMAgents.groovy --list
+
+# Provision a new Azure VM from template
+groovy ManageAzureVMAgents.groovy --provision --template "my-azure-template"
+
+# Clean up an Azure VM
+groovy ManageAzureVMAgents.groovy --cleanup --node-name azure-agent-01
+```
+
+##### Upravljanje Kubernetesom
+
+```bash
+# List Kubernetes pods used as Jenkins agents
+groovy ManageKubernetesAgents.groovy --list
+
+# Provision a new Kubernetes pod from template
+groovy ManageKubernetesAgents.groovy --provision --template "my-k8s-template"
+
+# Delete a Kubernetes pod
+groovy ManageKubernetesAgents.groovy --delete --pod-name k8s-agent-xyz123
+```
+
+#### Upravljanje Jenkins instancom
+
+##### Stanje i sigurnost
+
+```bash
+# Perform a Jenkins instance health check
+groovy JenkinsInstanceHealthCheck.groovy
+
+# Audit Jenkins security settings
+groovy AuditJenkinsSecurity.groovy --detailed
+
+# Scan for security vulnerabilities
+groovy SecurityVulnerabilityScan.groovy --critical-only
+```
+
+##### Upravljanje konfiguracijom
+
+```bash
+# Backup Jenkins configuration
+groovy BackupJenkinsConfig.groovy --output jenkins-backup.tar.gz
+
+# Optimize agent resources
+groovy OptimizeAgentResources.groovy --reclaim-idle
+
+# Optimize job scheduling
+groovy OptimizeJobScheduling.groovy --balance-load
+```
+
+### Programski API
+
+Biblioteka također pruža programski API za korištenje u vašim Groovy skriptama:
+
+JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
+
+`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
+
+#### Upravljanje poslovima
+
+```groovy
+import com.github.thomasvincent.jenkinsscripts.jobs.JobCleaner
+import com.github.thomasvincent.jenkinsscripts.jobs.JobTemplate
+import jenkins.model.Jenkins
+
+// Clean build history for a job
+def jenkins = Jenkins.get()
+def cleaner = new JobCleaner(jenkins, "my-job", true, 100)
+cleaner.clean()
+
+// Create a job from a template
+def template = new JobTemplate(
+    jenkins: jenkins,
+    templateJobName: "template-job",
+    parameters: [
+        'PROJECT_NAME': 'frontend-app',
+        'GIT_URL': 'https://github.com/myorg/frontend-app.git'
+    ]
+)
+template.applyTemplate("new-job")
+```
+
+#### Upravljanje oblakom
+
+```groovy
+import com.github.thomasvincent.jenkinsscripts.cloud.AWSNodeManager
+import com.github.thomasvincent.jenkinsscripts.cloud.AzureNodeManager
+import com.github.thomasvincent.jenkinsscripts.cloud.KubernetesNodeManager
+import com.github.thomasvincent.jenkinsscripts.cloud.OracleCloudNodeManager
+import com.github.thomasvincent.jenkinsscripts.cloud.DigitalOceanNodeManager
+import jenkins.model.Jenkins
+
+// Manage EC2 instances
+def awsManager = new AWSNodeManager(Jenkins.get())
+def templates = awsManager.getEC2Templates()
+def nodes = awsManager.getEC2Nodes()
+awsManager.provisionNewInstance("my-ec2-template")
+
+// Manage Azure VMs
+def azureManager = new AzureNodeManager(Jenkins.get())
+def azureNodes = azureManager.getAzureNodesInfo()
+azureManager.provisionNewVM("my-azure-template")
+
+// Manage Kubernetes agents
+def k8sManager = new KubernetesNodeManager(Jenkins.get())
+def k8sNodes = k8sManager.getKubernetesNodes()
+k8sManager.provisionNewPod("my-k8s-template")
+
+// Manage Oracle Cloud instances
+def ociManager = new OracleCloudNodeManager(Jenkins.get())
+def ociNodes = ociManager.getOCIComputeInstances()
+ociManager.provisionNewInstance("my-oci-template")
+
+// Manage DigitalOcean droplets
+def doManager = new DigitalOceanNodeManager(Jenkins.get())
+def doNodes = doManager.getDigitalOceanNodes()
+doManager.provisionNewDroplet("my-do-template")
+```
+
+## Razvoj
+
+### Izgradnja projekta
+
+```bash
+./gradlew build
+```
+
+### Pokretanje testova
+
+```bash
+# Run unit tests
+./gradlew test
+
+# Run all configured checks
+./gradlew check
+```
+
+> **Napomena**: Postoji poznata greška s JFFI nativnom zavisnošću (jffi-1.2.17-native.jar) koja može izazvati pad testova. Ako naiđete na taj problem, testove možete preskočiti pomoću:
+>
+> ```bash
+> ./gradlew build -x test
+> ```
+>
+> GitHub Actions testovi trenutno su podešeni da preskaču problematične testove.
+
+#### Docker okruženje za testiranje
+
+Oba Compose servisa pokreću Gradle testove na Javi 24.
+
+[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
+
+```sh
+docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java21
+```
+
+### Kvalitet koda
+
+Ovaj projekat koristi CodeNarc za provjeru kvaliteta Groovy koda:
+
+```bash
+./gradlew codenarcMain codenarcTest
+```
+
+## Dostupne integracije s oblakom
+
+Biblioteka podržava sljedeće provajdere oblaka:
+
+- **AWS EC2**: Upravljanje EC2 instancama kao Jenkins agentima
+- **Azure VMs**: Upravljanje Azure virtuelnim mašinama kao Jenkins agentima
+- **Kubernetes**: Upravljanje Kubernetes podovima kao Jenkins agentima
+- **Oracle Cloud**: Upravljanje Oracle Cloud Infrastructure (OCI) instancama kao Jenkins agentima
+- **DigitalOcean**: Upravljanje DigitalOcean dropletima kao Jenkins agentima
+
+## Planirane mogućnosti
+
+- **Google Cloud integracija**: Upravljanje Jenkins agentima na Google Cloud Platformi
+- **AWS ECS/Fargate podrška**: Podrška za agente zasnovane na kontejnerima u AWS-u
+- **Upravljanje s više Jenkins instanci**: Unaprijeđeni alati za upravljanje s više Jenkins servera
+- **Migracija između oblaka**: Alati za migraciju agenata između provajdera oblaka
+
+## Doprinosi
+
+Doprinosi su dobrodošli! Molimo vas da pratite naše [smjernice za doprinose](../../../CONTRIBUTING.md).
+
+## Sigurnost
+
+Za sigurnosna pitanja pregledajte našu [sigurnosnu politiku](../../../SECURITY.md).
+
+## Licenca
+
+Ovaj projekat je licenciran pod MIT licencom - za detalje pogledajte datoteku [LICENSE](../../../LICENSE).

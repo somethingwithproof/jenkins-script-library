@@ -2,11 +2,12 @@
 **Languages:** [English](../../../README.md) · **Filipino** · [Deutsch](../de/README.md) · [Español](../es/README.md) · [Français](../fr/README.md) · [Português (BR)](../pt-BR/README.md) · [Русский](../ru/README.md) · [日本語](../ja/README.md) · [한국어](../ko/README.md) · [简体中文](../zh-CN/README.md) · [العربية](../ar/README.md) · [हिन्दी](../hi/README.md)
 
 <details>
-<summary>All 45 languages (Tier 1, Africa, Asia)</summary>
+<summary>All 48 languages (Tier 1, Africa, Asia, Balkans)</summary>
 
 - **Tier 1:** [English](../../../README.md) · [Deutsch](../de/README.md) · [Español](../es/README.md) · [Français](../fr/README.md) · [Italiano](../it/README.md) · [Português (BR)](../pt-BR/README.md) · [Nederlands](../nl/README.md) · [Русский](../ru/README.md) · [Українська](../uk/README.md) · [日本語](../ja/README.md) · [한국어](../ko/README.md) · [简体中文](../zh-CN/README.md) · [繁體中文](../zh-TW/README.md) · [العربية](../ar/README.md) · [हिन्दी](../hi/README.md) · [Polski](../pl/README.md) · [Türkçe](../tr/README.md) · [Svenska](../sv/README.md) · [Tiếng Việt](../vi/README.md) · [Bahasa Indonesia](../id/README.md)
 - **Africa:** [Afrikaans](../af-ZA/README.md) · [አማርኛ](../am-ET/README.md) · [العربية (مصر)](../ar-EG/README.md) · [العربية (المغرب)](../ar-MA/README.md) · [Français (Maroc)](../fr-MA/README.md) · [Français (Sénégal)](../fr-SN/README.md) · [Hausa](../ha-NG/README.md) · [Igbo](../ig-NG/README.md) · [Malagasy](../mg-MG/README.md) · [Kinyarwanda](../rw-RW/README.md) · [Soomaali](../so-SO/README.md) · [Kiswahili](../sw-KE/README.md) · [isiXhosa](../xh-ZA/README.md) · [Yorùbá](../yo-NG/README.md) · [isiZulu](../zu-ZA/README.md)
 - **Asia:** [বাংলা](../bn/README.md) · [فارسی](../fa/README.md) · [עברית](../he/README.md) · [मराठी](../mr/README.md) · [தமிழ்](../ta/README.md) · [తెలుగు](../te/README.md) · [ไทย](../th/README.md) · [اردو](../ur/README.md) · [Bahasa Melayu](../ms/README.md) · **Filipino**
+- **Balkans:** [Bosanski](../bs/README.md) · [Hrvatski](../hr/README.md) · [Српски](../sr/README.md)
 
 </details>
 <!-- translations:end -->
@@ -106,16 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### Pag-migrate ng Job
 
-```bash
-# Migrate a specific job
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job
-
-# Migrate all jobs matching a pattern
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --pattern "frontend-.*"
-
-# Use a replacement config file to modify properties during migration
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job --replacements-file replacements.json
-```
+Hindi magagamit ang remote migration. Kahit magbigay ng target URL, ginagamit ng script ang kasalukuyang Jenkins controller.
 
 ##### Paggawa ng Template ng Job
 
@@ -246,11 +238,14 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 Nagbibigay din ang library ng programmatic API na magagamit sa sarili mong mga Groovy script:
 
+JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
+
+`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
+
 #### Pamamahala ng Job
 
 ```groovy
 import com.github.thomasvincent.jenkinsscripts.jobs.JobCleaner
-import com.github.thomasvincent.jenkinsscripts.jobs.JobMigrator
 import com.github.thomasvincent.jenkinsscripts.jobs.JobTemplate
 import jenkins.model.Jenkins
 
@@ -269,11 +264,6 @@ def template = new JobTemplate(
     ]
 )
 template.applyTemplate("new-job")
-
-// Migrate a job between Jenkins instances with JenkinsAccessor
-def localAccessor = new LocalJenkinsAccessor(jenkins)
-def migrator = new JobMigrator(localAccessor, localAccessor)
-migrator.migrateJob("source-job", "target-job")
 ```
 
 #### Pamamahala ng Cloud
@@ -327,9 +317,6 @@ doManager.provisionNewDroplet("my-do-template")
 # Run unit tests
 ./gradlew test
 
-# Run integration tests
-./gradlew integrationTest
-
 # Run all tests
 ./gradlew check
 ```
@@ -337,21 +324,21 @@ doManager.provisionNewDroplet("my-do-template")
 > **Tala**: May kilalang isyu sa JFFI native dependency (jffi-1.2.17-native.jar) na maaaring magdulot ng pagkabigo sa mga pagsusuri. Kung maranasan mo ito, maaari mong laktawan ang mga pagsusuri gamit ang:
 >
 > ```bash
-> ./gradlew build -PskipTests
+> ./gradlew build -x test
 > ```
 >
 > Kasalukuyang naka-configure ang mga pagsusuri sa GitHub Actions upang laktawan ang mga problemadong pagsusuri.
 
 #### Kapaligiran sa Pagsusuri gamit ang Docker
 
-Kasama sa proyekto ang isang kapaligiran sa pagsusuri na nakabatay sa Docker upang beripikahin ang pagiging tugma sa iba't ibang bersyon ng Java:
+[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
 
 ```sh
 docker compose -f docker-compose.test.yml run --rm java17
 docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-Gumagamit ang mga integration test ng JenkinsRule upang lumikha ng pansamantalang instance ng Jenkins para sa pagsusuri, kaya hindi mo kailangan ng tumatakbong server ng Jenkins. Bineberipika ng mga pagsusuring ito na gumagana nang tama ang mga script sa mga totoong API at data structure ng Jenkins. Tingnan ang [dokumentasyon ng integration test](../../../src/integration-test/README.md) para sa karagdagang detalye.
 
 ### Kalidad ng Code
 
