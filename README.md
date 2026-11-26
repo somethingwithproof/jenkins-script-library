@@ -73,6 +73,8 @@ This library can be used in two ways:
    }
    ```
 
+   > **Note**: The published Gradle artifact currently compiles only the `util` and `pipeline` packages (`build.gradle`). Use `jobs`, `cloud`, and `scripts` directly from `src/main/groovy/`.
+
 2. **As individual scripts to run directly in Jenkins**:
 
    The scripts in `src/main/groovy/com/github/thomasvincent/jenkinsscripts/scripts/` can be executed directly in Jenkins Script Console or through the Jenkins CLI.
@@ -115,8 +117,10 @@ groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin 
 groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --pattern "frontend-.*"
 
 # Use a replacement config file to modify properties during migration
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job --replacements-file replacements.json
+groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job --replacements-file replacements.json --modify
 ```
+
+> **Note**: `MigrateJobs.groovy` currently uses a placeholder `connectToJenkins` helper that returns the local `Jenkins.get()` instance rather than connecting to a remote controller.
 
 ##### Job Templating
 
@@ -271,12 +275,15 @@ def template = new JobTemplate(
 )
 template.applyTemplate("new-job")
 
+// Copy a job between two Jenkins instances provided by the caller
+// (for example, an in-process JenkinsRule harness; no remote connector is bundled)
 boolean migrateBetween(Jenkins source, Jenkins target) {
     if (source.is(target)) {
         throw new IllegalArgumentException("Source and target must be distinct Jenkins instances")
     }
     return new JobMigrator(source, target).migrateJob("source-job", "target-job")
 }
+migrateBetween(jenkins, targetJenkins)
 ```
 
 #### Cloud Management
@@ -330,31 +337,28 @@ doManager.provisionNewDroplet("my-do-template")
 # Run unit tests
 ./gradlew test
 
-# Run integration tests
-./gradlew integrationTest
-
-# Run all tests
+# Run all configured checks
 ./gradlew check
 ```
 
 > **Note**: There's a known issue with the JFFI native dependency (jffi-1.2.17-native.jar) that may cause test failures. If you encounter this, you can skip tests with:
 >
 > ```bash
-> ./gradlew build -PskipTests
+> ./gradlew build -x test
 > ```
 >
 > The GitHub Actions tests are currently configured to skip problematic tests.
 
 #### Docker Testing Environment
 
-The project includes a Docker-based testing environment to verify compatibility with different Java versions:
+The project includes a Docker-based testing environment to run the test suite in containers:
 
 ```sh
 docker compose -f docker-compose.test.yml run --rm java17
 docker compose -f docker-compose.test.yml run --rm java21
 ```
 
-The [Compose file](docker-compose.test.yml) defines the Java 17 and 21 test services. Each command above runs one service and removes the container when it exits.
+The [Compose file](docker-compose.test.yml) defines the `java17` and `java21` test services; both Dockerfiles currently build from `eclipse-temurin:24-jdk`. Each command above runs one service and removes the container when it exits.
 
 The integration tests use JenkinsRule to create a temporary Jenkins instance for testing, so you don't need a running Jenkins server. These tests verify that the scripts work correctly with real Jenkins APIs and data structures. See the [integration test documentation](src/integration-test/README.md) for more details.
 

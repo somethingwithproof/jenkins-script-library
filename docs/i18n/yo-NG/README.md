@@ -271,12 +271,15 @@ def template = new JobTemplate(
 )
 template.applyTemplate("new-job")
 
+// Copy a job between two Jenkins instances provided by the caller
+// (for example, an in-process JenkinsRule harness; no remote connector is bundled)
 boolean migrateBetween(Jenkins source, Jenkins target) {
     if (source.is(target)) {
         throw new IllegalArgumentException("Source and target must be distinct Jenkins instances")
     }
     return new JobMigrator(source, target).migrateJob("source-job", "target-job")
 }
+migrateBetween(jenkins, targetJenkins)
 ```
 
 #### Ìṣàkóso Àwọsánmà

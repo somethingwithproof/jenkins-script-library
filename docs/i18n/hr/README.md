@@ -73,6 +73,8 @@ Ova biblioteka može se koristiti na dva načina:
    }
    ```
 
+   > **Napomena**: Objavljeni Gradle artefakt trenutačno prevodi samo pakete `util` i `pipeline` (`build.gradle`). Klase iz `jobs`, `cloud` i `scripts` koristite izravno iz `src/main/groovy/`.
+
 2. **Kao zasebne skripte za izravno izvođenje u Jenkinsu**:
 
    Skripte u `src/main/groovy/com/github/thomasvincent/jenkinsscripts/scripts/` mogu se izvoditi izravno u konzoli Jenkins Script Console ili putem Jenkins CLI alata.
@@ -115,8 +117,10 @@ groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin 
 groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --pattern "frontend-.*"
 
 # Use a replacement config file to modify properties during migration
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job --replacements-file replacements.json
+groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job --replacements-file replacements.json --modify
 ```
+
+> **Napomena**: `MigrateJobs.groovy` trenutačno koristi pomoćnu funkciju `connectToJenkins` koja vraća lokalnu instancu `Jenkins.get()` umjesto povezivanja s udaljenim kontrolerom.
 
 ##### Izrada poslova iz predložaka
 
@@ -271,12 +275,15 @@ def template = new JobTemplate(
 )
 template.applyTemplate("new-job")
 
+// Copy a job between two Jenkins instances provided by the caller
+// (for example, an in-process JenkinsRule harness; no remote connector is bundled)
 boolean migrateBetween(Jenkins source, Jenkins target) {
     if (source.is(target)) {
         throw new IllegalArgumentException("Source and target must be distinct Jenkins instances")
     }
     return new JobMigrator(source, target).migrateJob("source-job", "target-job")
 }
+migrateBetween(jenkins, targetJenkins)
 ```
 
 #### Upravljanje oblakom
@@ -330,24 +337,21 @@ doManager.provisionNewDroplet("my-do-template")
 # Run unit tests
 ./gradlew test
 
-# Run integration tests
-./gradlew integrationTest
-
-# Run all tests
+# Run all configured checks
 ./gradlew check
 ```
 
 > **Napomena**: Postoji poznata pogreška s nativnom ovisnošću JFFI (jffi-1.2.17-native.jar) koja može uzrokovati neuspjeh testova. Ako naiđete na to, testove možete preskočiti pomoću:
 >
 > ```bash
-> ./gradlew build -PskipTests
+> ./gradlew build -x test
 > ```
 >
 > Testovi u GitHub Actions trenutačno su postavljeni tako da preskaču problematične testove.
 
 #### Docker okruženje za testiranje
 
-Projekt uključuje Docker okruženje za testiranje radi provjere kompatibilnosti s različitim inačicama Jave:
+Projekt uključuje Docker okruženje za pokretanje testova u spremnicima (oba servisa `java17` i `java21` u [Compose datoteci](../../../docker-compose.test.yml) trenutačno koriste sliku `eclipse-temurin:24-jdk`):
 
 ```sh
 docker compose -f docker-compose.test.yml run --rm java17
