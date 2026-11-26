@@ -271,10 +271,12 @@ def template = new JobTemplate(
 )
 template.applyTemplate("new-job")
 
-// Migrate a job between Jenkins instances with JenkinsAccessor
-def localAccessor = new LocalJenkinsAccessor(jenkins)
-def migrator = new JobMigrator(localAccessor, localAccessor)
-migrator.migrateJob("source-job", "target-job")
+boolean migrateBetween(Jenkins source, Jenkins target) {
+    if (source.is(target)) {
+        throw new IllegalArgumentException("Source and target must be distinct Jenkins instances")
+    }
+    return new JobMigrator(source, target).migrateJob("source-job", "target-job")
+}
 ```
 
 #### Gerenciamento de nuvem
