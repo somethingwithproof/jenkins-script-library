@@ -32,6 +32,7 @@ dependencies {
     codenarc "org.codenarc:CodeNarc:${codenarc.toolVersion}"
     // Use individual Groovy modules instead of deprecated groovy-all
     implementation 'org.codehaus.groovy:groovy'
+    implementation 'org.codehaus.groovy:groovy-cli-commons'
     implementation 'org.codehaus.groovy:groovy-json'
     implementation 'org.codehaus.groovy:groovy-xml'
     implementation 'org.codehaus.groovy:groovy-templates'
@@ -39,10 +40,45 @@ dependencies {
     implementation 'org.apache.logging.log4j:log4j-core:2.26.1'
     implementation 'commons-io:commons-io:2.22.0'
 
-    // Jenkins core APIs scoped to compile time only; version tracks latest LTS
+    // Jenkins core and plugin APIs scoped to compile time only; version tracks latest LTS
     compileOnly "org.jenkins-ci.main:jenkins-core:${jenkinsLtsVersion}"
+    compileOnly 'jakarta.servlet:jakarta.servlet-api:6.1.0'
+    compileOnly 'javax.servlet:javax.servlet-api:4.0.1'
+    compileOnly 'com.cloudbees:groovy-cps:4403.4405.va_b_cdb_b_d0b_89f'
+    compileOnly('org.jenkins-ci.plugins.workflow:workflow-api:1429.v7a_1b_efb_a_f7c5@jar')
+    compileOnly('org.jenkins-ci.plugins.workflow:workflow-step-api:724.v538c2362b_dfb_@jar')
+    compileOnly('org.jenkins-ci.plugins.workflow:workflow-job:1624.ve973eb_34e031@jar')
+    compileOnly('org.jenkins-ci.plugins.workflow:workflow-cps:4403.4405.va_b_cdb_b_d0b_89f@jar')
+    compileOnly('org.jenkins-ci.plugins.workflow:workflow-support:1035.v6a_23b_e298a_5d@jar')
+    compileOnly('org.jenkins-ci.plugins:credentials:1521.v1e4763284417@jar')
+    compileOnly('org.jenkins-ci.plugins:plain-credentials:199.v9f8e1f741799@jar')
+    compileOnly('org.jenkins-ci.plugins:cloudbees-folder:6.1107.v31f8955765c8@jar')
+    compileOnly('org.jenkins-ci.plugins:git:5.11.0@jar')
+    compileOnly('org.jenkins-ci.plugins:ssh-slaves:3.1097.v868116049892@jar')
+    compileOnly('org.jenkins-ci.plugins:ec2:2068.vd80935072db_b_@jar')
+    compileOnly('org.csanchez.jenkins.plugins:kubernetes:4560.vc25b_83890c34@jar')
+    compileOnly('org.jenkins-ci.plugins:azure-vm-agents:1124.v89b_2f7a_76f35@jar')
+    compileOnly('org.jenkins-ci.plugins:oracle-cloud-infrastructure-compute:1.0.21@jar')
+    compileOnly('org.jenkins-ci.plugins:script-security:1436.1438.v3dc5ef7d16f2@jar')
 
+    testImplementation "org.jenkins-ci.main:jenkins-core:${jenkinsLtsVersion}"
+    testImplementation 'jakarta.servlet:jakarta.servlet-api:6.1.0'
+    testImplementation 'javax.servlet:javax.servlet-api:4.0.1'
+    testImplementation 'com.cloudbees:groovy-cps:4403.4405.va_b_cdb_b_d0b_89f'
+    testImplementation('org.jenkins-ci.plugins.workflow:workflow-api:1429.v7a_1b_efb_a_f7c5@jar')
+    testImplementation('org.jenkins-ci.plugins.workflow:workflow-step-api:724.v538c2362b_dfb_@jar')
+    testImplementation('org.jenkins-ci.plugins.workflow:workflow-job:1624.ve973eb_34e031@jar')
+    testImplementation('org.jenkins-ci.plugins.workflow:workflow-support:1035.v6a_23b_e298a_5d@jar')
+    testImplementation('org.jenkins-ci.plugins:credentials:1521.v1e4763284417@jar')
+    testImplementation('org.jenkins-ci.plugins:plain-credentials:199.v9f8e1f741799@jar')
+    testImplementation('org.jenkins-ci.plugins:cloudbees-folder:6.1107.v31f8955765c8@jar')
+    testImplementation('org.jenkins-ci.plugins:git:5.11.0@jar')
+    testImplementation('org.jenkins-ci.plugins:ec2:2068.vd80935072db_b_@jar')
+    testImplementation('org.csanchez.jenkins.plugins:kubernetes:4560.vc25b_83890c34@jar')
     testImplementation 'org.spockframework:spock-core:2.5-groovy-3.0'
+    testImplementation 'org.mockito:mockito-core:5.17.0'
+    testImplementation 'net.bytebuddy:byte-buddy:1.17.5'
+    testImplementation 'org.objenesis:objenesis:3.4'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
@@ -52,8 +88,6 @@ sourceSets {
     main {
         groovy {
             srcDirs = ['src/main/groovy']
-            include '**/util/**'
-            include '**/pipeline/**'
         }
     }
     test {
@@ -65,6 +99,7 @@ sourceSets {
 
 test {
     useJUnitPlatform()
+    jvmArgs '-XX:+EnableDynamicAgentLoading'
 }
 
 publishing {

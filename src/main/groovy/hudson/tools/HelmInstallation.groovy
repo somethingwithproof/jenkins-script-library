@@ -91,29 +91,13 @@ public class HelmInstallation extends ToolInstallation
      */
     @Extension
     public static class DescriptorImpl extends ToolDescriptor<HelmInstallation> {
-        
+
         /**
          * {@inheritDoc}
          */
         @Override
         public String getDisplayName() {
             return "Helm"
-        }
-        
-        /**
-         * {@inheritDoc}
-         */
-        @Override
-        public HelmInstallation[] getInstallations() {
-            return Jenkins.get().getDescriptorByType(HelmInstallation.DescriptorImpl.class).getInstallations()
-        }
-        
-        /**
-         * {@inheritDoc}
-         */
-        @Override
-        public void setInstallations(HelmInstallation... installations) {
-            Jenkins.get().getDescriptorByType(HelmInstallation.DescriptorImpl.class).setInstallations(installations)
         }
     }
 }
