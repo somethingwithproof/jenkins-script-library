@@ -107,16 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### 작업 마이그레이션
 
-```bash
-# Migrate a specific job
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job
-
-# Migrate all jobs matching a pattern
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --pattern "frontend-.*"
-
-# Use a replacement config file to modify properties during migration
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job --replacements-file replacements.json
-```
+원격 컨트롤러로의 마이그레이션은 지원되지 않습니다. 대상 URL을 지정해도 스크립트는 현재 Jenkins 컨트롤러를 사용합니다.
 
 ##### 작업 템플릿화
 
@@ -247,11 +238,14 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 이 라이브러리는 사용자 정의 Groovy 스크립트에서 사용할 수 있는 프로그래밍 API도 제공합니다:
 
+JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
+
+`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
+
 #### 작업 관리
 
 ```groovy
 import com.github.thomasvincent.jenkinsscripts.jobs.JobCleaner
-import com.github.thomasvincent.jenkinsscripts.jobs.JobMigrator
 import com.github.thomasvincent.jenkinsscripts.jobs.JobTemplate
 import jenkins.model.Jenkins
 
@@ -270,16 +264,6 @@ def template = new JobTemplate(
     ]
 )
 template.applyTemplate("new-job")
-
-// Copy a job between two Jenkins instances provided by the caller
-// (for example, an in-process JenkinsRule harness; no remote connector is bundled)
-boolean migrateBetween(Jenkins source, Jenkins target) {
-    if (source.is(target)) {
-        throw new IllegalArgumentException("Source and target must be distinct Jenkins instances")
-    }
-    return new JobMigrator(source, target).migrateJob("source-job", "target-job")
-}
-migrateBetween(jenkins, targetJenkins)
 ```
 
 #### 클라우드 관리
@@ -333,9 +317,6 @@ doManager.provisionNewDroplet("my-do-template")
 # Run unit tests
 ./gradlew test
 
-# Run integration tests
-./gradlew integrationTest
-
 # Run all tests
 ./gradlew check
 ```
@@ -343,21 +324,21 @@ doManager.provisionNewDroplet("my-do-template")
 > **참고**: JFFI 네이티브 의존성(jffi-1.2.17-native.jar)과 관련된 알려진 이슈로 인해 테스트가 실패할 수 있습니다. 이 문제가 발생하면 다음 명령으로 테스트를 건너뛸 수 있습니다:
 >
 > ```bash
-> ./gradlew build -PskipTests
+> ./gradlew build -x test
 > ```
 >
 > 현재 GitHub Actions 테스트는 문제가 발생하는 테스트를 건너뛰도록 구성되어 있습니다.
 
 #### Docker 테스트 환경
 
-이 프로젝트는 다양한 Java 버전과의 호환성을 검증하기 위한 Docker 기반 테스트 환경을 포함하고 있습니다:
+[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
 
 ```sh
 docker compose -f docker-compose.test.yml run --rm java17
 docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-통합 테스트는 JenkinsRule을 사용하여 테스트용 임시 Jenkins 인스턴스를 생성하므로 실행 중인 Jenkins 서버가 필요하지 않습니다. 이러한 테스트는 스크립트가 실제 Jenkins API 및 데이터 구조와 올바르게 동작하는지 검증합니다. 자세한 내용은 [통합 테스트 문서](../../../src/integration-test/README.md)를 참고하세요.
 
 ### 코드 품질
 

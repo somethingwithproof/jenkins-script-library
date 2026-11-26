@@ -107,16 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### Міграція завдань
 
-```bash
-# Migrate a specific job
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job
-
-# Migrate all jobs matching a pattern
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --pattern "frontend-.*"
-
-# Use a replacement config file to modify properties during migration
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job --replacements-file replacements.json
-```
+Перенесення на віддалений контролер недоступне. Навіть якщо вказати цільовий URL, скрипт використовує поточний контролер Jenkins.
 
 ##### Шаблонізація завдань
 
@@ -247,11 +238,14 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 Бібліотека також надає програмний API для використання у власних скриптах Groovy:
 
+JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
+
+`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
+
 #### Керування завданнями
 
 ```groovy
 import com.github.thomasvincent.jenkinsscripts.jobs.JobCleaner
-import com.github.thomasvincent.jenkinsscripts.jobs.JobMigrator
 import com.github.thomasvincent.jenkinsscripts.jobs.JobTemplate
 import jenkins.model.Jenkins
 
@@ -270,16 +264,6 @@ def template = new JobTemplate(
     ]
 )
 template.applyTemplate("new-job")
-
-// Copy a job between two Jenkins instances provided by the caller
-// (for example, an in-process JenkinsRule harness; no remote connector is bundled)
-boolean migrateBetween(Jenkins source, Jenkins target) {
-    if (source.is(target)) {
-        throw new IllegalArgumentException("Source and target must be distinct Jenkins instances")
-    }
-    return new JobMigrator(source, target).migrateJob("source-job", "target-job")
-}
-migrateBetween(jenkins, targetJenkins)
 ```
 
 #### Керування хмарними ресурсами
@@ -333,9 +317,6 @@ doManager.provisionNewDroplet("my-do-template")
 # Run unit tests
 ./gradlew test
 
-# Run integration tests
-./gradlew integrationTest
-
 # Run all tests
 ./gradlew check
 ```
@@ -343,21 +324,21 @@ doManager.provisionNewDroplet("my-do-template")
 > **Примітка**: існує відома проблема з нативною залежністю JFFI (jffi-1.2.17-native.jar), яка може спричиняти збої тестів. Якщо ви зіткнетеся з нею, ви можете пропустити тести командою:
 >
 > ```bash
-> ./gradlew build -PskipTests
+> ./gradlew build -x test
 > ```
 >
 > Тести GitHub Actions наразі налаштовано на пропуск проблемних тестів.
 
 #### Тестове середовище Docker
 
-Проєкт містить тестове середовище на основі Docker для перевірки сумісності з різними версіями Java:
+[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
 
 ```sh
 docker compose -f docker-compose.test.yml run --rm java17
 docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-Інтеграційні тести використовують JenkinsRule для створення тимчасового інстансу Jenkins під час тестування, тому запущений сервер Jenkins не потрібен. Ці тести перевіряють коректність роботи скриптів із реальними API та структурами даних Jenkins. Докладніше дивіться в [документації з інтеграційного тестування](../../../src/integration-test/README.md).
 
 ### Якість коду
 

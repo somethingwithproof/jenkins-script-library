@@ -107,16 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### பணி இடம்பெயர்வு
 
-```bash
-# Migrate a specific job
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job
-
-# Migrate all jobs matching a pattern
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --pattern "frontend-.*"
-
-# Use a replacement config file to modify properties during migration
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job --replacements-file replacements.json
-```
+தொலைநிலைக் கட்டுப்படுத்திக்கு இடமாற்றம் செய்ய முடியாது. இலக்கு URL கொடுத்தாலும், ஸ்கிரிப்ட் தற்போதைய Jenkins கட்டுப்படுத்தியையே பயன்படுத்தும்.
 
 ##### பணி வார்ப்புருவாக்கம்
 
@@ -247,11 +238,14 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 உங்கள் சொந்த Groovy ஸ்கிரிப்டுகளில் பயன்படுத்துவதற்கான நிரல் API-ஐயும் இந்த நூலகம் வழங்குகிறது:
 
+JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
+
+`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
+
 #### பணி மேலாண்மை
 
 ```groovy
 import com.github.thomasvincent.jenkinsscripts.jobs.JobCleaner
-import com.github.thomasvincent.jenkinsscripts.jobs.JobMigrator
 import com.github.thomasvincent.jenkinsscripts.jobs.JobTemplate
 import jenkins.model.Jenkins
 
@@ -270,16 +264,6 @@ def template = new JobTemplate(
     ]
 )
 template.applyTemplate("new-job")
-
-// Copy a job between two Jenkins instances provided by the caller
-// (for example, an in-process JenkinsRule harness; no remote connector is bundled)
-boolean migrateBetween(Jenkins source, Jenkins target) {
-    if (source.is(target)) {
-        throw new IllegalArgumentException("Source and target must be distinct Jenkins instances")
-    }
-    return new JobMigrator(source, target).migrateJob("source-job", "target-job")
-}
-migrateBetween(jenkins, targetJenkins)
 ```
 
 #### மேகக்கணி மேலாண்மை
@@ -333,9 +317,6 @@ doManager.provisionNewDroplet("my-do-template")
 # Run unit tests
 ./gradlew test
 
-# Run integration tests
-./gradlew integrationTest
-
 # Run all tests
 ./gradlew check
 ```
@@ -343,21 +324,21 @@ doManager.provisionNewDroplet("my-do-template")
 > **குறிப்பு**: JFFI இயல்பான சார்பில் (jffi-1.2.17-native.jar) சோதனைத் தோல்விகளை ஏற்படுத்தக்கூடிய அறியப்பட்ட சிக்கல் உள்ளது. இதை நீங்கள் எதிர்கொண்டால், பின்வருமாறு சோதனைகளைத் தவிர்க்கலாம்:
 >
 > ```bash
-> ./gradlew build -PskipTests
+> ./gradlew build -x test
 > ```
 >
 > GitHub Actions சோதனைகள் தற்போது சிக்கலான சோதனைகளைத் தவிர்க்கும் வகையில் கட்டமைக்கப்பட்டுள்ளன.
 
 #### Docker சோதனைச் சூழல்
 
-வெவ்வேறு Java பதிப்புகளுடனான இணக்கத்தன்மையைச் சரிபார்க்க, இந்தத் திட்டத்தில் Docker-அடிப்படையிலான சோதனைச் சூழல் உள்ளது:
+[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
 
 ```sh
 docker compose -f docker-compose.test.yml run --rm java17
 docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-ஒருங்கிணைப்புச் சோதனைகள் சோதனைக்காகத் தற்காலிக Jenkins நிகழ்வை உருவாக்க JenkinsRule-ஐப் பயன்படுத்துகின்றன; எனவே இயங்கும் Jenkins சேவையகம் உங்களுக்குத் தேவையில்லை. உண்மையான Jenkins API-கள் மற்றும் தரவுக் கட்டமைப்புகளுடன் ஸ்கிரிப்டுகள் சரியாகச் செயல்படுகின்றன என்பதை இந்தச் சோதனைகள் உறுதிப்படுத்துகின்றன. மேலும் விவரங்களுக்கு [ஒருங்கிணைப்புச் சோதனை ஆவணத்தைப்](../../../src/integration-test/README.md) பார்க்கவும்.
 
 ### குறியீட்டுத் தரம்
 

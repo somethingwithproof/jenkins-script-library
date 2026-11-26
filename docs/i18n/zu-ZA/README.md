@@ -107,16 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### Ukuthuthwa Kwemisebenzi
 
-```bash
-# Migrate a specific job
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job
-
-# Migrate all jobs matching a pattern
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --pattern "frontend-.*"
-
-# Use a replacement config file to modify properties during migration
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job --replacements-file replacements.json
-```
+Ukuthuthela imisebenzi kusilawuli esikude akutholakali. Noma unikeza i-URL okuqondiswe kuyo, iskripthi sisebenzisa isilawuli se-Jenkins samanje.
 
 ##### Ukwenza Amathemphulethi Emisebenzi
 
@@ -247,11 +238,14 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 Le layibhrari iphinde inikeze i-API yohlelo ongayisebenzisa emibhalweni yakho ye-Groovy:
 
+JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
+
+`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
+
 #### Ukuphathwa Kwemisebenzi
 
 ```groovy
 import com.github.thomasvincent.jenkinsscripts.jobs.JobCleaner
-import com.github.thomasvincent.jenkinsscripts.jobs.JobMigrator
 import com.github.thomasvincent.jenkinsscripts.jobs.JobTemplate
 import jenkins.model.Jenkins
 
@@ -270,16 +264,6 @@ def template = new JobTemplate(
     ]
 )
 template.applyTemplate("new-job")
-
-// Copy a job between two Jenkins instances provided by the caller
-// (for example, an in-process JenkinsRule harness; no remote connector is bundled)
-boolean migrateBetween(Jenkins source, Jenkins target) {
-    if (source.is(target)) {
-        throw new IllegalArgumentException("Source and target must be distinct Jenkins instances")
-    }
-    return new JobMigrator(source, target).migrateJob("source-job", "target-job")
-}
-migrateBetween(jenkins, targetJenkins)
 ```
 
 #### Ukuphathwa Kwefu
@@ -333,9 +317,6 @@ doManager.provisionNewDroplet("my-do-template")
 # Run unit tests
 ./gradlew test
 
-# Run integration tests
-./gradlew integrationTest
-
 # Run all tests
 ./gradlew check
 ```
@@ -343,21 +324,21 @@ doManager.provisionNewDroplet("my-do-template")
 > **Qaphela**: Kunenkinga eyaziwayo ngesidingo somdabu se-JFFI (jffi-1.2.17-native.jar) engabangela ukwehluleka kokuhlolwa. Uma uhlangabezana nalokhu, ungeqa ukuhlolwa nge:
 >
 > ```bash
-> ./gradlew build -PskipTests
+> ./gradlew build -x test
 > ```
 >
 > Ukuhlolwa kwe-GitHub Actions okwamanje kulungiselelwe ukweqa ukuhlolwa okunezinkinga.
 
 #### Indawo Yokuhlola Ye-Docker
 
-Iphrojekthi ihlanganisa indawo yokuhlola esekelwe ku-Docker yokuqinisekisa ukuhambisana nezinguqulo ezahlukene ze-Java:
+[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
 
 ```sh
 docker compose -f docker-compose.test.yml run --rm java17
 docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-Ukuhlolwa kokuhlanganiswa kusebenzisa i-JenkinsRule ukudala isibonelo sesikhashana se-Jenkins sokuhlola, ngakho awudingi iseva ye-Jenkins esebenzayo. Lokhu kuhlolwa kuqinisekisa ukuthi imibhalo isebenza kahle ngama-API angempela e-Jenkins nezakhiwo zedatha. Bheka [imibhalo yokuhlolwa kokuhlanganiswa](../../../src/integration-test/README.md) ukuthola imininingwane eyengeziwe.
 
 ### Ikhwalithi Yekhodi
 

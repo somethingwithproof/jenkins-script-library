@@ -107,16 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### Mbufe Job
 
-```bash
-# Migrate a specific job
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job
-
-# Migrate all jobs matching a pattern
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --pattern "frontend-.*"
-
-# Use a replacement config file to modify properties during migration
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job --replacements-file replacements.json
-```
+Enweghị ike ibugharị ọrụ gaa na Jenkins controller dị anya. Ọ bụrụgodị na i tinye URL ebe a na-aga, script ahụ ga-eji controller Jenkins nke ugbu a.
 
 ##### Ndebiri Job
 
@@ -247,11 +238,14 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 Ọba akwụkwọ koodu a na-enyekwa API mmemme maka ojiji na skriptị Groovy nke gị:
 
+JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
+
+`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
+
 #### Njikwa Job
 
 ```groovy
 import com.github.thomasvincent.jenkinsscripts.jobs.JobCleaner
-import com.github.thomasvincent.jenkinsscripts.jobs.JobMigrator
 import com.github.thomasvincent.jenkinsscripts.jobs.JobTemplate
 import jenkins.model.Jenkins
 
@@ -270,16 +264,6 @@ def template = new JobTemplate(
     ]
 )
 template.applyTemplate("new-job")
-
-// Copy a job between two Jenkins instances provided by the caller
-// (for example, an in-process JenkinsRule harness; no remote connector is bundled)
-boolean migrateBetween(Jenkins source, Jenkins target) {
-    if (source.is(target)) {
-        throw new IllegalArgumentException("Source and target must be distinct Jenkins instances")
-    }
-    return new JobMigrator(source, target).migrateJob("source-job", "target-job")
-}
-migrateBetween(jenkins, targetJenkins)
 ```
 
 #### Njikwa Igwe Ojii
@@ -333,9 +317,6 @@ doManager.provisionNewDroplet("my-do-template")
 # Run unit tests
 ./gradlew test
 
-# Run integration tests
-./gradlew integrationTest
-
 # Run all tests
 ./gradlew check
 ```
@@ -343,21 +324,21 @@ doManager.provisionNewDroplet("my-do-template")
 > **Rịba ama**: E nwere nsogbu a maara na ndabere native nke JFFI (jffi-1.2.17-native.jar) nke nwere ike ịkpata ọdịda nnwale. Ọ bụrụ na ị zute nke a, ị nwere ike ịwụfe nnwale site na:
 >
 > ```bash
-> ./gradlew build -PskipTests
+> ./gradlew build -x test
 > ```
 >
 > A haziri nnwale GitHub Actions ugbu a iji wụfee nnwale ndị nwere nsogbu.
 
 #### Gburugburu Nnwale Docker
 
-Ọrụ a gụnyere gburugburu nnwale dabere na Docker iji nyochaa ndakọrịta na ụdị Java dị iche iche:
+[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
 
 ```sh
 docker compose -f docker-compose.test.yml run --rm java17
 docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-Nnwale njikọta na-eji JenkinsRule iji mepụta instance Jenkins nwa oge maka nnwale, yabụ ị chọghị sava Jenkins na-agba ọsọ. Nnwale ndị a na-ekwenye na skriptị ndị ahụ na-arụ ọrụ nke ọma na API na nhazi data Jenkins n'ezie. Hụ [akwụkwọ nkọwa nnwale njikọta](../../../src/integration-test/README.md) maka nkọwa ndị ọzọ.
 
 ### Ogo Koodu
 

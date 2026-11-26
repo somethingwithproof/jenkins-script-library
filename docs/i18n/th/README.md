@@ -107,16 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### การย้ายจ็อบ
 
-```bash
-# Migrate a specific job
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job
-
-# Migrate all jobs matching a pattern
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --pattern "frontend-.*"
-
-# Use a replacement config file to modify properties during migration
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job --replacements-file replacements.json
-```
+ยังไม่รองรับการย้ายงานไปยังคอนโทรลเลอร์ระยะไกล แม้จะระบุ URL ปลายทาง สคริปต์ก็ยังใช้คอนโทรลเลอร์ Jenkins ปัจจุบัน
 
 ##### การสร้างเทมเพลตจ็อบ
 
@@ -247,11 +238,14 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 ไลบรารียังมี API สำหรับการเขียนโปรแกรมเพื่อนำไปใช้ในสคริปต์ Groovy ของคุณเอง:
 
+JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
+
+`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
+
 #### การจัดการจ็อบ
 
 ```groovy
 import com.github.thomasvincent.jenkinsscripts.jobs.JobCleaner
-import com.github.thomasvincent.jenkinsscripts.jobs.JobMigrator
 import com.github.thomasvincent.jenkinsscripts.jobs.JobTemplate
 import jenkins.model.Jenkins
 
@@ -270,16 +264,6 @@ def template = new JobTemplate(
     ]
 )
 template.applyTemplate("new-job")
-
-// Copy a job between two Jenkins instances provided by the caller
-// (for example, an in-process JenkinsRule harness; no remote connector is bundled)
-boolean migrateBetween(Jenkins source, Jenkins target) {
-    if (source.is(target)) {
-        throw new IllegalArgumentException("Source and target must be distinct Jenkins instances")
-    }
-    return new JobMigrator(source, target).migrateJob("source-job", "target-job")
-}
-migrateBetween(jenkins, targetJenkins)
 ```
 
 #### การจัดการคลาวด์
@@ -333,9 +317,6 @@ doManager.provisionNewDroplet("my-do-template")
 # Run unit tests
 ./gradlew test
 
-# Run integration tests
-./gradlew integrationTest
-
 # Run all tests
 ./gradlew check
 ```
@@ -343,21 +324,21 @@ doManager.provisionNewDroplet("my-do-template")
 > **หมายเหตุ**: มีปัญหาที่ทราบอยู่แล้วกับดีเพนเดนซีเนทีฟ JFFI (jffi-1.2.17-native.jar) ซึ่งอาจทำให้การทดสอบล้มเหลว หากคุณพบปัญหานี้ สามารถข้ามการทดสอบได้ด้วยคำสั่ง:
 >
 > ```bash
-> ./gradlew build -PskipTests
+> ./gradlew build -x test
 > ```
 >
 > ปัจจุบันการทดสอบบน GitHub Actions ถูกตั้งค่าให้ข้ามชุดทดสอบที่มีปัญหาไว้แล้ว
 
 #### สภาพแวดล้อมการทดสอบด้วย Docker
 
-โปรเจกต์นี้มีสภาพแวดล้อมการทดสอบบน Docker เพื่อตรวจสอบความเข้ากันได้กับ Java เวอร์ชันต่าง ๆ:
+[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
 
 ```sh
 docker compose -f docker-compose.test.yml run --rm java17
 docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-อินทิเกรชันเทสต์ใช้ JenkinsRule เพื่อสร้างอินสแตนซ์ Jenkins ชั่วคราวสำหรับการทดสอบ คุณจึงไม่จำเป็นต้องมีเซิร์ฟเวอร์ Jenkins ที่รันอยู่ก่อน การทดสอบเหล่านี้ช่วยยืนยันว่าสคริปต์ทำงานได้ถูกต้องกับ API และโครงสร้างข้อมูลจริงของ Jenkins ดูรายละเอียดเพิ่มเติมได้ใน[เอกสารประกอบการทดสอบอินทิเกรชัน](../../../src/integration-test/README.md)
 
 ### คุณภาพโค้ด
 

@@ -107,16 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### జాబ్ మైగ్రేషన్
 
-```bash
-# Migrate a specific job
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job
-
-# Migrate all jobs matching a pattern
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --pattern "frontend-.*"
-
-# Use a replacement config file to modify properties during migration
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job --replacements-file replacements.json
-```
+రిమోట్ కంట్రోలర్‌కు మైగ్రేషన్ అందుబాటులో లేదు. లక్ష్య URL ఇచ్చినా స్క్రిప్ట్ ప్రస్తుత Jenkins కంట్రోలర్‌నే ఉపయోగిస్తుంది.
 
 ##### జాబ్ టెంప్లేటింగ్
 
@@ -247,11 +238,14 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 మీ స్వంత Groovy స్క్రిప్ట్‌లలో ఉపయోగించడానికి ఈ లైబ్రరీ ప్రోగ్రామాటిక్ APIని కూడా అందిస్తుంది:
 
+JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
+
+`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
+
 #### జాబ్ నిర్వహణ
 
 ```groovy
 import com.github.thomasvincent.jenkinsscripts.jobs.JobCleaner
-import com.github.thomasvincent.jenkinsscripts.jobs.JobMigrator
 import com.github.thomasvincent.jenkinsscripts.jobs.JobTemplate
 import jenkins.model.Jenkins
 
@@ -270,16 +264,6 @@ def template = new JobTemplate(
     ]
 )
 template.applyTemplate("new-job")
-
-// Copy a job between two Jenkins instances provided by the caller
-// (for example, an in-process JenkinsRule harness; no remote connector is bundled)
-boolean migrateBetween(Jenkins source, Jenkins target) {
-    if (source.is(target)) {
-        throw new IllegalArgumentException("Source and target must be distinct Jenkins instances")
-    }
-    return new JobMigrator(source, target).migrateJob("source-job", "target-job")
-}
-migrateBetween(jenkins, targetJenkins)
 ```
 
 #### క్లౌడ్ నిర్వహణ
@@ -333,9 +317,6 @@ doManager.provisionNewDroplet("my-do-template")
 # Run unit tests
 ./gradlew test
 
-# Run integration tests
-./gradlew integrationTest
-
 # Run all tests
 ./gradlew check
 ```
@@ -343,21 +324,21 @@ doManager.provisionNewDroplet("my-do-template")
 > **గమనిక**: JFFI నేటివ్ డిపెండెన్సీ (jffi-1.2.17-native.jar)తో తెలిసిన సమస్య ఉంది, ఇది పరీక్ష వైఫల్యాలకు కారణం కావచ్చు. మీరు దీనిని ఎదుర్కొంటే, ఈ క్రింది విధంగా పరీక్షలను దాటవేయవచ్చు:
 >
 > ```bash
-> ./gradlew build -PskipTests
+> ./gradlew build -x test
 > ```
 >
 > GitHub Actions పరీక్షలు ప్రస్తుతం సమస్యాత్మక పరీక్షలను దాటవేసేలా కాన్ఫిగర్ చేయబడ్డాయి.
 
 #### Docker పరీక్షా ఎన్విరాన్‌మెంట్
 
-వివిధ Java వెర్షన్లతో అనుకూలతను ధృవీకరించడానికి ఈ ప్రాజెక్ట్ Docker-ఆధారిత పరీక్షా ఎన్విరాన్‌మెంట్‌ను కలిగి ఉంది:
+[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
 
 ```sh
 docker compose -f docker-compose.test.yml run --rm java17
 docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-ఇంటిగ్రేషన్ పరీక్షలు పరీక్ష కోసం తాత్కాలిక Jenkins ఇన్‌స్టాన్స్‌ను సృష్టించడానికి JenkinsRuleను ఉపయోగిస్తాయి, కాబట్టి మీకు నడుస్తున్న Jenkins సర్వర్ అవసరం లేదు. ఈ పరీక్షలు స్క్రిప్ట్‌లు నిజమైన Jenkins APIలు మరియు డేటా స్ట్రక్చర్లతో సరిగ్గా పనిచేస్తాయని ధృవీకరిస్తాయి. మరిన్ని వివరాల కోసం [ఇంటిగ్రేషన్ టెస్ట్ డాక్యుమెంటేషన్](../../../src/integration-test/README.md) చూడండి.
 
 ### కోడ్ నాణ్యత
 

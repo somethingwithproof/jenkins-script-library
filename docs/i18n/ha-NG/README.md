@@ -107,16 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### Ƙaurar Ayyuka
 
-```bash
-# Migrate a specific job
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job
-
-# Migrate all jobs matching a pattern
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --pattern "frontend-.*"
-
-# Use a replacement config file to modify properties during migration
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job --replacements-file replacements.json
-```
+Ba a iya ƙaura zuwa wata na’urar sarrafa Jenkins mai nisa. Ko da an ba da URL na inda za a je, rubutun yana amfani da na’urar sarrafawa ta yanzu.
 
 ##### Samfurin Ayyuka
 
@@ -247,11 +238,14 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 Laburaren yana kuma samar da API na shirye-shirye don amfani a cikin naka rubutun Groovy:
 
+JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
+
+`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
+
 #### Sarrafa Ayyuka
 
 ```groovy
 import com.github.thomasvincent.jenkinsscripts.jobs.JobCleaner
-import com.github.thomasvincent.jenkinsscripts.jobs.JobMigrator
 import com.github.thomasvincent.jenkinsscripts.jobs.JobTemplate
 import jenkins.model.Jenkins
 
@@ -270,16 +264,6 @@ def template = new JobTemplate(
     ]
 )
 template.applyTemplate("new-job")
-
-// Copy a job between two Jenkins instances provided by the caller
-// (for example, an in-process JenkinsRule harness; no remote connector is bundled)
-boolean migrateBetween(Jenkins source, Jenkins target) {
-    if (source.is(target)) {
-        throw new IllegalArgumentException("Source and target must be distinct Jenkins instances")
-    }
-    return new JobMigrator(source, target).migrateJob("source-job", "target-job")
-}
-migrateBetween(jenkins, targetJenkins)
 ```
 
 #### Sarrafa Girgije
@@ -333,9 +317,6 @@ doManager.provisionNewDroplet("my-do-template")
 # Run unit tests
 ./gradlew test
 
-# Run integration tests
-./gradlew integrationTest
-
 # Run all tests
 ./gradlew check
 ```
@@ -343,21 +324,21 @@ doManager.provisionNewDroplet("my-do-template")
 > **Lura**: Akwai sananniyar matsala tare da abin dogaro na asali na JFFI (jffi-1.2.17-native.jar) wanda zai iya haifar da gazawar gwaji. Idan ka ci karo da wannan, za ka iya tsallake gwaje-gwaje da:
 >
 > ```bash
-> ./gradlew build -PskipTests
+> ./gradlew build -x test
 > ```
 >
 > A halin yanzu an saita gwaje-gwajen GitHub Actions don tsallake gwaje-gwajen da ke da matsala.
 
 #### Muhallin Gwajin Docker
 
-Aikin ya ƙunshi muhallin gwaji na tushen Docker don tabbatar da dacewa da sigogin Java daban-daban:
+[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
 
 ```sh
 docker compose -f docker-compose.test.yml run --rm java17
 docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-Gwaje-gwajen haɗin kai suna amfani da JenkinsRule don ƙirƙirar samfurin Jenkins na wucin gadi don gwaji, don haka ba ka buƙatar uwar garken Jenkins da ke gudana. Waɗannan gwaje-gwajen suna tabbatar da cewa rubutun yana aiki daidai tare da ainihin APIs da tsarin bayanai na Jenkins. Duba [takardun gwajin haɗin kai](../../../src/integration-test/README.md) don ƙarin bayani.
 
 ### Ingancin Lamba
 

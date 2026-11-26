@@ -109,18 +109,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### Миграција послова
 
-```bash
-# Migrate a specific job
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job
-
-# Migrate all jobs matching a pattern
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --pattern "frontend-.*"
-
-# Use a replacement config file to modify properties during migration
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job --replacements-file replacements.json --modify
-```
-
-> **Напомена**: `MigrateJobs.groovy` тренутно користи помоћну функцију `connectToJenkins` која враћа локалну инстанцу `Jenkins.get()` уместо повезивања са удаљеним контролером.
+Удаљена миграција није доступна. Чак и када наведете циљни URL, скрипта користи тренутни Jenkins контролер.
 
 ##### Креирање послова из шаблона
 
@@ -251,11 +240,14 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 Библиотека такође пружа програмски API за коришћење у вашим Groovy скриптама:
 
+JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
+
+`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
+
 #### Управљање пословима
 
 ```groovy
 import com.github.thomasvincent.jenkinsscripts.jobs.JobCleaner
-import com.github.thomasvincent.jenkinsscripts.jobs.JobMigrator
 import com.github.thomasvincent.jenkinsscripts.jobs.JobTemplate
 import jenkins.model.Jenkins
 
@@ -274,16 +266,6 @@ def template = new JobTemplate(
     ]
 )
 template.applyTemplate("new-job")
-
-// Copy a job between two Jenkins instances provided by the caller
-// (for example, an in-process JenkinsRule harness; no remote connector is bundled)
-boolean migrateBetween(Jenkins source, Jenkins target) {
-    if (source.is(target)) {
-        throw new IllegalArgumentException("Source and target must be distinct Jenkins instances")
-    }
-    return new JobMigrator(source, target).migrateJob("source-job", "target-job")
-}
-migrateBetween(jenkins, targetJenkins)
 ```
 
 #### Управљање облаком
@@ -351,14 +333,16 @@ doManager.provisionNewDroplet("my-do-template")
 
 #### Docker окружење за тестирање
 
-Пројекат укључује Docker окружење за покретање тестова у контејнерима (оба сервиса `java17` и `java21` у [Compose датотеци](../../../docker-compose.test.yml) тренутно користе слику `eclipse-temurin:24-jdk`):
+Оба Compose сервиса покрећу Gradle тестове на Јави 24.
+
+[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
 
 ```sh
 docker compose -f docker-compose.test.yml run --rm java17
 docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-Интеграциони тестови користе JenkinsRule за креирање привремене Jenkins инстанце за тестирање, тако да вам није потребан покренут Jenkins сервер. Ови тестови проверавају да скрипте исправно раде са стварним Jenkins API-јима и структурама података. За више детаља погледајте [документацију за интеграционе тестове](../../../src/integration-test/README.md).
 
 ### Квалитет кода
 

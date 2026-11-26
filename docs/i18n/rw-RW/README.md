@@ -107,16 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### Kwimura imirimo
 
-```bash
-# Migrate a specific job
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job
-
-# Migrate all jobs matching a pattern
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --pattern "frontend-.*"
-
-# Use a replacement config file to modify properties during migration
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job --replacements-file replacements.json
-```
+Kwimurira imirimo ku yindi kontorola ntibishoboka. Nubwo watanga URL y’aho ushaka kuyimurira, iyi script ikoresha kontorola ya Jenkins urimo.
 
 ##### Gukora inyandikorugero z'imirimo
 
@@ -247,11 +238,14 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 Iri soko ry'ibikoresho ritanga kandi API yo muri porogaramu yo gukoresha muri script zawe za Groovy:
 
+JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
+
+`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
+
 #### Gucunga imirimo
 
 ```groovy
 import com.github.thomasvincent.jenkinsscripts.jobs.JobCleaner
-import com.github.thomasvincent.jenkinsscripts.jobs.JobMigrator
 import com.github.thomasvincent.jenkinsscripts.jobs.JobTemplate
 import jenkins.model.Jenkins
 
@@ -270,16 +264,6 @@ def template = new JobTemplate(
     ]
 )
 template.applyTemplate("new-job")
-
-// Copy a job between two Jenkins instances provided by the caller
-// (for example, an in-process JenkinsRule harness; no remote connector is bundled)
-boolean migrateBetween(Jenkins source, Jenkins target) {
-    if (source.is(target)) {
-        throw new IllegalArgumentException("Source and target must be distinct Jenkins instances")
-    }
-    return new JobMigrator(source, target).migrateJob("source-job", "target-job")
-}
-migrateBetween(jenkins, targetJenkins)
 ```
 
 #### Gucunga Cloud
@@ -333,9 +317,6 @@ doManager.provisionNewDroplet("my-do-template")
 # Run unit tests
 ./gradlew test
 
-# Run integration tests
-./gradlew integrationTest
-
 # Run all tests
 ./gradlew check
 ```
@@ -343,21 +324,21 @@ doManager.provisionNewDroplet("my-do-template")
 > **Icyitonderwa**: Hari ikibazo kizwi ku gikenerwa gakondo cya JFFI (jffi-1.2.17-native.jar) gishobora gutera amagerageza gutsindwa. Nuhura na cyo, ushobora gusimbuka amagerageza ukoresheje:
 >
 > ```bash
-> ./gradlew build -PskipTests
+> ./gradlew build -x test
 > ```
 >
 > Amagerageza ya GitHub Actions ubu ateguwe gusimbuka amagerageza atera ibibazo.
 
 #### Urubuga rw'igerageza rwa Docker
 
-Umushinga urimo urubuga rw'igerageza rushingiye kuri Docker rugenewe kugenzura imikoranire na verisiyo zitandukanye za Java:
+[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
 
 ```sh
 docker compose -f docker-compose.test.yml run --rm java17
 docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-Amagerageza y'ihuza akoresha JenkinsRule kugira ngo akore urugero rw'agateganyo rwa Jenkins rwo kugerageza, bityo ntukeneye seriveri ya Jenkins iri gukora. Aya magerageza agenzura ko script zikora neza hamwe na API nyazo za Jenkins n'imiterere y'amakuru. Reba [inyandiko z'amagerageza y'ihuza](../../../src/integration-test/README.md) kugira ngo ubone ibisobanuro birambuye.
 
 ### Ubwiza bwa kode
 

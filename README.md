@@ -109,18 +109,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### Job Migration
 
-```bash
-# Migrate a specific job
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job
-
-# Migrate all jobs matching a pattern
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --pattern "frontend-.*"
-
-# Use a replacement config file to modify properties during migration
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job --replacements-file replacements.json --modify
-```
-
-> **Note**: `MigrateJobs.groovy` currently uses a placeholder `connectToJenkins` helper that returns the local `Jenkins.get()` instance rather than connecting to a remote controller.
+Remote migration is unavailable. Even with a target URL, the script uses the current Jenkins controller.
 
 ##### Job Templating
 
@@ -251,11 +240,14 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 The library also provides a programmatic API for use in your own Groovy scripts:
 
+JAR → [`util`](src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
+
+`src/main/groovy` → [`jobs`](src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
+
 #### Job Management
 
 ```groovy
 import com.github.thomasvincent.jenkinsscripts.jobs.JobCleaner
-import com.github.thomasvincent.jenkinsscripts.jobs.JobMigrator
 import com.github.thomasvincent.jenkinsscripts.jobs.JobTemplate
 import jenkins.model.Jenkins
 
@@ -274,16 +266,6 @@ def template = new JobTemplate(
     ]
 )
 template.applyTemplate("new-job")
-
-// Copy a job between two Jenkins instances provided by the caller
-// (for example, an in-process JenkinsRule harness; no remote connector is bundled)
-boolean migrateBetween(Jenkins source, Jenkins target) {
-    if (source.is(target)) {
-        throw new IllegalArgumentException("Source and target must be distinct Jenkins instances")
-    }
-    return new JobMigrator(source, target).migrateJob("source-job", "target-job")
-}
-migrateBetween(jenkins, targetJenkins)
 ```
 
 #### Cloud Management
@@ -351,16 +333,16 @@ doManager.provisionNewDroplet("my-do-template")
 
 #### Docker Testing Environment
 
-The project includes a Docker-based testing environment to run the test suite in containers:
+Both Compose services run the Gradle test suite on Java 24.
+
+[`java17`](Dockerfile.test) → `eclipse-temurin:24-jdk`
+
+[`java21`](Dockerfile.java21) → `eclipse-temurin:24-jdk`
 
 ```sh
 docker compose -f docker-compose.test.yml run --rm java17
 docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-The [Compose file](docker-compose.test.yml) defines the `java17` and `java21` test services; both Dockerfiles currently build from `eclipse-temurin:24-jdk`. Each command above runs one service and removes the container when it exits.
-
-The integration tests use JenkinsRule to create a temporary Jenkins instance for testing, so you don't need a running Jenkins server. These tests verify that the scripts work correctly with real Jenkins APIs and data structures. See the [integration test documentation](src/integration-test/README.md) for more details.
 
 ### Code Quality
 

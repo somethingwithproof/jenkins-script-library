@@ -107,16 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### Ìṣíkiri Iṣẹ́
 
-```bash
-# Migrate a specific job
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job
-
-# Migrate all jobs matching a pattern
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --pattern "frontend-.*"
-
-# Use a replacement config file to modify properties during migration
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job --replacements-file replacements.json
-```
+Kò ṣeé gbé iṣẹ́ lọ sí olùdarí Jenkins tó jìnnà. Bí o tilẹ̀ fi URL ibi tí o fẹ́ lọ sí sílẹ̀, script náà máa ń lo olùdarí Jenkins tó wà lọ́wọ́.
 
 ##### Ìṣẹ̀dá Àwòkọ́ṣe Iṣẹ́
 
@@ -247,11 +238,14 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 Àkójọpọ̀ náà tún ń pèsè API ìṣètò-èdè fún ìlò nínú àwọn ìwé-àṣẹ Groovy tìrẹ fúnra rẹ:
 
+JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
+
+`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
+
 #### Ìṣàkóso Iṣẹ́
 
 ```groovy
 import com.github.thomasvincent.jenkinsscripts.jobs.JobCleaner
-import com.github.thomasvincent.jenkinsscripts.jobs.JobMigrator
 import com.github.thomasvincent.jenkinsscripts.jobs.JobTemplate
 import jenkins.model.Jenkins
 
@@ -270,16 +264,6 @@ def template = new JobTemplate(
     ]
 )
 template.applyTemplate("new-job")
-
-// Copy a job between two Jenkins instances provided by the caller
-// (for example, an in-process JenkinsRule harness; no remote connector is bundled)
-boolean migrateBetween(Jenkins source, Jenkins target) {
-    if (source.is(target)) {
-        throw new IllegalArgumentException("Source and target must be distinct Jenkins instances")
-    }
-    return new JobMigrator(source, target).migrateJob("source-job", "target-job")
-}
-migrateBetween(jenkins, targetJenkins)
 ```
 
 #### Ìṣàkóso Àwọsánmà
@@ -333,9 +317,6 @@ doManager.provisionNewDroplet("my-do-template")
 # Run unit tests
 ./gradlew test
 
-# Run integration tests
-./gradlew integrationTest
-
 # Run all tests
 ./gradlew check
 ```
@@ -343,21 +324,21 @@ doManager.provisionNewDroplet("my-do-template")
 > **Àkíyèsí**: Ìṣòro tí a mọ̀ wà pẹ̀lú ìgbẹ́kẹ̀lé abínibí JFFI (jffi-1.2.17-native.jar) tí ó lè fa ìkùnà ìdánwò. Tí o bá pàdé èyí, o lè fo àwọn ìdánwò náà pẹ̀lú:
 >
 > ```bash
-> ./gradlew build -PskipTests
+> ./gradlew build -x test
 > ```
 >
 > Àwọn ìdánwò GitHub Actions wà ní ìṣètò lọ́wọ́lọ́wọ́ láti fo àwọn ìdánwò tí ó ní ìṣòro.
 
 #### Àyíká Ìdánwò Docker
 
-Iṣẹ́ àkànṣe náà ní àyíká ìdánwò tí ó dá lórí Docker láti jẹ́rìísí ìbáramu pẹ̀lú àwọn ẹ̀yà Java ọ̀tọ̀ọ̀tọ̀:
+[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
 
 ```sh
 docker compose -f docker-compose.test.yml run --rm java17
 docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-Àwọn ìdánwò ìsopọ̀ ń lo JenkinsRule láti ṣẹ̀dá àpẹẹrẹ Jenkins ìgbàdíẹ̀ fún ìdánwò, nítorí náà o kò nílò ẹ̀rọ-ìpèsè Jenkins tí ń ṣiṣẹ́. Àwọn ìdánwò wọ̀nyí ń jẹ́rìísí pé àwọn ìwé-àṣẹ náà ń ṣiṣẹ́ déédéé pẹ̀lú àwọn API Jenkins gidi àti àwọn ètò dátà. Wo [ìwé-àkọsílẹ̀ ìdánwò ìsopọ̀](../../../src/integration-test/README.md) fún àwọn àlàyé sí i.
 
 ### Dídára Kóòdù
 

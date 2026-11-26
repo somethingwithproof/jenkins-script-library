@@ -107,16 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### Raridda Shaqooyinka
 
-```bash
-# Migrate a specific job
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job
-
-# Migrate all jobs matching a pattern
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --pattern "frontend-.*"
-
-# Use a replacement config file to modify properties during migration
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job --replacements-file replacements.json
-```
+U guurista kontaroole fog lama heli karo. Xataa haddii URL bartilmaameed la bixiyo, qoraalku wuxuu adeegsadaa kontaroolaha Jenkins ee hadda jira.
 
 ##### Qaab-dhismeedka Shaqooyinka
 
@@ -247,11 +238,14 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 Maktabaddu waxay sidoo kale bixisaa API barnaamij oo aad ku isticmaali karto qoraalladaada Groovy:
 
+JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
+
+`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
+
 #### Maamulka Shaqooyinka
 
 ```groovy
 import com.github.thomasvincent.jenkinsscripts.jobs.JobCleaner
-import com.github.thomasvincent.jenkinsscripts.jobs.JobMigrator
 import com.github.thomasvincent.jenkinsscripts.jobs.JobTemplate
 import jenkins.model.Jenkins
 
@@ -270,16 +264,6 @@ def template = new JobTemplate(
     ]
 )
 template.applyTemplate("new-job")
-
-// Copy a job between two Jenkins instances provided by the caller
-// (for example, an in-process JenkinsRule harness; no remote connector is bundled)
-boolean migrateBetween(Jenkins source, Jenkins target) {
-    if (source.is(target)) {
-        throw new IllegalArgumentException("Source and target must be distinct Jenkins instances")
-    }
-    return new JobMigrator(source, target).migrateJob("source-job", "target-job")
-}
-migrateBetween(jenkins, targetJenkins)
 ```
 
 #### Maamulka Daruurta
@@ -333,9 +317,6 @@ doManager.provisionNewDroplet("my-do-template")
 # Run unit tests
 ./gradlew test
 
-# Run integration tests
-./gradlew integrationTest
-
 # Run all tests
 ./gradlew check
 ```
@@ -343,21 +324,21 @@ doManager.provisionNewDroplet("my-do-template")
 > **Fiiro gaar ah**: Waxaa jirta cillad la yaqaan oo la xiriirta ku-tiirsanaanta asalka ah ee JFFI (jffi-1.2.17-native.jar) taas oo keeni karta fashil tijaabo. Haddii aad tan la kulanto, waxaad ka boodi kartaa tijaabooyinka adigoo adeegsanaya:
 >
 > ```bash
-> ./gradlew build -PskipTests
+> ./gradlew build -x test
 > ```
 >
 > Tijaabooyinka GitHub Actions hadda waxaa loo habeeyey inay ka boodaan tijaabooyinka dhibaatada leh.
 
 #### Deegaanka Tijaabada ee Docker
 
-Mashruucu wuxuu ka kooban yahay deegaan tijaabo oo ku salaysan Docker si loo xaqiijiyo iswaafaqsanaanta noocyada kala duwan ee Java:
+[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
 
 ```sh
 docker compose -f docker-compose.test.yml run --rm java17
 docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-Tijaabooyinka isku-dhafku waxay isticmaalaan JenkinsRule si ay u abuuraan dhacdo Jenkins ku-meel-gaar ah oo tijaabo ah, sidaas darteed uma baahnid server Jenkins ah oo shaqaynaya. Tijaabooyinkani waxay xaqiijiyaan in qoraalladu si sax ah ula shaqeeyaan API-yada iyo qaab-dhismeedyada xogta ee Jenkins dhabta ah. Eeg [dukumeentiyada tijaabada isku-dhafka](../../../src/integration-test/README.md) si aad u hesho faahfaahin dheeraad ah.
 
 ### Tayada Koodhka
 

@@ -107,16 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### Migrasi Tugas
 
-```bash
-# Migrate a specific job
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job
-
-# Migrate all jobs matching a pattern
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --pattern "frontend-.*"
-
-# Use a replacement config file to modify properties during migration
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job --replacements-file replacements.json
-```
+Migrasi ke pengawal jauh tidak tersedia. Walaupun URL sasaran diberikan, skrip tetap menggunakan pengawal Jenkins semasa.
 
 ##### Pembuatan Templat Tugas
 
@@ -247,11 +238,14 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 Pustaka ini juga menyediakan API berprogram untuk digunakan dalam skrip Groovy anda sendiri:
 
+JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
+
+`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
+
 #### Pengurusan Tugas
 
 ```groovy
 import com.github.thomasvincent.jenkinsscripts.jobs.JobCleaner
-import com.github.thomasvincent.jenkinsscripts.jobs.JobMigrator
 import com.github.thomasvincent.jenkinsscripts.jobs.JobTemplate
 import jenkins.model.Jenkins
 
@@ -270,16 +264,6 @@ def template = new JobTemplate(
     ]
 )
 template.applyTemplate("new-job")
-
-// Copy a job between two Jenkins instances provided by the caller
-// (for example, an in-process JenkinsRule harness; no remote connector is bundled)
-boolean migrateBetween(Jenkins source, Jenkins target) {
-    if (source.is(target)) {
-        throw new IllegalArgumentException("Source and target must be distinct Jenkins instances")
-    }
-    return new JobMigrator(source, target).migrateJob("source-job", "target-job")
-}
-migrateBetween(jenkins, targetJenkins)
 ```
 
 #### Pengurusan Awan
@@ -333,9 +317,6 @@ doManager.provisionNewDroplet("my-do-template")
 # Run unit tests
 ./gradlew test
 
-# Run integration tests
-./gradlew integrationTest
-
 # Run all tests
 ./gradlew check
 ```
@@ -343,21 +324,21 @@ doManager.provisionNewDroplet("my-do-template")
 > **Nota**: Terdapat isu yang diketahui berkaitan kebergantungan asli JFFI (jffi-1.2.17-native.jar) yang mungkin menyebabkan kegagalan ujian. Jika anda menghadapi isu ini, anda boleh melangkau ujian dengan:
 >
 > ```bash
-> ./gradlew build -PskipTests
+> ./gradlew build -x test
 > ```
 >
 > Ujian GitHub Actions pada masa ini dikonfigurasikan untuk melangkau ujian yang bermasalah.
 
 #### Persekitaran Pengujian Docker
 
-Projek ini menyertakan persekitaran pengujian berasaskan Docker untuk mengesahkan keserasian dengan versi Java yang berbeza:
+[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
 
 ```sh
 docker compose -f docker-compose.test.yml run --rm java17
 docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-Ujian integrasi menggunakan JenkinsRule untuk mencipta tika Jenkins sementara bagi tujuan pengujian, jadi anda tidak memerlukan pelayan Jenkins yang sedang berjalan. Ujian ini menentusahkan bahawa skrip berfungsi dengan betul bersama API dan struktur data Jenkins sebenar. Lihat [dokumentasi ujian integrasi](../../../src/integration-test/README.md) untuk butiran lanjut.
 
 ### Kualiti Kod
 

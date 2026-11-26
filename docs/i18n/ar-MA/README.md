@@ -107,16 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### ترحيل المهام
 
-```bash
-# Migrate a specific job
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job
-
-# Migrate all jobs matching a pattern
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --pattern "frontend-.*"
-
-# Use a replacement config file to modify properties during migration
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job --replacements-file replacements.json
-```
+الترحيل لوحدة تحكّم بعيدة ما متاحش. حتى إلا حدّدتي عنوان URL ديال الوجهة، السكريبت كيستعمل وحدة تحكّم Jenkins الحالية.
 
 ##### تحويل المهام لقوالب
 
@@ -247,11 +238,14 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 المكتبة كتقدم كذلك واجهة برمجية (API) باش تستعملها فسكريبتات Groovy ديالك:
 
+JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
+
+`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
+
 #### إدارة المهام
 
 ```groovy
 import com.github.thomasvincent.jenkinsscripts.jobs.JobCleaner
-import com.github.thomasvincent.jenkinsscripts.jobs.JobMigrator
 import com.github.thomasvincent.jenkinsscripts.jobs.JobTemplate
 import jenkins.model.Jenkins
 
@@ -270,16 +264,6 @@ def template = new JobTemplate(
     ]
 )
 template.applyTemplate("new-job")
-
-// Copy a job between two Jenkins instances provided by the caller
-// (for example, an in-process JenkinsRule harness; no remote connector is bundled)
-boolean migrateBetween(Jenkins source, Jenkins target) {
-    if (source.is(target)) {
-        throw new IllegalArgumentException("Source and target must be distinct Jenkins instances")
-    }
-    return new JobMigrator(source, target).migrateJob("source-job", "target-job")
-}
-migrateBetween(jenkins, targetJenkins)
 ```
 
 #### إدارة السحابة
@@ -333,9 +317,6 @@ doManager.provisionNewDroplet("my-do-template")
 # Run unit tests
 ./gradlew test
 
-# Run integration tests
-./gradlew integrationTest
-
 # Run all tests
 ./gradlew check
 ```
@@ -343,21 +324,21 @@ doManager.provisionNewDroplet("my-do-template")
 > **ملاحظة**: كاين واحد المشكل معروف مع التبعية الأصلية JFFI (jffi-1.2.17-native.jar) اللي يقدر يسبب فشل الاختبارات. إلى صادفتي هاد المشكل، تقدر تتجاوز الاختبارات بـ:
 >
 > ```bash
-> ./gradlew build -PskipTests
+> ./gradlew build -x test
 > ```
 >
 > اختبارات GitHub Actions مضبوطة حالياً باش تتجاوز الاختبارات اللي فيها مشاكل.
 
 #### بيئة الاختبار بـ Docker
 
-المشروع فيه بيئة اختبار مبنية على Docker باش تتحقق من التوافق مع إصدارات Java المختلفة:
+[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
 
 ```sh
 docker compose -f docker-compose.test.yml run --rm java17
 docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-اختبارات التكامل كتستعمل JenkinsRule باش تصاوب نسخة Jenkins مؤقتة للاختبار، يعني ما محتاجش يكون عندك سيرفر Jenkins خدام. هاد الاختبارات كيتحققو بلي السكريبتات خدامين مزيان مع واجهات برمجة التطبيقات وهياكل البيانات الحقيقية ديال Jenkins. شوف [وثائق اختبارات التكامل](../../../src/integration-test/README.md) لتفاصيل أكثر.
 
 ### جودة الكود
 

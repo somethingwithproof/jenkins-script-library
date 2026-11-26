@@ -107,16 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### הגירת משימות
 
-```bash
-# Migrate a specific job
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job
-
-# Migrate all jobs matching a pattern
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --pattern "frontend-.*"
-
-# Use a replacement config file to modify properties during migration
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job --replacements-file replacements.json
-```
+העברה לבקר מרוחק אינה זמינה. גם אם מציינים כתובת יעד, הסקריפט משתמש בבקר Jenkins הנוכחי.
 
 ##### יצירת תבניות למשימות
 
@@ -247,11 +238,14 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 הספרייה מספקת גם ממשק API תכנותי לשימוש בסקריפטי Groovy משלכם:
 
+JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
+
+`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
+
 #### ניהול משימות
 
 ```groovy
 import com.github.thomasvincent.jenkinsscripts.jobs.JobCleaner
-import com.github.thomasvincent.jenkinsscripts.jobs.JobMigrator
 import com.github.thomasvincent.jenkinsscripts.jobs.JobTemplate
 import jenkins.model.Jenkins
 
@@ -270,16 +264,6 @@ def template = new JobTemplate(
     ]
 )
 template.applyTemplate("new-job")
-
-// Copy a job between two Jenkins instances provided by the caller
-// (for example, an in-process JenkinsRule harness; no remote connector is bundled)
-boolean migrateBetween(Jenkins source, Jenkins target) {
-    if (source.is(target)) {
-        throw new IllegalArgumentException("Source and target must be distinct Jenkins instances")
-    }
-    return new JobMigrator(source, target).migrateJob("source-job", "target-job")
-}
-migrateBetween(jenkins, targetJenkins)
 ```
 
 #### ניהול ענן
@@ -333,9 +317,6 @@ doManager.provisionNewDroplet("my-do-template")
 # Run unit tests
 ./gradlew test
 
-# Run integration tests
-./gradlew integrationTest
-
 # Run all tests
 ./gradlew check
 ```
@@ -343,21 +324,21 @@ doManager.provisionNewDroplet("my-do-template")
 > **הערה**: קיימת בעיה מוכרת עם התלות המקומית של JFFI (jffi-1.2.17-native.jar) שעלולה לגרום לכשלי בדיקות. אם אתם נתקלים בכך, ניתן לדלג על הבדיקות באמצעות:
 >
 > ```bash
-> ./gradlew build -PskipTests
+> ./gradlew build -x test
 > ```
 >
 > הבדיקות ב-GitHub Actions מוגדרות כעת לדלג על בדיקות בעייתיות.
 
 #### סביבת בדיקות ב-Docker
 
-הפרויקט כולל סביבת בדיקות מבוססת Docker לאימות תאימות עם גרסאות Java שונות:
+[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
 
 ```sh
 docker compose -f docker-compose.test.yml run --rm java17
 docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-בדיקות האינטגרציה משתמשות ב-JenkinsRule כדי ליצור מופע Jenkins זמני לבדיקה, כך שאין צורך בשרת Jenkins פועל. בדיקות אלה מאמתות שהסקריפטים פועלים כראוי מול ממשקי API ומבני נתונים אמיתיים של Jenkins. ראו [תיעוד בדיקות האינטגרציה](../../../src/integration-test/README.md) לפרטים נוספים.
 
 ### איכות קוד
 

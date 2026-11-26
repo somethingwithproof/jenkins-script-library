@@ -107,16 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### مهاجرت کارها
 
-```bash
-# Migrate a specific job
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job
-
-# Migrate all jobs matching a pattern
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --pattern "frontend-.*"
-
-# Use a replacement config file to modify properties during migration
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job --replacements-file replacements.json
-```
+انتقال به کنترل‌کنندهٔ راه دور در دسترس نیست. حتی با تعیین نشانی مقصد، اسکریپت از کنترل‌کنندهٔ فعلی Jenkins استفاده می‌کند.
 
 ##### قالب‌سازی کارها
 
@@ -247,11 +238,14 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 این کتابخانه همچنین یک API برنامه‌نویسی برای استفاده در اسکریپت‌های Groovy خودتان ارائه می‌دهد:
 
+JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
+
+`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
+
 #### مدیریت کارها (Jobs)
 
 ```groovy
 import com.github.thomasvincent.jenkinsscripts.jobs.JobCleaner
-import com.github.thomasvincent.jenkinsscripts.jobs.JobMigrator
 import com.github.thomasvincent.jenkinsscripts.jobs.JobTemplate
 import jenkins.model.Jenkins
 
@@ -270,16 +264,6 @@ def template = new JobTemplate(
     ]
 )
 template.applyTemplate("new-job")
-
-// Copy a job between two Jenkins instances provided by the caller
-// (for example, an in-process JenkinsRule harness; no remote connector is bundled)
-boolean migrateBetween(Jenkins source, Jenkins target) {
-    if (source.is(target)) {
-        throw new IllegalArgumentException("Source and target must be distinct Jenkins instances")
-    }
-    return new JobMigrator(source, target).migrateJob("source-job", "target-job")
-}
-migrateBetween(jenkins, targetJenkins)
 ```
 
 #### مدیریت ابر
@@ -333,9 +317,6 @@ doManager.provisionNewDroplet("my-do-template")
 # Run unit tests
 ./gradlew test
 
-# Run integration tests
-./gradlew integrationTest
-
 # Run all tests
 ./gradlew check
 ```
@@ -343,21 +324,21 @@ doManager.provisionNewDroplet("my-do-template")
 > **توجه**: یک مشکل شناخته‌شده در وابستگی بومی JFFI (فایل jffi-1.2.17-native.jar) وجود دارد که ممکن است باعث شکست آزمون‌ها شود. در صورت مواجهه با این مشکل، می‌توانید آزمون‌ها را با دستور زیر رد کنید:
 >
 > ```bash
-> ./gradlew build -PskipTests
+> ./gradlew build -x test
 > ```
 >
 > آزمون‌های GitHub Actions در حال حاضر به‌گونه‌ای پیکربندی شده‌اند که آزمون‌های مشکل‌ساز را رد کنند.
 
 #### محیط آزمون Docker
 
-این پروژه شامل یک محیط آزمون مبتنی بر Docker برای بررسی سازگاری با نسخه‌های مختلف Java است:
+[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
 
 ```sh
 docker compose -f docker-compose.test.yml run --rm java17
 docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-آزمون‌های یکپارچه‌سازی از JenkinsRule برای ایجاد یک نمونه موقت Jenkins جهت آزمون استفاده می‌کنند، بنابراین نیازی به یک سرور Jenkins در حال اجرا ندارید. این آزمون‌ها تأیید می‌کنند که اسکریپت‌ها به‌درستی با APIها و ساختارهای داده واقعی Jenkins کار می‌کنند. برای جزئیات بیشتر [مستندات آزمون یکپارچه‌سازی](../../../src/integration-test/README.md) را ببینید.
 
 ### کیفیت کد
 

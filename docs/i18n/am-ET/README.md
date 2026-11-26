@@ -107,16 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### የሥራ ማዛወር
 
-```bash
-# Migrate a specific job
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job
-
-# Migrate all jobs matching a pattern
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --pattern "frontend-.*"
-
-# Use a replacement config file to modify properties during migration
-groovy MigrateJobs.groovy --url https://target-jenkins.example.com --user admin --password adminPass --job my-job --replacements-file replacements.json
-```
+በርቀት ማዛወር አይቻልም። የዒላማ URL ቢሰጥም ስክሪፕቱ የአሁኑን የJenkins መቆጣጠሪያ ይጠቀማል።
 
 ##### የሥራ አብነት ማዘጋጀት
 
@@ -247,11 +238,14 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 ቤተ-መጻሕፍቱ በራስዎ የGroovy ስክሪፕቶች ውስጥ የሚጠቀሙበት የፕሮግራሚንግ APIም ያቀርባል፦
 
+JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
+
+`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
+
 #### የሥራ አስተዳደር
 
 ```groovy
 import com.github.thomasvincent.jenkinsscripts.jobs.JobCleaner
-import com.github.thomasvincent.jenkinsscripts.jobs.JobMigrator
 import com.github.thomasvincent.jenkinsscripts.jobs.JobTemplate
 import jenkins.model.Jenkins
 
@@ -270,16 +264,6 @@ def template = new JobTemplate(
     ]
 )
 template.applyTemplate("new-job")
-
-// Copy a job between two Jenkins instances provided by the caller
-// (for example, an in-process JenkinsRule harness; no remote connector is bundled)
-boolean migrateBetween(Jenkins source, Jenkins target) {
-    if (source.is(target)) {
-        throw new IllegalArgumentException("Source and target must be distinct Jenkins instances")
-    }
-    return new JobMigrator(source, target).migrateJob("source-job", "target-job")
-}
-migrateBetween(jenkins, targetJenkins)
 ```
 
 #### የደመና አስተዳደር
@@ -333,9 +317,6 @@ doManager.provisionNewDroplet("my-do-template")
 # Run unit tests
 ./gradlew test
 
-# Run integration tests
-./gradlew integrationTest
-
 # Run all tests
 ./gradlew check
 ```
@@ -343,21 +324,21 @@ doManager.provisionNewDroplet("my-do-template")
 > **ማስታወሻ**፦ የሙከራ ብልሽቶችን ሊያስከትል የሚችል ከJFFI ነባር ጥገኛ (jffi-1.2.17-native.jar) ጋር የተያያዘ የሚታወቅ ችግር አለ። ይህ ካጋጠመዎት ሙከራዎችን በሚከተለው መንገድ መዝለል ይችላሉ፦
 >
 > ```bash
-> ./gradlew build -PskipTests
+> ./gradlew build -x test
 > ```
 >
 > የGitHub Actions ሙከራዎች በአሁኑ ጊዜ ችግር ያለባቸውን ሙከራዎች እንዲዘሉ ተዋቅረዋል።
 
 #### የDocker ሙከራ አካባቢ
 
-ፕሮጀክቱ ከተለያዩ የJava ሥሪቶች ጋር ያለውን ተኳሃኝነት ለማረጋገጥ በDocker ላይ የተመሠረተ የሙከራ አካባቢን ያካትታል፦
+[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
 
 ```sh
 docker compose -f docker-compose.test.yml run --rm java17
 docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-የውህደት ሙከራዎቹ ለሙከራ ጊዜያዊ የJenkins አሃድ ለመፍጠር JenkinsRuleን ይጠቀማሉ፣ ስለዚህ እየሠራ ያለ የJenkins አገልጋይ አያስፈልግዎትም። እነዚህ ሙከራዎች ስክሪፕቶቹ ከእውነተኛ የJenkins APIዎች እና የውሂብ መዋቅሮች ጋር በትክክል እንደሚሠሩ ያረጋግጣሉ። ለተጨማሪ ዝርዝሮች [የውህደት ሙከራ ሰነድ](../../../src/integration-test/README.md)ን ይመልከቱ።
 
 ### የኮድ ጥራት
 
