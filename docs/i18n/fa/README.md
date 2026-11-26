@@ -346,42 +346,10 @@ doManager.provisionNewDroplet("my-do-template")
 
 این پروژه شامل یک محیط آزمون مبتنی بر Docker برای بررسی سازگاری با نسخه‌های مختلف Java است:
 
-```bash
-# Run tests in Java 8 (default)
-./run-tests.sh java8
-
-# Run tests in Java 11 with longer timeout
-./run-tests.sh java11 30m
-
-# Run tests in Java 17 with longer timeout
-./run-tests.sh java17 30m
-
-# Run all Java versions
-./run-tests.sh all 1h
-
-# Run tests with different scopes
-./run-tests.sh java8 30m false minimal  # Run minimal test set (core utilities only)
-./run-tests.sh java8 30m false default  # Run default test set
-./run-tests.sh java8 30m false all      # Run all tests including integration tests
+```sh
+docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-محیط آزمون Docker شامل موارد زیر است:
-
-- دریافت از پیش وابستگی‌ها برای اجرای سریع‌تر آزمون‌ها
-- کش کردن حجم (volume) برای وابستگی‌های Gradle و Maven
-- پیکربندی پایه مشترک برای محیطی یکسان
-- پشتیبانی از دامنه‌های مختلف آزمون (minimal، default، all)
-- محدودیت‌های حافظه و بررسی‌های سلامت برای کانتینرهای Docker
-
-#### سازگاری با Java
-
-این کتابخانه از نسخه‌های زیر از Java پشتیبانی می‌کند:
-
-- Java 8 (LTS)
-- Java 11 (LTS)
-- Java 17 (LTS)
-
-ما سازگاری رو به عقب با Java 8 را برای پشتیبانی از نصب‌های قدیمی‌تر Jenkins حفظ می‌کنیم. این کتابخانه به‌صورت پیش‌فرض با گزینه‌های سازگاری Java 8 کامپایل می‌شود.
 
 آزمون‌های یکپارچه‌سازی از JenkinsRule برای ایجاد یک نمونه موقت Jenkins جهت آزمون استفاده می‌کنند، بنابراین نیازی به یک سرور Jenkins در حال اجرا ندارید. این آزمون‌ها تأیید می‌کنند که اسکریپت‌ها به‌درستی با APIها و ساختارهای داده واقعی Jenkins کار می‌کنند. برای جزئیات بیشتر [مستندات آزمون یکپارچه‌سازی](../../../src/integration-test/README.md) را ببینید.
 

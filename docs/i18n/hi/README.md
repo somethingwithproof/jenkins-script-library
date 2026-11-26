@@ -346,42 +346,10 @@ doManager.provisionNewDroplet("my-do-template")
 
 विभिन्न Java संस्करणों के साथ संगतता सत्यापित करने के लिए प्रोजेक्ट में एक Docker-आधारित परीक्षण परिवेश शामिल है:
 
-```bash
-# Run tests in Java 8 (default)
-./run-tests.sh java8
-
-# Run tests in Java 11 with longer timeout
-./run-tests.sh java11 30m
-
-# Run tests in Java 17 with longer timeout
-./run-tests.sh java17 30m
-
-# Run all Java versions
-./run-tests.sh all 1h
-
-# Run tests with different scopes
-./run-tests.sh java8 30m false minimal  # Run minimal test set (core utilities only)
-./run-tests.sh java8 30m false default  # Run default test set
-./run-tests.sh java8 30m false all      # Run all tests including integration tests
+```sh
+docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-Docker परीक्षण परिवेश में शामिल हैं:
-
-- तेज़ परीक्षण निष्पादन के लिए निर्भरताओं की प्री-डाउनलोडिंग
-- Gradle और Maven निर्भरताओं के लिए वॉल्यूम कैशिंग
-- सुसंगत परिवेश के लिए साझा बेस कॉन्फ़िगरेशन
-- विभिन्न परीक्षण दायरे (minimal, default, all) के लिए समर्थन
-- Docker कंटेनरों के लिए मेमोरी सीमाएँ और स्वास्थ्य जाँच
-
-#### Java संगतता
-
-यह लाइब्रेरी निम्नलिखित Java संस्करणों का समर्थन करती है:
-
-- Java 8 (LTS)
-- Java 11 (LTS)
-- Java 17 (LTS)
-
-हम लेगेसी Jenkins इंस्टॉलेशन का समर्थन करने के लिए Java 8 के साथ पश्च-संगतता बनाए रखते हैं। लाइब्रेरी डिफ़ॉल्ट रूप से Java 8 संगतता विकल्पों के साथ कंपाइल की जाती है।
 
 एकीकरण परीक्षण के लिए एक अस्थायी Jenkins इंस्टेंस बनाने हेतु JenkinsRule का उपयोग किया जाता है, इसलिए आपको चल रहे Jenkins सर्वर की आवश्यकता नहीं होती। ये परीक्षण सत्यापित करते हैं कि स्क्रिप्ट वास्तविक Jenkins API और डेटा संरचनाओं के साथ सही ढंग से काम करती हैं। अधिक विवरण के लिए [एकीकरण परीक्षण दस्तावेज़ीकरण](../../../src/integration-test/README.md) देखें।
 

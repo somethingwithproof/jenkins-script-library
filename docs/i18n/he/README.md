@@ -346,42 +346,10 @@ doManager.provisionNewDroplet("my-do-template")
 
 הפרויקט כולל סביבת בדיקות מבוססת Docker לאימות תאימות עם גרסאות Java שונות:
 
-```bash
-# Run tests in Java 8 (default)
-./run-tests.sh java8
-
-# Run tests in Java 11 with longer timeout
-./run-tests.sh java11 30m
-
-# Run tests in Java 17 with longer timeout
-./run-tests.sh java17 30m
-
-# Run all Java versions
-./run-tests.sh all 1h
-
-# Run tests with different scopes
-./run-tests.sh java8 30m false minimal  # Run minimal test set (core utilities only)
-./run-tests.sh java8 30m false default  # Run default test set
-./run-tests.sh java8 30m false all      # Run all tests including integration tests
+```sh
+docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-סביבת הבדיקות ב-Docker כוללת:
-
-- הורדה מוקדמת של תלויות להרצת בדיקות מהירה יותר
-- אחסון במטמון באמצעות Volumes עבור תלויות Gradle ו-Maven
-- תצורת בסיס משותפת לסביבה עקבית
-- תמיכה בהיקפי בדיקה שונים (minimal, default, all)
-- מגבלות זיכרון ובדיקות תקינות למכולות Docker
-
-#### תאימות ל-Java
-
-ספרייה זו תומכת בגרסאות Java הבאות:
-
-- Java 8 (LTS)
-- Java 11 (LTS)
-- Java 17 (LTS)
-
-אנו שומרים על תאימות לאחור עם Java 8 כדי לתמוך בהתקנות Jenkins ותיקות. הספרייה מהודרת כברירת מחדל עם אפשרויות תאימות ל-Java 8.
 
 בדיקות האינטגרציה משתמשות ב-JenkinsRule כדי ליצור מופע Jenkins זמני לבדיקה, כך שאין צורך בשרת Jenkins פועל. בדיקות אלה מאמתות שהסקריפטים פועלים כראוי מול ממשקי API ומבני נתונים אמיתיים של Jenkins. ראו [תיעוד בדיקות האינטגרציה](../../../src/integration-test/README.md) לפרטים נוספים.
 

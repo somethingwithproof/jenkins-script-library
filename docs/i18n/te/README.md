@@ -346,42 +346,10 @@ doManager.provisionNewDroplet("my-do-template")
 
 వివిధ Java వెర్షన్లతో అనుకూలతను ధృవీకరించడానికి ఈ ప్రాజెక్ట్ Docker-ఆధారిత పరీక్షా ఎన్విరాన్‌మెంట్‌ను కలిగి ఉంది:
 
-```bash
-# Run tests in Java 8 (default)
-./run-tests.sh java8
-
-# Run tests in Java 11 with longer timeout
-./run-tests.sh java11 30m
-
-# Run tests in Java 17 with longer timeout
-./run-tests.sh java17 30m
-
-# Run all Java versions
-./run-tests.sh all 1h
-
-# Run tests with different scopes
-./run-tests.sh java8 30m false minimal  # Run minimal test set (core utilities only)
-./run-tests.sh java8 30m false default  # Run default test set
-./run-tests.sh java8 30m false all      # Run all tests including integration tests
+```sh
+docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-Docker పరీక్షా ఎన్విరాన్‌మెంట్ వీటిని కలిగి ఉంటుంది:
-
-- వేగవంతమైన పరీక్ష అమలు కోసం డిపెండెన్సీలను ముందుగానే డౌన్‌లోడ్ చేయడం
-- Gradle మరియు Maven డిపెండెన్సీల కోసం వాల్యూమ్ క్యాషింగ్
-- స్థిరమైన ఎన్విరాన్‌మెంట్ కోసం షేర్ చేయబడిన బేస్ కాన్ఫిగరేషన్
-- వివిధ పరీక్షా పరిధులకు (minimal, default, all) మద్దతు
-- Docker కంటైనర్ల కోసం మెమరీ పరిమితులు మరియు హెల్త్ చెక్‌లు
-
-#### Java అనుకూలత
-
-ఈ లైబ్రరీ క్రింది Java వెర్షన్లకు మద్దతు ఇస్తుంది:
-
-- Java 8 (LTS)
-- Java 11 (LTS)
-- Java 17 (LTS)
-
-పాత Jenkins ఇన్‌స్టాలేషన్లకు మద్దతు ఇవ్వడానికి మేము Java 8తో బ్యాక్‌వర్డ్ అనుకూలతను కొనసాగిస్తాము. ఈ లైబ్రరీ డిఫాల్ట్‌గా Java 8 అనుకూలత ఆప్షన్లతో కంపైల్ చేయబడుతుంది.
 
 ఇంటిగ్రేషన్ పరీక్షలు పరీక్ష కోసం తాత్కాలిక Jenkins ఇన్‌స్టాన్స్‌ను సృష్టించడానికి JenkinsRuleను ఉపయోగిస్తాయి, కాబట్టి మీకు నడుస్తున్న Jenkins సర్వర్ అవసరం లేదు. ఈ పరీక్షలు స్క్రిప్ట్‌లు నిజమైన Jenkins APIలు మరియు డేటా స్ట్రక్చర్లతో సరిగ్గా పనిచేస్తాయని ధృవీకరిస్తాయి. మరిన్ని వివరాల కోసం [ఇంటిగ్రేషన్ టెస్ట్ డాక్యుమెంటేషన్](../../../src/integration-test/README.md) చూడండి.
 

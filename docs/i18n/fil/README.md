@@ -346,42 +346,10 @@ doManager.provisionNewDroplet("my-do-template")
 
 Kasama sa proyekto ang isang kapaligiran sa pagsusuri na nakabatay sa Docker upang beripikahin ang pagiging tugma sa iba't ibang bersyon ng Java:
 
-```bash
-# Run tests in Java 8 (default)
-./run-tests.sh java8
-
-# Run tests in Java 11 with longer timeout
-./run-tests.sh java11 30m
-
-# Run tests in Java 17 with longer timeout
-./run-tests.sh java17 30m
-
-# Run all Java versions
-./run-tests.sh all 1h
-
-# Run tests with different scopes
-./run-tests.sh java8 30m false minimal  # Run minimal test set (core utilities only)
-./run-tests.sh java8 30m false default  # Run default test set
-./run-tests.sh java8 30m false all      # Run all tests including integration tests
+```sh
+docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-Kasama sa kapaligiran sa pagsusuri gamit ang Docker ang:
-
-- Paunang pag-download ng mga dependency para sa mas mabilis na pagpapatakbo ng pagsusuri
-- Volume caching para sa mga dependency ng Gradle at Maven
-- Pinagsasaluhang base configuration para sa pare-parehong kapaligiran
-- Suporta para sa iba't ibang saklaw ng pagsusuri (minimal, default, all)
-- Mga limitasyon sa memory at health check para sa mga container ng Docker
-
-#### Pagiging Tugma sa Java
-
-Sinusuportahan ng library na ito ang mga sumusunod na bersyon ng Java:
-
-- Java 8 (LTS)
-- Java 11 (LTS)
-- Java 17 (LTS)
-
-Pinananatili namin ang backward compatibility sa Java 8 upang suportahan ang mga legacy na pag-install ng Jenkins. Kino-compile ang library nang may mga opsyon sa pagiging tugma sa Java 8 bilang default.
 
 Gumagamit ang mga integration test ng JenkinsRule upang lumikha ng pansamantalang instance ng Jenkins para sa pagsusuri, kaya hindi mo kailangan ng tumatakbong server ng Jenkins. Bineberipika ng mga pagsusuring ito na gumagana nang tama ang mga script sa mga totoong API at data structure ng Jenkins. Tingnan ang [dokumentasyon ng integration test](../../../src/integration-test/README.md) para sa karagdagang detalye.
 

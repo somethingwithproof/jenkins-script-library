@@ -346,42 +346,10 @@ doManager.provisionNewDroplet("my-do-template")
 
 Iṣẹ́ àkànṣe náà ní àyíká ìdánwò tí ó dá lórí Docker láti jẹ́rìísí ìbáramu pẹ̀lú àwọn ẹ̀yà Java ọ̀tọ̀ọ̀tọ̀:
 
-```bash
-# Run tests in Java 8 (default)
-./run-tests.sh java8
-
-# Run tests in Java 11 with longer timeout
-./run-tests.sh java11 30m
-
-# Run tests in Java 17 with longer timeout
-./run-tests.sh java17 30m
-
-# Run all Java versions
-./run-tests.sh all 1h
-
-# Run tests with different scopes
-./run-tests.sh java8 30m false minimal  # Run minimal test set (core utilities only)
-./run-tests.sh java8 30m false default  # Run default test set
-./run-tests.sh java8 30m false all      # Run all tests including integration tests
+```sh
+docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-Àyíká ìdánwò Docker ní àwọn wọ̀nyí nínú:
-
-- Gbígba àwọn ìgbẹ́kẹ̀lé sílẹ̀ tẹ́lẹ̀ fún ṣíṣiṣẹ́ ìdánwò tí ó yára jù
-- Ìfipamọ́ kíákíá fólúùmù fún àwọn ìgbẹ́kẹ̀lé Gradle àti Maven
-- Ìṣètò ìpìlẹ̀ àjọpín fún àyíká tí ó dúró déédéé
-- Àtìlẹ́yìn fún àwọn ìwọ̀n ìdánwò ọ̀tọ̀ọ̀tọ̀ (minimal, default, all)
-- Àwọn ààlà ìrántí àti àwọn ìṣàyẹ̀wò ìlera fún àwọn àpótí-ẹ̀rọ Docker
-
-#### Ìbáramu Java
-
-Àkójọpọ̀ yìí ń ṣètìlẹ́yìn fún àwọn ẹ̀yà Java wọ̀nyí:
-
-- Java 8 (LTS)
-- Java 11 (LTS)
-- Java 17 (LTS)
-
-A ń pa ìbáramu ẹ̀yìn mọ́ pẹ̀lú Java 8 láti ṣètìlẹ́yìn fún àwọn ìfisílẹ̀ Jenkins àtijọ́. A ṣàkójọpọ̀ àkójọpọ̀ náà pẹ̀lú àwọn àṣàyàn ìbáramu Java 8 gẹ́gẹ́ bí àṣàyàn àkọ́kọ́.
 
 Àwọn ìdánwò ìsopọ̀ ń lo JenkinsRule láti ṣẹ̀dá àpẹẹrẹ Jenkins ìgbàdíẹ̀ fún ìdánwò, nítorí náà o kò nílò ẹ̀rọ-ìpèsè Jenkins tí ń ṣiṣẹ́. Àwọn ìdánwò wọ̀nyí ń jẹ́rìísí pé àwọn ìwé-àṣẹ náà ń ṣiṣẹ́ déédéé pẹ̀lú àwọn API Jenkins gidi àti àwọn ètò dátà. Wo [ìwé-àkọsílẹ̀ ìdánwò ìsopọ̀](../../../src/integration-test/README.md) fún àwọn àlàyé sí i.
 

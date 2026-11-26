@@ -346,42 +346,10 @@ doManager.provisionNewDroplet("my-do-template")
 
 Proje, farklı Java sürümleriyle uyumluluğu doğrulamak için Docker tabanlı bir test ortamı içerir:
 
-```bash
-# Run tests in Java 8 (default)
-./run-tests.sh java8
-
-# Run tests in Java 11 with longer timeout
-./run-tests.sh java11 30m
-
-# Run tests in Java 17 with longer timeout
-./run-tests.sh java17 30m
-
-# Run all Java versions
-./run-tests.sh all 1h
-
-# Run tests with different scopes
-./run-tests.sh java8 30m false minimal  # Run minimal test set (core utilities only)
-./run-tests.sh java8 30m false default  # Run default test set
-./run-tests.sh java8 30m false all      # Run all tests including integration tests
+```sh
+docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-Docker test ortamı şunları içerir:
-
-- Daha hızlı test yürütme için bağımlılıkların önceden indirilmesi
-- Gradle ve Maven bağımlılıkları için birim önbellekleme
-- Tutarlı bir ortam için paylaşılan temel yapılandırma
-- Farklı test kapsamları için destek (minimal, default, all)
-- Docker kapsayıcıları için bellek sınırları ve sağlık kontrolleri
-
-#### Java Uyumluluğu
-
-Bu kütüphane aşağıdaki Java sürümlerini destekler:
-
-- Java 8 (LTS)
-- Java 11 (LTS)
-- Java 17 (LTS)
-
-Eski Jenkins kurulumlarını desteklemek için Java 8 ile geriye dönük uyumluluğu koruyoruz. Kütüphane varsayılan olarak Java 8 uyumluluk seçenekleriyle derlenir.
 
 Entegrasyon testleri, test için geçici bir Jenkins örneği oluşturmak amacıyla JenkinsRule kullanır; bu nedenle çalışan bir Jenkins sunucusuna ihtiyacınız yoktur. Bu testler, betiklerin gerçek Jenkins API'leri ve veri yapılarıyla doğru çalıştığını doğrular. Daha fazla ayrıntı için [entegrasyon testi belgelerine](../../../src/integration-test/README.md) bakın.
 

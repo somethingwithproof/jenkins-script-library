@@ -346,42 +346,10 @@ doManager.provisionNewDroplet("my-do-template")
 
 Aikin ya ƙunshi muhallin gwaji na tushen Docker don tabbatar da dacewa da sigogin Java daban-daban:
 
-```bash
-# Run tests in Java 8 (default)
-./run-tests.sh java8
-
-# Run tests in Java 11 with longer timeout
-./run-tests.sh java11 30m
-
-# Run tests in Java 17 with longer timeout
-./run-tests.sh java17 30m
-
-# Run all Java versions
-./run-tests.sh all 1h
-
-# Run tests with different scopes
-./run-tests.sh java8 30m false minimal  # Run minimal test set (core utilities only)
-./run-tests.sh java8 30m false default  # Run default test set
-./run-tests.sh java8 30m false all      # Run all tests including integration tests
+```sh
+docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-Muhallin gwajin Docker ya ƙunshi:
-
-- Sauke abubuwan dogaro a gaba don hanzarta gudanar da gwaji
-- Adanar wucin gadi (volume caching) don abubuwan dogaron Gradle da Maven
-- Saitin tushe na tarayya don daidaitaccen muhalli
-- Goyon bayan iyakokin gwaji daban-daban (minimal, default, all)
-- Iyakokin ƙwaƙwalwa da binciken lafiya don kwantenonin Docker
-
-#### Dacewar Java
-
-Wannan laburare yana goyon bayan sigogin Java masu zuwa:
-
-- Java 8 (LTS)
-- Java 11 (LTS)
-- Java 17 (LTS)
-
-Muna kiyaye dacewar baya tare da Java 8 don tallafawa tsofaffin girkawar Jenkins. Ana tattara laburaren tare da zaɓuɓɓukan dacewar Java 8 ta tsoho.
 
 Gwaje-gwajen haɗin kai suna amfani da JenkinsRule don ƙirƙirar samfurin Jenkins na wucin gadi don gwaji, don haka ba ka buƙatar uwar garken Jenkins da ke gudana. Waɗannan gwaje-gwajen suna tabbatar da cewa rubutun yana aiki daidai tare da ainihin APIs da tsarin bayanai na Jenkins. Duba [takardun gwajin haɗin kai](../../../src/integration-test/README.md) don ƙarin bayani.
 

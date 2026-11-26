@@ -346,42 +346,10 @@ doManager.provisionNewDroplet("my-do-template")
 
 يتضمن المشروع بيئة اختبار قائمة على Docker للتحقق من التوافق مع إصدارات Java المختلفة:
 
-```bash
-# Run tests in Java 8 (default)
-./run-tests.sh java8
-
-# Run tests in Java 11 with longer timeout
-./run-tests.sh java11 30m
-
-# Run tests in Java 17 with longer timeout
-./run-tests.sh java17 30m
-
-# Run all Java versions
-./run-tests.sh all 1h
-
-# Run tests with different scopes
-./run-tests.sh java8 30m false minimal  # Run minimal test set (core utilities only)
-./run-tests.sh java8 30m false default  # Run default test set
-./run-tests.sh java8 30m false all      # Run all tests including integration tests
+```sh
+docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-تتضمن بيئة الاختبار المعتمدة على Docker ما يلي:
-
-- التنزيل المسبق للتبعيات لتسريع تنفيذ الاختبارات
-- التخزين المؤقت للأحجام (volume caching) لتبعيات Gradle وMaven
-- تهيئة أساسية مشتركة لضمان بيئة متسقة
-- دعم نطاقات اختبار مختلفة (minimal وdefault وall)
-- حدود الذاكرة وفحوصات السلامة لحاويات Docker
-
-#### التوافق مع Java
-
-تدعم هذه المكتبة إصدارات Java التالية:
-
-- Java 8 (LTS)
-- Java 11 (LTS)
-- Java 17 (LTS)
-
-نحافظ على التوافق الرجعي مع Java 8 لدعم تثبيتات Jenkins القديمة. وتُجمَّع المكتبة افتراضياً بخيارات التوافق مع Java 8.
 
 تستخدم اختبارات التكامل JenkinsRule لإنشاء مثيل Jenkins مؤقت للاختبار، بحيث لا تحتاج إلى خادم Jenkins قيد التشغيل. وتتحقق هذه الاختبارات من أن النصوص البرمجية تعمل بصورة صحيحة مع واجهات برمجة Jenkins وهياكل البيانات الحقيقية. راجع [توثيق اختبارات التكامل](../../../src/integration-test/README.md) لمزيد من التفاصيل.
 

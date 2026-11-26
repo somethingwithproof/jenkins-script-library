@@ -346,42 +346,10 @@ doManager.provisionNewDroplet("my-do-template")
 
 Het project bevat een op Docker gebaseerde testomgeving om compatibiliteit met verschillende Java-versies te verifiëren:
 
-```bash
-# Run tests in Java 8 (default)
-./run-tests.sh java8
-
-# Run tests in Java 11 with longer timeout
-./run-tests.sh java11 30m
-
-# Run tests in Java 17 with longer timeout
-./run-tests.sh java17 30m
-
-# Run all Java versions
-./run-tests.sh all 1h
-
-# Run tests with different scopes
-./run-tests.sh java8 30m false minimal  # Run minimal test set (core utilities only)
-./run-tests.sh java8 30m false default  # Run default test set
-./run-tests.sh java8 30m false all      # Run all tests including integration tests
+```sh
+docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-De Docker-testomgeving omvat:
-
-- Vooraf downloaden van afhankelijkheden voor snellere testuitvoering
-- Volumecaching voor Gradle- en Maven-afhankelijkheden
-- Gedeelde basisconfiguratie voor een consistente omgeving
-- Ondersteuning voor verschillende testbereiken (minimal, default, all)
-- Geheugenlimieten en gezondheidscontroles voor Docker-containers
-
-#### Java-compatibiliteit
-
-Deze bibliotheek ondersteunt de volgende Java-versies:
-
-- Java 8 (LTS)
-- Java 11 (LTS)
-- Java 17 (LTS)
-
-We behouden achterwaartse compatibiliteit met Java 8 om oudere Jenkins-installaties te ondersteunen. De bibliotheek wordt standaard gecompileerd met Java 8-compatibiliteitsopties.
 
 De integratietests gebruiken JenkinsRule om een tijdelijke Jenkins-instantie aan te maken voor testen, zodat je geen draaiende Jenkins-server nodig hebt. Deze tests verifiëren dat de scripts correct werken met echte Jenkins-API's en datastructuren. Zie de [documentatie voor integratietests](../../../src/integration-test/README.md) voor meer details.
 

@@ -346,42 +346,10 @@ doManager.provisionNewDroplet("my-do-template")
 
 வெவ்வேறு Java பதிப்புகளுடனான இணக்கத்தன்மையைச் சரிபார்க்க, இந்தத் திட்டத்தில் Docker-அடிப்படையிலான சோதனைச் சூழல் உள்ளது:
 
-```bash
-# Run tests in Java 8 (default)
-./run-tests.sh java8
-
-# Run tests in Java 11 with longer timeout
-./run-tests.sh java11 30m
-
-# Run tests in Java 17 with longer timeout
-./run-tests.sh java17 30m
-
-# Run all Java versions
-./run-tests.sh all 1h
-
-# Run tests with different scopes
-./run-tests.sh java8 30m false minimal  # Run minimal test set (core utilities only)
-./run-tests.sh java8 30m false default  # Run default test set
-./run-tests.sh java8 30m false all      # Run all tests including integration tests
+```sh
+docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-Docker சோதனைச் சூழலில் பின்வருவன அடங்கும்:
-
-- வேகமான சோதனை இயக்கத்திற்காகச் சார்புகளை முன்கூட்டியே பதிவிறக்குதல்
-- Gradle மற்றும் Maven சார்புகளுக்கான தொகுதித் தேக்ககம் (volume caching)
-- சீரான சூழலுக்கான பகிரப்பட்ட அடிப்படைக் கட்டமைப்பு
-- வெவ்வேறு சோதனை வரம்புகளுக்கான ஆதரவு (minimal, default, all)
-- Docker கொள்கலன்களுக்கான நினைவக வரம்புகள் மற்றும் ஆரோக்கியச் சரிபார்ப்புகள்
-
-#### Java இணக்கத்தன்மை
-
-இந்த நூலகம் பின்வரும் Java பதிப்புகளை ஆதரிக்கிறது:
-
-- Java 8 (LTS)
-- Java 11 (LTS)
-- Java 17 (LTS)
-
-பழைய Jenkins நிறுவல்களை ஆதரிக்க Java 8-உடன் பின்னோக்கிய இணக்கத்தன்மையைப் பராமரிக்கிறோம். இந்த நூலகம் இயல்புநிலையாக Java 8 இணக்கத்தன்மை விருப்பங்களுடன் தொகுக்கப்படுகிறது.
 
 ஒருங்கிணைப்புச் சோதனைகள் சோதனைக்காகத் தற்காலிக Jenkins நிகழ்வை உருவாக்க JenkinsRule-ஐப் பயன்படுத்துகின்றன; எனவே இயங்கும் Jenkins சேவையகம் உங்களுக்குத் தேவையில்லை. உண்மையான Jenkins API-கள் மற்றும் தரவுக் கட்டமைப்புகளுடன் ஸ்கிரிப்டுகள் சரியாகச் செயல்படுகின்றன என்பதை இந்தச் சோதனைகள் உறுதிப்படுத்துகின்றன. மேலும் விவரங்களுக்கு [ஒருங்கிணைப்புச் சோதனை ஆவணத்தைப்](../../../src/integration-test/README.md) பார்க்கவும்.
 

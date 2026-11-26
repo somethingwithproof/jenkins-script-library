@@ -346,42 +346,10 @@ doManager.provisionNewDroplet("my-do-template")
 
 项目包含基于 Docker 的测试环境，用于验证不同 Java 版本的兼容性：
 
-```bash
-# Run tests in Java 8 (default)
-./run-tests.sh java8
-
-# Run tests in Java 11 with longer timeout
-./run-tests.sh java11 30m
-
-# Run tests in Java 17 with longer timeout
-./run-tests.sh java17 30m
-
-# Run all Java versions
-./run-tests.sh all 1h
-
-# Run tests with different scopes
-./run-tests.sh java8 30m false minimal  # Run minimal test set (core utilities only)
-./run-tests.sh java8 30m false default  # Run default test set
-./run-tests.sh java8 30m false all      # Run all tests including integration tests
+```sh
+docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java21
 ```
-
-Docker 测试环境包含以下特性：
-
-- 预下载依赖项以加快测试执行速度
-- 为 Gradle 和 Maven 依赖项提供卷缓存
-- 共享基础配置以确保一致的环境
-- 支持不同的测试范围（minimal、default、all）
-- 为 Docker 容器配置内存限制和健康检查
-
-#### Java 兼容性
-
-本库支持以下 Java 版本：
-
-- Java 8 (LTS)
-- Java 11 (LTS)
-- Java 17 (LTS)
-
-我们保持对 Java 8 的向后兼容，以支持旧版 Jenkins 部署。本库默认使用 Java 8 兼容选项进行编译。
 
 集成测试使用 JenkinsRule 创建临时 Jenkins 实例进行测试，因此无需运行中的 Jenkins 服务器。这些测试验证脚本是否能与真实的 Jenkins API 和数据结构正常工作。详情请参阅[集成测试文档](../../../src/integration-test/README.md)。
 
