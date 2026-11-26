@@ -134,24 +134,70 @@ class PipelineUtilsSpec extends Specification {
         "unknown" | "amd64"
     }
     
+    def "currentOS propagates InterruptedException and restores interrupt flag"() {
+        given:
+        mockPipeline.unix = true
+        mockPipeline.throwInterruptedOnSh = true
+
+        when:
+        utils.currentOS()
+
+        then:
+        thrown(InterruptedException)
+        Thread.interrupted() // verifies and clears interrupt flag
+    }
+
+    def "currentArchitecture propagates InterruptedException and restores interrupt flag"() {
+        given:
+        mockPipeline.unix = true
+        mockPipeline.throwInterruptedOnSh = true
+
+        when:
+        utils.currentArchitecture()
+
+        then:
+        thrown(InterruptedException)
+        Thread.interrupted()
+    }
+
+    def "PipelineUtils survives Java serialization with Serializable pipeline"() {
+        given:
+        def original = new PipelineUtils(new MockPipeline(unix: true, shOutput: "Darwin"))
+        def baos = new ByteArrayOutputStream()
+        new ObjectOutputStream(baos).withCloseable { it.writeObject(original) }
+
+        when:
+        PipelineUtils restored = new ObjectInputStream(new ByteArrayInputStream(baos.toByteArray())).withCloseable {
+            it.readObject() as PipelineUtils
+        }
+
+        then:
+        restored.currentOS() == "darwin"
+    }
+
     // Simple mock class for testing
-    static class MockPipeline {
+    static class MockPipeline implements Serializable {
+        private static final long serialVersionUID = 1L
         boolean unix = true
         String shOutput = ""
         String powershellOutput = ""
         boolean throwOnSh = false
-        
+        boolean throwInterruptedOnSh = false
+
         boolean isUnix() {
             return unix
         }
-        
+
         String sh(Map args) {
+            if (throwInterruptedOnSh) {
+                throw new InterruptedException("Build aborted")
+            }
             if (throwOnSh) {
                 throw new IOException("Command failed")
             }
             return shOutput
         }
-        
+
         String powershell(Map args) {
             return powershellOutput
         }
