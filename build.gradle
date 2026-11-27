@@ -146,14 +146,19 @@ def prepareControllerPlugins = tasks.register('prepareControllerPlugins', Sync) 
     from configurations.controllerPlugins
     into layout.buildDirectory.dir('pipeline-test-plugins')
 }
+def testSpotRequests = tasks.register('testSpotRequests', Exec) {
+    description = 'Test interruptible capacity requests with isolated provider CLI responses.'
+    group = 'verification'
+    commandLine 'python3', '-B', '-m', 'unittest', 'discover', '-s', 'src/test/python'
+}
 tasks.register('integrationTest', Test) {
     description = 'Run controller acceptance tests in a temporary Jenkins home.'
     group = 'verification'
     testClassesDirs = sourceSets.controllerTest.output.classesDirs
     classpath = sourceSets.controllerTest.runtimeClasspath
     useJUnit()
-    dependsOn prepareControllerPlugins
-    inputs.files(prepareControllerPlugins, fileTree('src/controller-test/fixtures'), 'Jenkinsfile', fileTree('examples') { include '**/*.jenkinsfile' },
+    dependsOn prepareControllerPlugins, testSpotRequests
+    inputs.files(prepareControllerPlugins, fileTree('src/controller-test/fixtures'), fileTree('resources'), 'Jenkinsfile', fileTree('examples') { include '**/*.jenkinsfile' },
         fileTree('templates') { include '**/*.jenkinsfile' }, fileTree('vars'), fileTree('src/com'), fileTree('src/hudson'))
     doFirst {
         systemProperty 'pipeline.pluginDir', prepareControllerPlugins.get().destinationDir.absolutePath

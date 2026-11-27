@@ -27,11 +27,11 @@ public class PipelineLibraryTest {
 
     @Test public void loadLibraryValidatePipelinesAndResumeBuild() throws Throwable {
         File repo = temporary.newFolder("library");
-        for (String dir : new String[] {"src/com", "src/hudson", "vars"}) {
+        for (String dir : new String[] {"src/com", "src/hudson", "vars", "resources"}) {
             new FilePath(new File(dir).getAbsoluteFile()).copyRecursiveTo(new FilePath(new File(repo, dir)));
         }
         git(repo, "init", "--quiet", "-b", "main");
-        git(repo, "add", "--", "src", "vars");
+        git(repo, "add", "--", "src", "vars", "resources");
         git(repo, "commit", "--quiet", "-m", "Library fixture");
 
         Path plugins = controller.getHome().toPath().resolve("plugins");

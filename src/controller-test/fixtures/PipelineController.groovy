@@ -36,6 +36,9 @@ void beforeRestart() {
         @Library('jenkins-script-library') _
         def report
         node {
+            def spot = provisionSpot(provider: 'aws', requestId: 'preview', region: 'us-east-1',
+                spec: [LaunchTemplate: [LaunchTemplateId: 'lt-fixture', Version: '1']])
+            assert spot == [provider: 'aws', target: 'us-east-1/preview', status: 'planned']
             assert cloudInventory().agents.isEmpty()
             assert optimizeCloudCosts.optimize(dryRun: false).counts.applied == 0
             report = auditPlugins(expected: 'absent-fixture:latest')

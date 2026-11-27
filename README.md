@@ -308,6 +308,11 @@ savings. An apply request reports a status for each action. The bundled cost
 providers currently report unsupported operations. The build description reports
 action counts. Estimated savings are projections based on configured model rates.
 
+To request interruptible capacity, call `provisionSpot` from a Pipeline agent.
+It supports EC2 Spot, Azure Spot VMs, Google Spot VMs, OCI preemptible instances
+and Kubernetes Pods on managed interruptible pools. Preview is the default.
+See [provider inputs and submission examples](vars/README.md#spot-capacity).
+
 ### Controller operations from a trusted Pipeline
 
 ```groovy
