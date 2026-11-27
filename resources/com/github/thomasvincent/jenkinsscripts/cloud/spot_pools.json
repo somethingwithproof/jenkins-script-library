@@ -1,4 +1,5 @@
 {
+  "doks": ["doks.digitalocean.com/capacity-type", "spot"],
   "eks": ["eks.amazonaws.com/capacityType", "SPOT"],
   "gke": ["cloud.google.com/gke-spot", "true"],
   "aks": ["kubernetes.azure.com/scalesetpriority", "spot"],

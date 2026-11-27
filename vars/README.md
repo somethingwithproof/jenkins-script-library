@@ -104,10 +104,14 @@ echo "Submitted ${submitted.resourceId}"
 | `oracle` | Commercial OCI `region`, stable `requestId`, and native LaunchInstanceDetails `spec` with compartment, availability domain, shape, source and network settings | Requests a preemptible instance with a terminate action. The boot volume is preserved by default. |
 | `kubernetes` | `context`, `namespace`, `pool` and a named v1 Pod `spec` | Requires an existing interruptible pool. The Pod remains pending if matching capacity is unavailable. |
 
-Kubernetes accepts `eks` (managed node group), `aks`, `gke` and `oke`. The step
+Kubernetes accepts `eks` (managed node group), `aks`, `gke`, `oke` and `doks`. The step
 adds the provider's required node selector and preserves existing selectors. AKS, GKE
 and OKE also receive a matching scheduling toleration. A Pod that fixes a node
 directly, changes the scheduler, or specifies a conflicting pool selector is rejected.
+
+For DigitalOcean Kubernetes, use `pool: 'doks'` with an existing Spot GPU node pool.
+The Pod targets `doks.digitalocean.com/capacity-type=spot`. Supply any tolerations
+required by the chosen GPU model or your node pool in the Pod spec. [DigitalOcean GPU worker nodes](https://docs.digitalocean.com/products/kubernetes/details/supported-gpus/)
 
 Use a stable request ID or resource name for the same logical request. After an
 ambiguous provider response, check that target before retrying. Actual cloud
@@ -133,9 +137,12 @@ timeout(time: 30, unit: 'MINUTES') {
 
 The step checks capacity on the allocated Unix agent before invoking the body.
 It skips candidates whose capacity is regular or cannot be verified, and fails
-if it exhausts the candidate set. The body runs once and its return value, errors,
-and interruptions propagate to the caller. Handle retrying interrupted builds
-in the calling Pipeline, according to whether its workload can safely be repeated.
+if it exhausts the candidate set. By default the body runs at most once. For work that can safely
+start over, pass `maxAttempts: 2` to allow one retry after a Jenkins agent failure.
+Each retry takes a fresh snapshot, skips previously tried nodes and verifies the
+replacement before restarting the body. Check out sources or restore any required
+state inside the body. The step returns the successful result and propagates
+application errors, explicit aborts and exhausted retries.
 
 | Provider | Agent verification requirements |
 | --- | --- |
@@ -143,4 +150,4 @@ in the calling Pipeline, according to whether its workload can safely be repeate
 | `azure` | Python 3 and Azure Instance Metadata Service access to the VM priority field. |
 | `gcp` | Python 3 and Compute Engine metadata access to the VM preemptible scheduling flag. |
 | `oracle` | Python 3, OCI instance metadata, and an authenticated OCI CLI with permission to read the current instance. The instance OCID and region come from metadata. |
-| `kubernetes` | Python 3 and kubectl with permission to get the agent Pod and its worker Node. Set `pool` to `eks`, `aks`, `gke` or `oke`. Expose `POD_NAME`, `POD_NAMESPACE` and `POD_UID` from `metadata.name`, `metadata.namespace` and `metadata.uid` via the Downward API. The verifier checks that the Pod UID matches and reads the capacity label on its assigned worker. |
+| `kubernetes` | Python 3 and kubectl with permission to get the agent Pod and its worker Node. Set `pool` to `eks`, `aks`, `gke`, `oke` or `doks`. Expose `POD_NAME`, `POD_NAMESPACE` and `POD_UID` from `metadata.name`, `metadata.namespace` and `metadata.uid` via the Downward API. The verifier checks that the Pod UID matches and reads the capacity label on its assigned worker. |
