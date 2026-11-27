@@ -33,7 +33,14 @@ try {
     String pattern = resolveVar('JOB_PATTERN', 'deprecated-.*')
     String cleanJob = resolveVar('CLEAN_JOB', '')
     int buildLimit = Integer.parseInt(resolveVar('BUILD_LIMIT', '50'))
-    boolean dryRun = resolveVar('DRY_RUN', 'true').equalsIgnoreCase('true')
+    if (buildLimit <= 0) {
+        throw new IllegalArgumentException("BUILD_LIMIT must be a positive integer, got: ${buildLimit}")
+    }
+    String dryRunRaw = resolveVar('DRY_RUN', 'true')
+    if (!dryRunRaw.equalsIgnoreCase('true') && !dryRunRaw.equalsIgnoreCase('false')) {
+        throw new IllegalArgumentException("DRY_RUN must be 'true' or 'false', got: '${dryRunRaw}'")
+    }
+    boolean dryRun = dryRunRaw.equalsIgnoreCase('true')
 
     log.info("Running job cleanup (pattern=${pattern}, dryRun=${dryRun})")
     def disabler = new JobDisabler(jenkins)
@@ -42,7 +49,13 @@ try {
 
     if (cleanJob && !dryRun) {
         def cleaner = new JobCleaner(jenkins, cleanJob, false, 25, buildLimit)
-        cleaner.clean()
+        boolean cleaned = cleaner.clean()
+        if (!cleaned) {
+            String failureMsg = "Failed to clean build history for '${cleanJob}'"
+            log.warning(failureMsg)
+            println failureMsg
+            throw new IllegalStateException(failureMsg)
+        }
         log.info("Cleaned build history for ${cleanJob} (limit=${buildLimit})")
         println "Cleaned build history for ${cleanJob}"
     } else if (cleanJob) {

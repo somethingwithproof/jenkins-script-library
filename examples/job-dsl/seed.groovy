@@ -6,6 +6,10 @@
  * that consumes jenkins-script-library via its repository Jenkinsfile.
  */
 
+folder('platform') {
+    displayName('Platform')
+}
+
 multibranchPipelineJob('platform/sample-service') {
     displayName('Sample Service')
     description('Multibranch Pipeline using jenkins-script-library shared steps.')

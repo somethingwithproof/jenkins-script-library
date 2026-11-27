@@ -17,12 +17,16 @@ import hudson.slaves.OfflineCause
 import hudson.slaves.SlaveComputer
 import jenkins.model.Jenkins
 
+import java.util.concurrent.CancellationException
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
+import java.util.concurrent.Future
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.ThreadFactory
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
@@ -54,6 +58,8 @@ class SelfHealingAgentManager {
     private final ConcurrentHashMap<String, AgentHealthState> agentStates = new ConcurrentHashMap<>()
     private final ConcurrentHashMap<String, AtomicInteger> retryCounters = new ConcurrentHashMap<>()
     private final ConcurrentHashMap<String, ScheduledFuture<?>> pendingRecoveries = new ConcurrentHashMap<>()
+    // External connect() futures observed without cancelling on stop()
+    private final ConcurrentHashMap<String, Future<?>> pendingConnects = new ConcurrentHashMap<>()
     private ScheduledExecutorService scheduler
     private ScheduledFuture<?> healthCheckFuture
 
@@ -69,9 +75,9 @@ class SelfHealingAgentManager {
     private volatile Closure onAgentReplaced
 
     SelfHealingAgentManager(Map<String, Object> config = [:], Jenkins jenkins = null) {
-        this.maxRetryAttempts = (config.maxRetryAttempts as Integer) ?: 3
-        this.retryDelayMs = (config.retryDelayMs as Long) ?: 30000L
-        this.healthCheckIntervalMs = (config.healthCheckIntervalMs as Long) ?: 60000L
+        this.maxRetryAttempts = config.maxRetryAttempts != null ? (config.maxRetryAttempts as Integer) : 3
+        this.retryDelayMs = config.retryDelayMs != null ? (config.retryDelayMs as Long) : 30000L
+        this.healthCheckIntervalMs = config.healthCheckIntervalMs != null ? (config.healthCheckIntervalMs as Long) : 60000L
         this.enableAutoReconnect = config.enableAutoReconnect != false
         this.enableAutoRestart = config.enableAutoRestart != false
         this.enableAutoReplace = (config.enableAutoReplace as Boolean) ?: false
@@ -191,6 +197,7 @@ class SelfHealingAgentManager {
     private void pruneRemovedAgents(Set<String> activeAgentNames) {
         agentStates.keySet().removeIf { String name -> !activeAgentNames.contains(name) }
         retryCounters.keySet().removeIf { String name -> !activeAgentNames.contains(name) }
+        pendingConnects.keySet().removeIf { String name -> !activeAgentNames.contains(name) }
         pendingRecoveries.entrySet().removeIf { Map.Entry<String, ScheduledFuture<?>> entry ->
             if (!activeAgentNames.contains(entry.key)) {
                 entry.value?.cancel(false)
@@ -209,6 +216,7 @@ class SelfHealingAgentManager {
         if (computer.isOffline()) {
             handleOfflineAgent(computer, state)
         } else if (computer.isOnline()) {
+            pendingConnects.remove(agentName)
             AgentStatus previousStatus = state.status
             if (previousStatus == AgentStatus.RECOVERING || previousStatus == AgentStatus.FAILED
                     || previousStatus == AgentStatus.REPLACING) {
@@ -220,7 +228,8 @@ class SelfHealingAgentManager {
                 successfulRecoveries.incrementAndGet()
                 onRecoverySuccess?.call(agentName)
                 LOGGER.info("Agent ${agentName} recovered successfully")
-            } else if (previousStatus == AgentStatus.UNKNOWN || previousStatus == AgentStatus.MANUALLY_OFFLINE) {
+            } else if (previousStatus == AgentStatus.UNKNOWN || previousStatus == AgentStatus.MANUALLY_OFFLINE
+                    || previousStatus == AgentStatus.OFFLINE) {
                 state.status = AgentStatus.HEALTHY
                 state.lastHealthyTime = System.currentTimeMillis()
                 resetRetryCounter(agentName)
@@ -251,6 +260,8 @@ class SelfHealingAgentManager {
 
         if (readOnly) {
             LOGGER.fine("Agent ${agentName} is offline (read-only check, skipping recovery)")
+            state.status = AgentStatus.OFFLINE
+            state.lastFailureTime = System.currentTimeMillis()
             return
         }
 
@@ -260,9 +271,8 @@ class SelfHealingAgentManager {
             return
         }
 
-        // Deduplicate while a delayed recovery task is already in flight
-        ScheduledFuture<?> inFlight = pendingRecoveries.get(agentName)
-        if (inFlight != null && !inFlight.isDone()) {
+        // Deduplicate while a delayed recovery task or asynchronous launch is already in flight
+        if (hasPendingRecovery(agentName)) {
             LOGGER.fine("Recovery task already in flight for agent ${agentName}, skipping duplicate attempt")
             return
         }
@@ -305,9 +315,25 @@ class SelfHealingAgentManager {
         if (enableAutoReconnect) {
             try {
                 LOGGER.info("Attempting to reconnect agent ${agentName}")
-                computer.connect(true)
+                Future<?> connectFuture = computer.connect(true)
 
                 if (singlePass) {
+                    if (connectFuture != null && !connectFuture.isDone()) {
+                        pendingConnects.put(agentName, connectFuture)
+                        LOGGER.info("Reconnect still pending for agent ${agentName}; skipping restart while launch is in progress")
+                        return
+                    }
+                    if (connectFuture != null) {
+                        try {
+                            connectFuture.get()
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt()
+                            LOGGER.log(Level.WARNING, "Interrupted while checking reconnect result for agent ${agentName}", e)
+                            return
+                        } catch (ExecutionException | CancellationException e) {
+                            LOGGER.log(Level.WARNING, "Reconnect attempt failed for agent ${agentName}", e)
+                        }
+                    }
                     if (!computer.isOnline() && enableAutoRestart) {
                         attemptRestart(computer, state)
                     }
@@ -379,11 +405,27 @@ class SelfHealingAgentManager {
                 Node node = slaveComputer.node
 
                 if (node != null) {
-                    slaveComputer.disconnect(new OfflineCause.ByCLI("Self-healing restart"))
+                    Future<?> disconnectFuture = slaveComputer.disconnect(new OfflineCause.ByCLI("Self-healing restart"))
 
                     if (singlePass) {
+                        if (disconnectFuture != null) {
+                            long disconnectTimeoutMs = retryDelayMs > 0L ? retryDelayMs : 10000L
+                            try {
+                                disconnectFuture.get(disconnectTimeoutMs, TimeUnit.MILLISECONDS)
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt()
+                                LOGGER.log(Level.WARNING, "Interrupted while waiting for agent ${agentName} disconnect; skipping reconnect", e)
+                                return
+                            } catch (TimeoutException | ExecutionException | CancellationException e) {
+                                LOGGER.log(Level.WARNING, "Disconnect for agent ${agentName} did not complete cleanly within ${disconnectTimeoutMs}ms; skipping reconnect", e)
+                                return
+                            }
+                        }
                         try {
-                            slaveComputer.connect(true)
+                            Future<?> reconnectFuture = slaveComputer.connect(true)
+                            if (reconnectFuture != null && !reconnectFuture.isDone()) {
+                                pendingConnects.put(agentName, reconnectFuture)
+                            }
                             LOGGER.info("Restart initiated for agent ${agentName}")
                         } catch (Exception e) {
                             LOGGER.log(Level.WARNING, "Failed to restart agent ${agentName}", e)
@@ -491,6 +533,24 @@ class SelfHealingAgentManager {
     }
 
     /**
+     * Returns true when a delayed recovery task or asynchronous launch future is still in flight for the agent.
+     */
+    boolean hasPendingRecovery(String agentName) {
+        ScheduledFuture<?> scheduled = pendingRecoveries.get(agentName)
+        if (scheduled != null && !scheduled.isDone()) {
+            return true
+        }
+        Future<?> connectFuture = pendingConnects.get(agentName)
+        if (connectFuture != null) {
+            if (!connectFuture.isDone()) {
+                return true
+            }
+            pendingConnects.remove(agentName, connectFuture)
+        }
+        return false
+    }
+
+    /**
      * Get status of all agents.
      */
     List<Map<String, Object>> getAgentStatuses() {
@@ -508,6 +568,7 @@ class SelfHealingAgentManager {
      */
     static enum AgentStatus {
         HEALTHY,
+        OFFLINE,
         RECOVERING,
         FAILED,
         MANUALLY_OFFLINE,

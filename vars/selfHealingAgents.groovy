@@ -45,13 +45,17 @@ def healthCheck(Map config = [:]) {
  * Returns a single-pass agent health snapshot without triggering reconnects unless enabled.
  */
 def statistics(Map config = [:]) {
-    Map readOnlyDefaults = [
+    Map userConfig = config ?: [:]
+    boolean recoveryRequested = (userConfig.enableAutoReconnect == true) ||
+        (userConfig.enableAutoRestart == true) ||
+        (userConfig.enableAutoReplace == true)
+    Map defaults = [
         enableAutoReconnect: false,
         enableAutoRestart  : false,
         enableAutoReplace  : false,
-        readOnly           : true
+        readOnly           : !recoveryRequested
     ]
-    return runSinglePassNonCps(readOnlyDefaults + (config ?: [:]))
+    return runSinglePassNonCps(defaults + userConfig)
 }
 
 /**
@@ -64,13 +68,23 @@ def agentStatuses(Map config = [:]) {
 
 @NonCPS
 private Map runSinglePassNonCps(Map config) {
+    int maxRetryAttempts = config.maxRetryAttempts != null ? (config.maxRetryAttempts as Integer) : 1
+    if (maxRetryAttempts < 0) {
+        throw new IllegalArgumentException("maxRetryAttempts must be >= 0, got: ${maxRetryAttempts}")
+    }
+    long retryDelayMs = config.retryDelayMs != null ? (config.retryDelayMs as Long) : 0L
+    if (retryDelayMs < 0L) {
+        throw new IllegalArgumentException("retryDelayMs must be >= 0, got: ${retryDelayMs}")
+    }
+    boolean readOnly = config.readOnly == true
+
     Map<String, Object> effectiveConfig = [
-        maxRetryAttempts   : config.maxRetryAttempts != null ? (config.maxRetryAttempts as Integer) : 1,
-        retryDelayMs       : config.retryDelayMs != null ? (config.retryDelayMs as Long) : 0L,
+        maxRetryAttempts   : maxRetryAttempts,
+        retryDelayMs       : retryDelayMs,
         enableAutoReconnect: config.enableAutoReconnect != false,
         enableAutoRestart  : config.enableAutoRestart != false,
         enableAutoReplace  : config.enableAutoReplace == true,
-        readOnly           : config.readOnly == true,
+        readOnly           : readOnly,
         singlePass         : true
     ]
 
@@ -90,7 +104,28 @@ private Map runSinglePassNonCps(Map config) {
     }
 
     try {
-        manager.performHealthCheck()
+        int maxPasses = readOnly ? 1 : (maxRetryAttempts + 1)
+        for (int pass = 0; pass < maxPasses; pass++) {
+            manager.performHealthCheck()
+            if (readOnly || pass + 1 >= maxPasses) {
+                break
+            }
+            boolean hasActionableRecovering = manager.getAgentStatuses().any { Map<String, Object> status ->
+                status.status == SelfHealingAgentManager.AgentStatus.RECOVERING.name() &&
+                    !manager.hasPendingRecovery(status.agentName as String)
+            }
+            if (!hasActionableRecovering) {
+                break
+            }
+            if (retryDelayMs > 0L) {
+                try {
+                    Thread.sleep(retryDelayMs)
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt()
+                    throw ie
+                }
+            }
+        }
         Map<String, Object> stats = new LinkedHashMap<>(manager.getStatistics())
         List<Map<String, Object>> statuses = manager.getAgentStatuses()
         stats.put('agentStatuses', statuses)

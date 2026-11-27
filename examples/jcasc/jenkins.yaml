@@ -11,7 +11,8 @@ unclassified:
   globalLibraries:
     libraries:
       - name: "jenkins-script-library"
-        defaultVersion: "v1.0.0"
+        # Pin to a post-v1.0.0 release tag or commit SHA that includes vars/helmDeploy.groovy.
+        defaultVersion: "${JENKINS_LIBRARY_VERSION:-main}"
         implicit: false
         allowVersionOverride: true
         includeInChangesets: false

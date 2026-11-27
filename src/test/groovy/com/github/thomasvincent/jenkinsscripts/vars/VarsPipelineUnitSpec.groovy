@@ -204,7 +204,7 @@ class VarsPipelineUnitSpec extends Specification {
         customResult.command.contains('--dry-run')
         customResult.command.contains('--create-namespace')
         customResult.command.contains("'/opt/helm-3/helm'")
-        unit.shScripts.any { it.contains("'/opt/helm-3/helm' lint './charts/orders'") }
+        unit.shScripts.any { it.contains("'/opt/helm-3/helm' lint './charts/orders'") && it.contains("--set 'replicas=2'") }
         roundTripSerialize(customResult) == customResult
 
         when: "missing required parameters"
@@ -587,6 +587,38 @@ class VarsPipelineUnitSpec extends Specification {
         results == [[job: 'deprecated-demo', success: true]]
         roundTripSerialize(results) == results
 
+        when: "jobName dryRun does not disable job"
+        List jobDryRunResults
+        MockedStatic<Jenkins> mockedJobDry = Mockito.mockStatic(Jenkins)
+        try {
+            mockedJobDry.when { Jenkins.get() }.thenReturn(jenkins)
+            Mockito.when(jenkins.getItemByFullName('deprecated-demo', hudson.model.Job)).thenReturn(job)
+            jobDryRunResults = step.call(jobName: 'deprecated-demo', dryRun: true)
+        } finally {
+            mockedJobDry.close()
+        }
+
+        then:
+        jobDryRunResults == [[job: 'deprecated-demo', success: true]]
+        Mockito.verify(job, Mockito.never()).save()
+
+        when: "folderPath dryRun does not disable jobs inside folder"
+        Folder folder = Mockito.mock(Folder)
+        Mockito.when(folder.getItems()).thenReturn([job])
+        Mockito.when(jenkins.getItemByFullName('legacy-folder')).thenReturn(folder)
+        List folderDryRunResults
+        MockedStatic<Jenkins> mockedFolderDry = Mockito.mockStatic(Jenkins)
+        try {
+            mockedFolderDry.when { Jenkins.get() }.thenReturn(jenkins)
+            folderDryRunResults = step.call(folderPath: 'legacy-folder', dryRun: true)
+        } finally {
+            mockedFolderDry.close()
+        }
+
+        then:
+        folderDryRunResults == [[job: 'deprecated-demo', success: true]]
+        Mockito.verify(job, Mockito.never()).save()
+
         when: "missing folderPath triggers error"
         MockedStatic<Jenkins> mocked2 = Mockito.mockStatic(Jenkins)
         try {
@@ -760,11 +792,178 @@ class VarsPipelineUnitSpec extends Specification {
         then:
         1 * offlineAgent.connect(true)
         healResult.totalAttempts == 1
+        healResult.failed == 1
         healResult.agentStatuses.size() == 1
+        healResult.agentStatuses[0].status == 'FAILED'
         statsResult.totalAttempts == 0
+        statsResult.failed == 0
         statuses.size() == 1
         statuses[0].agentName == 'linux-agent-1'
+        statuses[0].status == 'OFFLINE'
         roundTripSerialize(healResult) == healResult
         roundTripSerialize(statuses) == statuses
+    }
+
+    def "selfHealingAgents completes retry budget, reaches REPLACING, counts recovery success, and honors statistics recovery flags"() {
+        given:
+        def step = unit.loadScript('vars/selfHealingAgents.groovy')
+        Jenkins jenkins = Mockito.mock(Jenkins)
+        Computer stubbornAgent = Mock(Computer)
+        stubbornAgent.name >> 'stubborn-agent'
+        stubbornAgent.isOffline() >> true
+        stubbornAgent.isOnline() >> false
+        stubbornAgent.offlineCause >> null
+
+        boolean recoveringOffline = true
+        Computer recoveringAgent = Mock(Computer)
+        recoveringAgent.name >> 'recovering-agent'
+        recoveringAgent.isOffline() >> { recoveringOffline }
+        recoveringAgent.isOnline() >> { !recoveringOffline }
+        recoveringAgent.offlineCause >> null
+        recoveringAgent.getMonitorData() >> [:]
+        recoveringAgent.connect(true) >> {
+            recoveringOffline = false
+            return null
+        }
+
+        Mockito.when(jenkins.toComputer()).thenReturn(null)
+        Mockito.when(jenkins.computers).thenReturn([stubbornAgent, recoveringAgent] as Computer[])
+
+        when: "autoReplace enabled with maxRetryAttempts=2"
+        Map replaceResult
+        MockedStatic<Jenkins> mocked = Mockito.mockStatic(Jenkins)
+        try {
+            mocked.when { Jenkins.getInstanceOrNull() }.thenReturn(jenkins)
+            replaceResult = step.call(
+                maxRetryAttempts: 2,
+                enableAutoReconnect: true,
+                enableAutoRestart: false,
+                enableAutoReplace: true
+            )
+        } finally {
+            mocked.close()
+        }
+
+        then: "stubborn agent reaches REPLACING and recovering agent reaches HEALTHY"
+        2 * stubbornAgent.connect(true)
+        replaceResult.totalAttempts == 3
+        replaceResult.successful == 1
+        replaceResult.failed == 1
+        replaceResult.agents['stubborn-agent'].status == 'REPLACING'
+        replaceResult.agents['recovering-agent'].status == 'HEALTHY'
+
+        when: "statistics called with explicit enableAutoReconnect:true vs explicit readOnly:true"
+        Map statsWithReconnect
+        Map statsForcedReadOnly
+        MockedStatic<Jenkins> mocked2 = Mockito.mockStatic(Jenkins)
+        try {
+            mocked2.when { Jenkins.getInstanceOrNull() }.thenReturn(jenkins)
+            statsWithReconnect = step.statistics(enableAutoReconnect: true)
+            statsForcedReadOnly = step.statistics(enableAutoReconnect: true, readOnly: true)
+        } finally {
+            mocked2.close()
+        }
+
+        then:
+        1 * stubbornAgent.connect(true)
+        statsWithReconnect.totalAttempts == 1
+        statsForcedReadOnly.totalAttempts == 0
+    }
+
+    def "auditSecurity skips users removed from the security realm while counting valid admins"() {
+        given:
+        def step = unit.loadScript('vars/auditSecurity.groovy')
+        Jenkins jenkins = Mockito.mock(Jenkins)
+        AuthorizationStrategy strategy = Mockito.mock(AuthorizationStrategy)
+        hudson.security.ACL rootAcl = Mockito.mock(hudson.security.ACL)
+        hudson.model.User removedUser = Mockito.mock(hudson.model.User)
+        hudson.model.User validAdmin = Mockito.mock(hudson.model.User)
+        org.springframework.security.core.Authentication adminAuth =
+            Mockito.mock(org.springframework.security.core.Authentication)
+
+        Mockito.when(removedUser.id).thenReturn('former-employee')
+        Mockito.when(removedUser.impersonate2()).thenThrow(
+            new org.springframework.security.core.userdetails.UsernameNotFoundException('former-employee')
+        )
+        Mockito.when(validAdmin.id).thenReturn('active-admin')
+        Mockito.when(validAdmin.impersonate2()).thenReturn(adminAuth)
+        Mockito.when(strategy.getACL(jenkins)).thenReturn(rootAcl)
+        Mockito.when(rootAcl.hasPermission2(Jenkins.ANONYMOUS2, Jenkins.ADMINISTER)).thenReturn(false)
+        Mockito.when(rootAcl.hasPermission2(Jenkins.ANONYMOUS2, Jenkins.READ)).thenReturn(false)
+        Mockito.when(rootAcl.hasPermission2(adminAuth, Jenkins.ADMINISTER)).thenReturn(true)
+
+        Mockito.when(jenkins.isUseSecurity()).thenReturn(true)
+        Mockito.when(jenkins.isSlaveAgentPortEnforced()).thenReturn(true)
+        Mockito.when(jenkins.getSecurityRealm()).thenReturn(Mockito.mock(SecurityRealm))
+        Mockito.when(jenkins.getAuthorizationStrategy()).thenReturn(strategy)
+        Mockito.when(jenkins.getCrumbIssuer()).thenReturn(Mockito.mock(hudson.security.csrf.CrumbIssuer))
+        Mockito.when(jenkins.getAgentProtocols()).thenReturn(['JNLP4-connect'] as Set)
+        Mockito.when(jenkins.getNodes()).thenReturn([])
+        Mockito.when(jenkins.getPluginManager()).thenReturn(Mockito.mock(PluginManager))
+
+        when:
+        Map result
+        MockedStatic<Jenkins> mocked = Mockito.mockStatic(Jenkins)
+        MockedStatic<hudson.model.User> mockedUsers = Mockito.mockStatic(hudson.model.User)
+        try {
+            mocked.when { Jenkins.get() }.thenReturn(jenkins)
+            mockedUsers.when { hudson.model.User.getAll() }.thenReturn([removedUser, validAdmin])
+            result = step.call(archive: false, failOnCritical: false)
+        } finally {
+            mockedUsers.close()
+            mocked.close()
+        }
+
+        then: "audit succeeds, counts active-admin (no 'No Admin Users' finding), and records skipped user"
+        List authFindings = (result.findings.AUTHORIZATION ?: []) as List
+        authFindings.any { it.title == 'Unresolved User Account: former-employee' && it.severity == 'INFO' }
+        !authFindings.any { it.title == 'No Admin Users' }
+    }
+
+    def "admin cleanup-jobs script rejects nonpositive BUILD_LIMIT, invalid DRY_RUN, and failed JobCleaner.clean()"() {
+        given:
+        File scriptFile = new File('admin-scripts/cleanup-jobs.groovy')
+        Jenkins jenkins = Mockito.mock(Jenkins)
+        Mockito.when(jenkins.hasPermission(Jenkins.ADMINISTER)).thenReturn(true)
+        Mockito.when(jenkins.getAllItems(hudson.model.Job)).thenReturn([])
+        Mockito.when(jenkins.getItemByFullName('missing-job', hudson.model.TopLevelItem)).thenReturn(null)
+
+        when: "BUILD_LIMIT=0 is rejected before disabling jobs"
+        MockedStatic<Jenkins> mocked1 = Mockito.mockStatic(Jenkins)
+        try {
+            mocked1.when { Jenkins.get() }.thenReturn(jenkins)
+            new GroovyShell(new Binding([DRY_RUN: 'false', BUILD_LIMIT: '0', CLEAN_JOB: 'missing-job'])).evaluate(scriptFile)
+        } finally {
+            mocked1.close()
+        }
+
+        then:
+        thrown(IllegalArgumentException)
+        Mockito.verifyNoInteractions(jenkins)
+
+        when: "invalid DRY_RUN value is rejected before disabling jobs"
+        MockedStatic<Jenkins> mocked2 = Mockito.mockStatic(Jenkins)
+        try {
+            mocked2.when { Jenkins.get() }.thenReturn(jenkins)
+            new GroovyShell(new Binding([DRY_RUN: 'tru'])).evaluate(scriptFile)
+        } finally {
+            mocked2.close()
+        }
+
+        then:
+        thrown(IllegalArgumentException)
+        Mockito.verifyNoInteractions(jenkins)
+
+        when: "JobCleaner.clean() returning false fails instead of printing success"
+        MockedStatic<Jenkins> mocked3 = Mockito.mockStatic(Jenkins)
+        try {
+            mocked3.when { Jenkins.get() }.thenReturn(jenkins)
+            new GroovyShell(new Binding([DRY_RUN: 'false', CLEAN_JOB: 'missing-job', BUILD_LIMIT: '5'])).evaluate(scriptFile)
+        } finally {
+            mocked3.close()
+        }
+
+        then:
+        thrown(IllegalStateException)
     }
 }

@@ -154,7 +154,7 @@ class JobDisabler implements Serializable {
     }
 
     /**
-     * Disables a specific job by name.
+     * Disables a specific job by name (or verifies it in dry-run mode).
      *
      * Requires admin permissions and validates job existence.
      *
@@ -164,14 +164,15 @@ class JobDisabler implements Serializable {
      * // Disable a pipeline job
      * disabler.disableJob("deployment-pipeline")
      *
-     * // Disable job in a folder
-     * disabler.disableJob("project/backend-tests")
+     * // Preview disabling a job in a folder
+     * disabler.disableJob("project/backend-tests", true)
      * ```
      *
      * @param jobName Job's full name to disable
-     * @return true if job was disabled, false otherwise
+     * @param dryRun When true, checks existence without mutating the job
+     * @return true if job was disabled (or matched in dry-run), false otherwise
      */
-    boolean disableJob(String jobName) {
+    boolean disableJob(String jobName, boolean dryRun = false) {
         if (!hasAdminPermission()) {
             LOGGER.severe("Operation aborted. User lacks required administrative privileges.")
             return false
@@ -187,6 +188,11 @@ class JobDisabler implements Serializable {
         if (job == null) {
             LOGGER.warning("Job not found: ${jobName}")
             return false
+        }
+
+        if (dryRun) {
+            LOGGER.info("Dry-run: would disable job: ${job.fullName}")
+            return true
         }
 
         return disableJobInternal(job)
@@ -225,13 +231,14 @@ class JobDisabler implements Serializable {
     }
 
     /**
-     * Disables jobs contained in a folder/item group.
+     * Disables jobs contained in a folder/item group (or previews them in dry-run mode).
      *
      * @param folder Folder or ItemGroup containing jobs
      * @param recursive Whether to descend into nested folders
-     * @return List of disabled job full names
+     * @param dryRun When true, returns matching job full names without disabling them
+     * @return List of disabled (or matching, in dry-run) job full names
      */
-    List<String> disableJobsInFolder(Object folder, boolean recursive = false) {
+    List<String> disableJobsInFolder(Object folder, boolean recursive = false, boolean dryRun = false) {
         if (!hasAdminPermission()) {
             LOGGER.severe("Operation aborted. User lacks required administrative privileges.")
             return []
@@ -243,6 +250,10 @@ class JobDisabler implements Serializable {
 
         List<Job> targetJobs = []
         collectJobsInGroup((ItemGroup<?>) folder, recursive, targetJobs)
+
+        if (dryRun) {
+            return targetJobs.collect { it.fullName }
+        }
 
         List<String> disabled = []
         targetJobs.each { Job job ->

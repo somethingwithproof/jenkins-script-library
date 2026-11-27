@@ -1,4 +1,5 @@
-Return a read-only inventory of configured Jenkins clouds and online cloud agents.
+Return a read-only inventory of supported Jenkins clouds (AWS, Azure, GCP, Kubernetes, Oracle)
+and their recognized cloud agents, including offline agents (with online set to false).
 Takes no parameters and returns a plain serializable map with clouds and agents lists.
-Static agents and agents whose configured cloud no longer exists are omitted.
+Unsupported cloud types, static agents, and agents whose configured cloud no longer exists are omitted.
 Requires a trusted shared library because it inspects controller cloud state.

@@ -32,6 +32,7 @@ import hudson.security.Permission
 import hudson.model.User
 import hudson.security.ACL
 import hudson.security.AuthorizationStrategy
+import org.springframework.security.core.userdetails.UsernameNotFoundException
 //import hudson.plugins.warnings.PluginsUtils
 
 import java.util.logging.Logger
@@ -256,8 +257,18 @@ class JenkinsSecurityAuditor {
         // Check admin accounts
         int adminCount = 0
         User.getAll().each { user ->
-            if (rootAcl.hasPermission2(user.impersonate2(), Jenkins.ADMINISTER)) {
-                adminCount++
+            try {
+                if (rootAcl.hasPermission2(user.impersonate2(), Jenkins.ADMINISTER)) {
+                    adminCount++
+                }
+            } catch (UsernameNotFoundException e) {
+                LOGGER.warning("Skipping permission check for user '${user.id}' not found in security realm: ${e.message}")
+                addFinding(
+                    FindingCategory.AUTHORIZATION,
+                    FindingSeverity.INFO,
+                    "Unresolved User Account: ${user.id}",
+                    "User '${user.id}' exists in Jenkins but could not be resolved in the current security realm; admin permission check was skipped."
+                )
             }
         }
 

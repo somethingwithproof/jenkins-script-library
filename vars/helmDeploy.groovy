@@ -35,12 +35,13 @@ def call(Map args = [:]) {
     String helmBin = (args.helmBin ?: 'helm').toString().trim()
 
     try {
+        boolean unix = isUnix()
         if (args.toolName) {
             String toolHome = tool(name: args.toolName as String)
-            helmBin = "${toolHome}/helm"
+            helmBin = unix ? "${toolHome}/helm" : "${toolHome}\\helm.exe"
         } else if (args.version) {
             String binDir = helper.use(args.version as String)
-            helmBin = "${binDir}/helm"
+            helmBin = unix ? "${binDir}/helm" : "${binDir}\\helm.exe"
         }
 
         if (shouldLint) {
@@ -48,6 +49,7 @@ def call(Map args = [:]) {
             helper.lint([
                 chart      : chart,
                 valuesFiles: args.valuesFiles ?: [],
+                setValues  : args.setValues ?: [:],
                 helmBin    : helmBin
             ])
         }

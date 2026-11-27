@@ -96,7 +96,88 @@ class HelmHelperSpec extends Specification {
         pipeline.env.PATH == '/var/tmp/build/helm/v3.17.0/linux-amd64:/usr/bin'
         pipeline.shCommands.size() == 1
         pipeline.shCommands[0].contains('https://get.helm.sh/helm-v3.17.0-linux-amd64.tar.gz')
+        pipeline.shCommands[0].contains('mktemp -d')
+        pipeline.shCommands[0].contains('mv -f "$STAGE_DIR/helm" "$BIN_DIR/helm"')
         pipeline.echoes.any { it.contains('Using Helm v3.17.0') }
+    }
+
+    def "use on Windows stages extraction per call, moves helm.exe into binDir, and updates PATH"() {
+        given:
+        def pipeline = new StubPipeline(unix: false, tmpDir: 'C:\\jenkins\\tmp')
+        def helper = new HelmHelper(pipeline)
+
+        when:
+        String binDir = helper.use('3.17.0')
+
+        then:
+        binDir == 'C:\\jenkins\\tmp\\helm\\v3.17.0\\windows-amd64'
+        pipeline.env.PATH == 'C:\\jenkins\\tmp\\helm\\v3.17.0\\windows-amd64;/usr/bin'
+        pipeline.shCommands.isEmpty()
+        pipeline.psCommands.size() == 1
+        pipeline.psCommands[0].contains('https://get.helm.sh/helm-v3.17.0-windows-amd64.zip')
+        pipeline.psCommands[0].contains('[System.Guid]::NewGuid()')
+        pipeline.psCommands[0].contains('Get-ChildItem -Path $stageDir -Filter "helm.exe" -Recurse')
+        pipeline.psCommands[0].contains('Move-Item -Path $extractedExe.FullName -Destination $helmExe -Force')
+    }
+
+    def "use preserves the original exception without wrapping via pipeline.error"() {
+        given:
+        def original = new InterruptedException('build aborted')
+        def pipeline = new StubPipeline() {
+            @Override
+            String sh(Map args) {
+                if (args.returnStdout) {
+                    return super.sh(args)
+                }
+                throw original
+            }
+        }
+        def helper = new HelmHelper(pipeline)
+
+        when:
+        helper.use('3.17.0')
+
+        then:
+        def thrown = thrown(InterruptedException)
+        thrown.is(original)
+    }
+
+    def "lint forwards setValues on Unix and uses powershell with PowerShell quoting on Windows"() {
+        given:
+        def unixPipeline = new StubPipeline(unix: true)
+        def unixHelper = new HelmHelper(unixPipeline)
+        def winPipeline = new StubPipeline(unix: false)
+        def winHelper = new HelmHelper(winPipeline)
+
+        when:
+        Map unixLint = unixHelper.lint(
+            chart: './charts/demo',
+            valuesFiles: ['values.yaml'],
+            setValues: [imageTag: "rel'42"]
+        )
+        Map winLint = winHelper.lint(
+            chart: './charts/demo',
+            valuesFiles: ['values.yaml'],
+            setValues: [imageTag: "rel'42"]
+        )
+        Map winDeploy = winHelper.deploy(
+            release: 'demo-app',
+            chart: './charts/demo',
+            setValues: [imageTag: "rel'42"]
+        )
+
+        then:
+        unixPipeline.shCommands.size() == 1
+        unixLint.command.contains("-f 'values.yaml'")
+        unixLint.command.contains("--set 'imageTag=rel'\"'\"'42'")
+
+        winPipeline.shCommands.isEmpty()
+        winPipeline.psCommands.size() == 2
+        winLint.command.startsWith("& 'helm' 'lint' './charts/demo'")
+        winLint.command.contains("'-f' 'values.yaml'")
+        winLint.command.contains("'--set' 'imageTag=rel''42'")
+        winDeploy.command.startsWith("& 'helm' 'upgrade' '--install' 'demo-app' './charts/demo'")
+        winDeploy.command.contains("'--set' 'imageTag=rel''42'")
     }
 
     def "buildDeployCommand applies defaults and preserves explicit false flags"() {

@@ -4,9 +4,17 @@
 package com.github.thomasvincent.jenkinsscripts.healing
 
 import hudson.model.Computer
+import hudson.model.Slave
+import hudson.slaves.OfflineCause
+import hudson.slaves.SlaveComputer
 import jenkins.model.Jenkins
 import spock.lang.Specification
 import spock.lang.Subject
+
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.Future
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 @Subject(SelfHealingAgentManager)
 class SelfHealingAgentManagerSpec extends Specification {
@@ -163,6 +171,115 @@ class SelfHealingAgentManagerSpec extends Specification {
         !manager.isRunning()
         manager.statistics.totalAttempts == 1
         manager.statistics.agents['single-pass-agent'].status == 'RECOVERING'
+
+        cleanup:
+        manager.stop()
+    }
+
+    def "readOnly mode records OFFLINE status without recovery attempts or callbacks"() {
+        given:
+        def jenkins = Mock(Jenkins)
+        def agent = Mock(Computer)
+        boolean offline = false
+        agent.name >> 'ro-agent'
+        agent.isOffline() >> { offline }
+        agent.isOnline() >> { !offline }
+        agent.offlineCause >> null
+        agent.getMonitorData() >> [:]
+        jenkins.toComputer() >> null
+        jenkins.computers >> ([agent] as Computer[])
+
+        int callbacks = 0
+        def manager = new SelfHealingAgentManager([
+            readOnly           : true,
+            singlePass         : true,
+            enableAutoReconnect: true,
+            enableAutoRestart  : true
+        ], jenkins)
+        manager.onRecoveryStart { name, attempt -> callbacks++ }
+        manager.onRecoveryFailure { name, reason -> callbacks++ }
+
+        when: "agent is observed online then offline"
+        manager.performHealthCheck()
+        String statusWhenOnline = manager.statistics.agents['ro-agent'].status
+        offline = true
+        manager.performHealthCheck()
+
+        then: "status updates from HEALTHY to OFFLINE without calling connect"
+        0 * agent.connect(_)
+        statusWhenOnline == 'HEALTHY'
+        manager.statistics.agents['ro-agent'].status == 'OFFLINE'
+        manager.statistics.totalAttempts == 0
+        callbacks == 0
+
+        cleanup:
+        manager.stop()
+    }
+
+    def "singlePass mode does not restart while reconnect future is still pending"() {
+        given:
+        def jenkins = Mock(Jenkins)
+        def agent = Mock(SlaveComputer)
+        def pendingFuture = new CompletableFuture<Void>()
+        agent.name >> 'pending-agent'
+        agent.isOffline() >> true
+        agent.isOnline() >> false
+        agent.offlineCause >> null
+        agent.node >> Mock(Slave)
+        jenkins.toComputer() >> null
+        jenkins.computers >> ([agent] as Computer[])
+
+        def manager = new SelfHealingAgentManager([
+            maxRetryAttempts   : 1,
+            enableAutoReconnect: true,
+            enableAutoRestart  : true,
+            singlePass         : true
+        ], jenkins)
+
+        when:
+        manager.performHealthCheck()
+
+        then:
+        1 * agent.connect(true) >> pendingFuture
+        0 * agent.disconnect(_)
+        manager.hasPendingRecovery('pending-agent')
+        manager.statistics.agents['pending-agent'].status == 'RECOVERING'
+
+        when: "stop is called while launch is in flight"
+        manager.stop()
+
+        then: "external connect future is not cancelled"
+        !pendingFuture.isCancelled()
+    }
+
+    def "singlePass restart waits for disconnect future and skips reconnect on disconnect timeout"() {
+        given:
+        def jenkins = Mock(Jenkins)
+        def agent = Mock(SlaveComputer)
+        def timedOutDisconnect = Mock(Future)
+        agent.name >> 'restart-agent'
+        agent.isOffline() >> true
+        agent.isOnline() >> false
+        agent.offlineCause >> null
+        agent.node >> Mock(Slave)
+        jenkins.toComputer() >> null
+        jenkins.computers >> ([agent] as Computer[])
+
+        def manager = new SelfHealingAgentManager([
+            maxRetryAttempts   : 1,
+            retryDelayMs       : 50L,
+            enableAutoReconnect: false,
+            enableAutoRestart  : true,
+            singlePass         : true
+        ], jenkins)
+
+        when:
+        manager.performHealthCheck()
+
+        then:
+        1 * agent.disconnect(_ as OfflineCause) >> timedOutDisconnect
+        1 * timedOutDisconnect.get(50L, TimeUnit.MILLISECONDS) >> { throw new TimeoutException('still closing') }
+        0 * agent.connect(true)
 
         cleanup:
         manager.stop()

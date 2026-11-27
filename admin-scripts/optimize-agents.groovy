@@ -46,6 +46,7 @@ try {
         enableAutoReconnect: recoverOffline,
         enableAutoRestart  : recoverOffline,
         enableAutoReplace  : false,
+        readOnly           : !recoverOffline,
         singlePass         : true
     ], jenkins)
     try {

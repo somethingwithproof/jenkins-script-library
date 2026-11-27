@@ -99,20 +99,25 @@ class HelmHelper implements Serializable {
         String extension = determineFileExtension()
         String downloadUrl = buildDownloadUrl(normalizedVersion, os, arch, extension)
         String baseTmp = pipeline.pwd(tmp: true)
-        String binDir = "${baseTmp}/helm/${normalizedVersion}/${os}-${arch}"
+        boolean unix = pipeline.isUnix()
+        String binDir = unix
+            ? "${baseTmp}/helm/${normalizedVersion}/${os}-${arch}"
+            : "${baseTmp}\\helm\\${normalizedVersion}\\${os}-${arch}"
 
         try {
-            if (pipeline.isUnix()) {
+            if (unix) {
                 String installScript = [
                     'set -eu',
                     "BIN_DIR=${shellQuote(binDir)}",
                     'if [ ! -x "$BIN_DIR/helm" ]; then',
                     '  mkdir -p "$BIN_DIR"',
-                    "  ARCHIVE=\"\$BIN_DIR/helm.${extension}\"",
+                    '  STAGE_DIR=$(mktemp -d "$BIN_DIR/.helm-install.XXXXXX")',
+                    '  trap \'rm -rf "$STAGE_DIR"\' EXIT',
+                    "  ARCHIVE=\"\$STAGE_DIR/helm.${extension}\"",
                     "  curl -fsSL ${shellQuote(downloadUrl)} -o \"\$ARCHIVE\"",
-                    '  tar -xzf "$ARCHIVE" -C "$BIN_DIR" --strip-components=1',
-                    '  rm -f "$ARCHIVE"',
-                    '  chmod +x "$BIN_DIR/helm"',
+                    '  tar -xzf "$ARCHIVE" -C "$STAGE_DIR" --strip-components=1',
+                    '  chmod +x "$STAGE_DIR/helm"',
+                    '  mv -f "$STAGE_DIR/helm" "$BIN_DIR/helm"',
                     'fi'
                 ].join('\n')
                 pipeline.sh(script: installScript)
@@ -121,13 +126,32 @@ class HelmHelper implements Serializable {
             } else {
                 String psScript = [
                     '$ErrorActionPreference = "Stop"',
-                    "\$binDir = '${binDir.replace("'", "''")}'",
-                    'if (-not (Test-Path (Join-Path $binDir "helm.exe"))) {',
+                    "\$binDir = ${powershellQuote(binDir)}",
+                    '$helmExe = Join-Path $binDir "helm.exe"',
+                    'if (-not (Test-Path $helmExe)) {',
                     '  New-Item -ItemType Directory -Force -Path $binDir | Out-Null',
-                    '  $archive = Join-Path $binDir "helm.zip"',
-                    "  Invoke-WebRequest -Uri '${downloadUrl}' -OutFile \$archive",
-                    '  Expand-Archive -Path $archive -DestinationPath $binDir -Force',
-                    '  Remove-Item -Path $archive -Force',
+                    '  $stageDir = Join-Path $binDir (".helm-install-" + [System.Guid]::NewGuid().ToString("N"))',
+                    '  New-Item -ItemType Directory -Force -Path $stageDir | Out-Null',
+                    '  try {',
+                    '    $archive = Join-Path $stageDir "helm.zip"',
+                    "    Invoke-WebRequest -Uri ${powershellQuote(downloadUrl)} -OutFile \$archive",
+                    '    Expand-Archive -Path $archive -DestinationPath $stageDir -Force',
+                    '    $extractedExe = Get-ChildItem -Path $stageDir -Filter "helm.exe" -Recurse | Select-Object -First 1',
+                    '    if (-not $extractedExe) {',
+                    '      throw "Extracted Helm archive did not contain helm.exe"',
+                    '    }',
+                    '    if (-not (Test-Path $helmExe)) {',
+                    '      try {',
+                    '        Move-Item -Path $extractedExe.FullName -Destination $helmExe -Force',
+                    '      } catch {',
+                    '        if (-not (Test-Path $helmExe)) {',
+                    '          throw',
+                    '        }',
+                    '      }',
+                    '    }',
+                    '  } finally {',
+                    '    Remove-Item -Path $stageDir -Recurse -Force -ErrorAction SilentlyContinue',
+                    '  }',
                     '}'
                 ].join('\n')
                 pipeline.powershell(script: psScript)
@@ -139,7 +163,6 @@ class HelmHelper implements Serializable {
             return binDir
         } catch (Exception e) {
             getLog().log(Level.WARNING, "Failed to install Helm ${normalizedVersion}", e)
-            pipeline.error("Failed to set up Helm ${normalizedVersion}: ${e.message}")
             throw e
         }
     }
@@ -152,9 +175,10 @@ class HelmHelper implements Serializable {
         if (!chart) {
             throw new IllegalArgumentException('chart parameter is required')
         }
-        String command = buildLintCommand(args)
+        boolean unix = pipeline.isUnix()
+        String command = buildLintCommand(args, unix)
         try {
-            pipeline.sh(script: command)
+            executeCommand(command, unix)
         } catch (Exception e) {
             getLog().log(Level.WARNING, "Helm lint failed for chart ${chart}", e)
             throw e
@@ -178,9 +202,10 @@ class HelmHelper implements Serializable {
         boolean createNamespace = args.createNamespace == true
         boolean dryRun = args.dryRun == true
 
-        String command = buildDeployCommand(args)
+        boolean unix = pipeline.isUnix()
+        String command = buildDeployCommand(args, unix)
         try {
-            pipeline.sh(script: command)
+            executeCommand(command, unix)
         } catch (Exception e) {
             getLog().log(Level.WARNING, "Helm deploy failed for release ${release}", e)
             throw e
@@ -199,27 +224,30 @@ class HelmHelper implements Serializable {
         ] as Map<String, Object>
     }
 
+    private void executeCommand(String command, boolean unix) {
+        if (unix) {
+            pipeline.sh(script: command)
+        } else {
+            pipeline.powershell(script: command)
+        }
+    }
+
     @NonCPS
-    String buildLintCommand(Map args = [:]) {
+    String buildLintCommand(Map args = [:], boolean unix = true) {
         String chart = (args.chart ?: '').toString().trim()
         if (!chart) {
             throw new IllegalArgumentException('chart parameter is required')
         }
         String helmBin = (args.helmBin ?: 'helm').toString().trim()
-        List<String> parts = [shellQuote(helmBin), 'lint', shellQuote(chart)]
-        List valuesFiles = (args.valuesFiles instanceof List) ? (args.valuesFiles as List) : []
-        for (Object file : valuesFiles) {
-            String path = file?.toString()?.trim()
-            if (path) {
-                parts.add('-f')
-                parts.add(shellQuote(path))
-            }
-        }
+        List<String> parts = unix
+            ? [shellQuote(helmBin), 'lint', shellQuote(chart)]
+            : ['&', powershellQuote(helmBin), powershellQuote('lint'), powershellQuote(chart)]
+        appendValuesAndSetArgs(parts, args, unix)
         return parts.join(' ')
     }
 
     @NonCPS
-    String buildDeployCommand(Map args = [:]) {
+    String buildDeployCommand(Map args = [:], boolean unix = true) {
         String release = (args.release ?: '').toString().trim()
         String chart = (args.chart ?: '').toString().trim()
         String namespace = (args.namespace ?: 'default').toString().trim()
@@ -244,37 +272,57 @@ class HelmHelper implements Serializable {
         boolean createNamespace = args.createNamespace == true
         boolean dryRun = args.dryRun == true
 
-        List<String> parts = [
-            shellQuote(helmBin),
-            'upgrade',
-            '--install',
-            shellQuote(release),
-            shellQuote(chart),
-            '--namespace',
-            shellQuote(namespace),
-            '--timeout',
-            shellQuote(timeout)
-        ]
+        List<String> parts = unix
+            ? [
+                shellQuote(helmBin),
+                'upgrade',
+                '--install',
+                shellQuote(release),
+                shellQuote(chart),
+                '--namespace',
+                shellQuote(namespace),
+                '--timeout',
+                shellQuote(timeout)
+            ]
+            : [
+                '&',
+                powershellQuote(helmBin),
+                powershellQuote('upgrade'),
+                powershellQuote('--install'),
+                powershellQuote(release),
+                powershellQuote(chart),
+                powershellQuote('--namespace'),
+                powershellQuote(namespace),
+                powershellQuote('--timeout'),
+                powershellQuote(timeout)
+            ]
 
         if (createNamespace) {
-            parts.add('--create-namespace')
+            parts.add(unix ? '--create-namespace' : powershellQuote('--create-namespace'))
         }
         if (atomic) {
-            parts.add('--atomic')
+            parts.add(unix ? '--atomic' : powershellQuote('--atomic'))
         }
         if (wait) {
-            parts.add('--wait')
+            parts.add(unix ? '--wait' : powershellQuote('--wait'))
         }
         if (dryRun) {
-            parts.add('--dry-run')
+            parts.add(unix ? '--dry-run' : powershellQuote('--dry-run'))
         }
 
+        appendValuesAndSetArgs(parts, args, unix)
+
+        return parts.join(' ')
+    }
+
+    @NonCPS
+    private static void appendValuesAndSetArgs(List<String> parts, Map args, boolean unix) {
         List valuesFiles = (args.valuesFiles instanceof List) ? (args.valuesFiles as List) : []
         for (Object file : valuesFiles) {
             String path = file?.toString()?.trim()
             if (path) {
-                parts.add('-f')
-                parts.add(shellQuote(path))
+                parts.add(unix ? '-f' : powershellQuote('-f'))
+                parts.add(unix ? shellQuote(path) : powershellQuote(path))
             }
         }
 
@@ -282,13 +330,12 @@ class HelmHelper implements Serializable {
             (args.setValues as Map).each { Object k, Object v ->
                 String key = k?.toString()?.trim()
                 if (key) {
-                    parts.add('--set')
-                    parts.add(shellQuote("${key}=${v == null ? '' : v.toString()}"))
+                    String pair = "${key}=${v == null ? '' : v.toString()}"
+                    parts.add(unix ? '--set' : powershellQuote('--set'))
+                    parts.add(unix ? shellQuote(pair) : powershellQuote(pair))
                 }
             }
         }
-
-        return parts.join(' ')
     }
 
     @NonCPS
@@ -319,5 +366,10 @@ class HelmHelper implements Serializable {
     @NonCPS
     static String shellQuote(String value) {
         return "'" + (value ?: '').replace("'", "'\"'\"'") + "'"
+    }
+
+    @NonCPS
+    static String powershellQuote(String value) {
+        return "'" + (value ?: '').replace("'", "''") + "'"
     }
 }

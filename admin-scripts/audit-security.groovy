@@ -22,7 +22,9 @@ try {
     Map<String, List<Map<String, String>>> findings = auditor.performSecurityAudit()
 
     int critical = 0
-    int warning = 0
+    int high = 0
+    int medium = 0
+    int low = 0
     int info = 0
 
     findings.each { String category, List<Map<String, String>> items ->
@@ -34,8 +36,13 @@ try {
                     critical++
                     break
                 case 'HIGH':
-                case 'WARNING':
-                    warning++
+                    high++
+                    break
+                case 'MEDIUM':
+                    medium++
+                    break
+                case 'LOW':
+                    low++
                     break
                 default:
                     info++
@@ -47,7 +54,7 @@ try {
         }
     }
 
-    String summary = "Security audit complete: ${critical} critical, ${warning} warnings, ${info} info"
+    String summary = "Security audit complete: ${critical} critical, ${high} high, ${medium} medium, ${low} low, ${info} info"
     log.info(summary)
     println summary
 } catch (Exception e) {
