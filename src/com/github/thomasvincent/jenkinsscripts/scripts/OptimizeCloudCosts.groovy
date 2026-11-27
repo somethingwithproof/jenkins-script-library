@@ -401,18 +401,18 @@ void outputOptimizationResults(Map results, Logger logger) {
             typeActions.each { action ->
                 switch (type) {
                     case 'TERMINATE_IDLE':
-                        logger.info("  - ${action.agent}")
+                        logger.info("  - ${action.agent} (${action.status})")
                         logger.info("    Idle Time: ${action.idleTime} minutes")
                         logger.info("    Savings: \$${formatCurrency(action.savingsPerHour)}/hour")
                         break
                     case 'CONVERT_TO_SPOT':
-                        logger.info("  - ${action.agent}")
+                        logger.info("  - ${action.agent} (${action.status})")
                         logger.info("    Current: \$${formatCurrency(action.currentCost)}/hour")
                         logger.info("    Spot: \$${formatCurrency(action.spotCost)}/hour")
                         logger.info("    Savings: \$${formatCurrency(action.savingsPerHour)}/hour")
                         break
                     case 'RIGHTSIZE_INSTANCE':
-                        logger.info("  - ${action.agent}")
+                        logger.info("  - ${action.agent} (${action.status})")
                         logger.info("    From: ${action.currentType} (\$${formatCurrency(action.currentCost)}/hour)")
                         logger.info("    To: ${action.recommendedType} (\$${formatCurrency(action.newCost)}/hour)")
                         logger.info("    Savings: \$${formatCurrency(action.savingsPerHour)}/hour")
@@ -424,7 +424,7 @@ void outputOptimizationResults(Map results, Logger logger) {
         logger.info("\nSUMMARY:")
         logger.info("  Total Actions: ${actions.size()}")
         logger.info("  Estimated Savings: \$${formatCurrency(results.estimatedSavings)}/hour")
-        logger.info("  Monthly Savings: \$${formatCurrency(results.estimatedMonthlySavings)}")
+        logger.info("  Estimated monthly savings: \$${formatCurrency(results.estimatedMonthlySavings)}")
     }
 
     logger.info("\n" + "="*80)

@@ -24,6 +24,7 @@
 
 package com.github.thomasvincent.jenkinsscripts.cost
 
+import com.github.thomasvincent.jenkinsscripts.cloud.CloudInventory
 import hudson.model.Computer
 import hudson.model.Executor
 import hudson.model.Node
@@ -32,9 +33,14 @@ import spock.lang.Specification
 
 class CloudCostOptimizerSpec extends Specification {
 
+    private CloudInventory inventory = Stub(CloudInventory) {
+        owner(_ as Node) >> { Node node -> [provider: 'AWS', cloudName: 'compute', agentId: node.nodeName] }
+    }
+
     private Computer mockCloudComputer(String name, String labels, boolean idle, long idleMinutesAgo, boolean busyExecutor = false) {
         Node node = Mock(Node) {
             getLabelString() >> labels
+            getNodeName() >> name
         }
         Executor exec = Mock(Executor) {
             isBusy() >> busyExecutor
@@ -59,7 +65,7 @@ class CloudCostOptimizerSpec extends Specification {
         Jenkins jenkins = Mock(Jenkins) {
             getComputers() >> ([agent1] as Computer[])
         }
-        CloudCostOptimizer optimizer = new CloudCostOptimizer(jenkins)
+        CloudCostOptimizer optimizer = new CloudCostOptimizer(jenkins, inventory)
         // m5.xlarge hourly cost = 0.192 -> monthly = 0.192 * 24 * 30 = 138.24
         double expectedMonthly = 0.192d * 24.0d * 30.0d
 
@@ -89,7 +95,7 @@ class CloudCostOptimizerSpec extends Specification {
             getComputer("aws-idle") >> idleAgent
             getComputer("aws-active") >> activeAgent
         }
-        CloudCostOptimizer optimizer = new CloudCostOptimizer(jenkins)
+        CloudCostOptimizer optimizer = new CloudCostOptimizer(jenkins, inventory)
         // Populate usageData via analyzeCosts
         optimizer.analyzeCosts()
 
@@ -104,6 +110,28 @@ class CloudCostOptimizerSpec extends Specification {
         actions.any { it.type == 'CONVERT_TO_SPOT' && it.agent == 'aws-active' }
     }
 
+    def "an apply request reports unsupported actions without claiming realized savings"() {
+        given:
+        Computer active = mockCloudComputer('worker', 'instance-type=m5.xlarge', false, 0, true)
+        Jenkins jenkins = Mock(Jenkins) {
+            getComputers() >> ([active] as Computer[])
+            getComputer('worker') >> active
+        }
+        def optimizer = new CloudCostOptimizer(jenkins, inventory)
+
+        when:
+        def preview = optimizer.optimizeResources(true)
+        def result = optimizer.optimizeResources(false)
+
+        then:
+        preview.counts.planned > 0
+        preview.actions.every { it.status == 'planned' }
+        result.counts.unsupported == preview.counts.planned
+        result.actions.every { it.status == 'unsupported' }
+        result.counts.applied == 0
+        result.estimatedMonthlySavings > 0
+    }
+
     def "analyzeCosts prunes removed computers from usageData"() {
         given:
         Computer ephemeral = mockCloudComputer("aws-ephemeral", "aws cloud instance-type=m5.xlarge", true, 45, false)
@@ -112,7 +140,7 @@ class CloudCostOptimizerSpec extends Specification {
             getComputers() >> { current }
             getComputer("aws-ephemeral") >> { current.length > 0 ? ephemeral : null }
         }
-        CloudCostOptimizer optimizer = new CloudCostOptimizer(jenkins)
+        CloudCostOptimizer optimizer = new CloudCostOptimizer(jenkins, inventory)
 
         when:
         optimizer.analyzeCosts()

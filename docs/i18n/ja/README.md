@@ -269,7 +269,6 @@ import com.github.thomasvincent.jenkinsscripts.cloud.AWSNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.AzureNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.KubernetesNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.OracleCloudNodeManager
-import com.github.thomasvincent.jenkinsscripts.cloud.DigitalOceanNodeManager
 import jenkins.model.Jenkins
 
 // Manage EC2 instances
@@ -293,10 +292,6 @@ def ociManager = new OracleCloudNodeManager(Jenkins.get())
 def ociNodes = ociManager.getOCIComputeInstances()
 ociManager.provisionNewInstance("my-oci-template")
 
-// Manage DigitalOcean droplets
-def doManager = new DigitalOceanNodeManager(Jenkins.get())
-def doNodes = doManager.getDigitalOceanNodes()
-doManager.provisionNewDroplet("my-do-template")
 ```
 
 ## 開発
@@ -352,7 +347,6 @@ docker compose -f docker-compose.test.yml run --rm java21
 - **Azure VMs**: Azure 仮想マシンを Jenkins エージェントとして管理
 - **Kubernetes**: Kubernetes Pod を Jenkins エージェントとして管理
 - **Oracle Cloud**: Oracle Cloud Infrastructure (OCI) インスタンスを Jenkins エージェントとして管理
-- **DigitalOcean**: DigitalOcean Droplet を Jenkins エージェントとして管理
 
 ## 今後の機能予定
 

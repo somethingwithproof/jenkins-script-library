@@ -269,7 +269,6 @@ import com.github.thomasvincent.jenkinsscripts.cloud.AWSNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.AzureNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.KubernetesNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.OracleCloudNodeManager
-import com.github.thomasvincent.jenkinsscripts.cloud.DigitalOceanNodeManager
 import jenkins.model.Jenkins
 
 // Manage EC2 instances
@@ -293,10 +292,6 @@ def ociManager = new OracleCloudNodeManager(Jenkins.get())
 def ociNodes = ociManager.getOCIComputeInstances()
 ociManager.provisionNewInstance("my-oci-template")
 
-// Manage DigitalOcean droplets
-def doManager = new DigitalOceanNodeManager(Jenkins.get())
-def doNodes = doManager.getDigitalOceanNodes()
-doManager.provisionNewDroplet("my-do-template")
 ```
 
 ## Pengembangan
@@ -352,7 +347,6 @@ Pustaka ini mendukung penyedia cloud berikut:
 - **Azure VMs**: Mengelola mesin virtual Azure sebagai agen Jenkins
 - **Kubernetes**: Mengelola pod Kubernetes sebagai agen Jenkins
 - **Oracle Cloud**: Mengelola instans Oracle Cloud Infrastructure (OCI) sebagai agen Jenkins
-- **DigitalOcean**: Mengelola droplet DigitalOcean sebagai agen Jenkins
 
 ## Fitur Mendatang
 

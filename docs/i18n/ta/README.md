@@ -269,7 +269,6 @@ import com.github.thomasvincent.jenkinsscripts.cloud.AWSNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.AzureNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.KubernetesNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.OracleCloudNodeManager
-import com.github.thomasvincent.jenkinsscripts.cloud.DigitalOceanNodeManager
 import jenkins.model.Jenkins
 
 // Manage EC2 instances
@@ -293,10 +292,6 @@ def ociManager = new OracleCloudNodeManager(Jenkins.get())
 def ociNodes = ociManager.getOCIComputeInstances()
 ociManager.provisionNewInstance("my-oci-template")
 
-// Manage DigitalOcean droplets
-def doManager = new DigitalOceanNodeManager(Jenkins.get())
-def doNodes = doManager.getDigitalOceanNodes()
-doManager.provisionNewDroplet("my-do-template")
 ```
 
 ## மேம்பாடு
@@ -352,7 +347,6 @@ docker compose -f docker-compose.test.yml run --rm java21
 - **Azure VMs**: Azure மெய்நிகர் கணினிகளை Jenkins முகவர்களாக நிர்வகித்தல்
 - **Kubernetes**: Kubernetes பாட்களை Jenkins முகவர்களாக நிர்வகித்தல்
 - **Oracle Cloud**: Oracle Cloud Infrastructure (OCI) நிகழ்வுகளை Jenkins முகவர்களாக நிர்வகித்தல்
-- **DigitalOcean**: DigitalOcean டிராப்லெட்டுகளை Jenkins முகவர்களாக நிர்வகித்தல்
 
 ## வரவிருக்கும் அம்சங்கள்
 

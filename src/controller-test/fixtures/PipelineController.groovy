@@ -36,6 +36,8 @@ void beforeRestart() {
         @Library('jenkins-script-library') _
         def report
         node {
+            assert cloudInventory().agents.isEmpty()
+            assert optimizeCloudCosts.optimize(dryRun: false).counts.applied == 0
             report = auditPlugins(expected: 'absent-fixture:latest')
             assert report.installed.any { it.id == 'workflow-job' }
             def zip = backupJenkinsConfig(destination: env.BACKUP_ROOT + '/named.zip',
@@ -68,4 +70,6 @@ void afterRestart() {
     run.getAction(InputAction).getExecution('Resume').proceed(null)
     rule.assertBuildStatusSuccess(rule.waitForCompletion(run))
     rule.assertLogContains('Inventory survived restart', run)
+    new GroovyShell(rule.jenkins.pluginManager.uberClassLoader, binding)
+        .evaluate(new File(project, 'src/controller-test/fixtures/CloudOwnership.groovy'))
 }

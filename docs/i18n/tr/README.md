@@ -269,7 +269,6 @@ import com.github.thomasvincent.jenkinsscripts.cloud.AWSNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.AzureNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.KubernetesNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.OracleCloudNodeManager
-import com.github.thomasvincent.jenkinsscripts.cloud.DigitalOceanNodeManager
 import jenkins.model.Jenkins
 
 // Manage EC2 instances
@@ -293,10 +292,6 @@ def ociManager = new OracleCloudNodeManager(Jenkins.get())
 def ociNodes = ociManager.getOCIComputeInstances()
 ociManager.provisionNewInstance("my-oci-template")
 
-// Manage DigitalOcean droplets
-def doManager = new DigitalOceanNodeManager(Jenkins.get())
-def doNodes = doManager.getDigitalOceanNodes()
-doManager.provisionNewDroplet("my-do-template")
 ```
 
 ## Geliştirme
@@ -352,7 +347,6 @@ Kütüphane aşağıdaki bulut sağlayıcılarını destekler:
 - **Azure VM'ler**: Azure sanal makinelerini Jenkins aracıları olarak yönetin
 - **Kubernetes**: Kubernetes pod'larını Jenkins aracıları olarak yönetin
 - **Oracle Cloud**: Oracle Cloud Infrastructure (OCI) örneklerini Jenkins aracıları olarak yönetin
-- **DigitalOcean**: DigitalOcean droplet'larını Jenkins aracıları olarak yönetin
 
 ## Planlanan Özellikler
 

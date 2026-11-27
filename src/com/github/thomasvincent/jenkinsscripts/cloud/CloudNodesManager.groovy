@@ -113,17 +113,11 @@ class CloudNodesManager {
      * @return List of nodes managed by the specified cloud type
      */
     protected List<Node> getCloudNodes(Class cloudClass) {
-        return ErrorHandler.withErrorHandling("retrieving cloud nodes", {
-            // This basic implementation returns nodes that appear to be cloud-managed
-            // Specific cloud implementations should override with more precise logic
-            return jenkins.nodes.findAll { node ->
-                // Basic cloud node detection
-                node.name.contains("cloud") ||
-                node.name.matches(/.*-[a-z0-9]{8}/) ||  // Many cloud agents have random suffixes
-                node.labelString.contains("cloud") ||
-                (node.descriptor?.displayName?.toLowerCase()?.contains("cloud") ?: false)
-            }
-        }, LOGGER, [])
+        def inventory = new CloudInventory()
+        return jenkins.nodes.findAll { node ->
+            def owner = inventory.owner(node)
+            owner && cloudClass.isInstance(jenkins.getCloud(owner.cloudName as String))
+        }
     }
 
     /**
@@ -132,24 +126,16 @@ class CloudNodesManager {
      * <p>Returns information about all detected cloud-based nodes
      * across all cloud providers.</p>
      *
-     * @return Map of cloud provider types to their managed nodes
+     * @return Map of configured cloud names to their managed nodes
      */
     Map<String, List<Node>> getAllCloudNodes() {
-        return ErrorHandler.withErrorHandling("getting all cloud nodes", {
-            def result = [:]
-
-            // Get all clouds and group their nodes
-            getConfiguredClouds().each { cloud ->
-                def cloudType = cloud.getClass().simpleName
-                def cloudNodes = getCloudNodes(cloud.getClass())
-
-                if (cloudNodes) {
-                    result[cloudType] = cloudNodes
-                }
-            }
-
-            return result
-        }, LOGGER, [:])
+        def inventory = new CloudInventory()
+        Map result = [:]
+        for (Node node : jenkins.nodes) {
+            def owner = inventory.owner(node)
+            if (owner) result.computeIfAbsent(owner.cloudName) { [] }.add(node)
+        }
+        return result
     }
 
     /**
@@ -157,7 +143,7 @@ class CloudNodesManager {
      *
      * <p>Returns counts of online/offline nodes grouped by cloud provider.</p>
      *
-     * @return Map of cloud provider types to node statistics
+     * @return Map of configured cloud names to node statistics
      */
     Map<String, Map<String, Integer>> getCloudNodeStats() {
         return ErrorHandler.withErrorHandling("getting cloud node statistics", {
@@ -167,8 +153,8 @@ class CloudNodesManager {
             allCloudNodes.each { cloudType, nodes ->
                 def stats = [
                     total: nodes.size(),
-                    online: nodes.count { !it.computer.offline },
-                    offline: nodes.count { it.computer.offline }
+                    online: nodes.count { it.toComputer()?.online == true },
+                    offline: nodes.count { it.toComputer()?.online != true }
                 ]
                 result[cloudType] = stats
             }
@@ -192,14 +178,14 @@ class CloudNodesManager {
         return ErrorHandler.withErrorHandling("extracting node information", {
             def computer = node.computer
 
-            return [
+            return (new CloudInventory().owner(node) ?: [:]) + [
                 name: node.nodeName,
                 displayName: node.displayName,
                 description: node.nodeDescription,
                 numExecutors: node.numExecutors,
                 labels: node.labelString,
                 remoteFS: node.remoteFS,
-                offline: computer?.offline ?: true,
+                offline: computer?.online != true,
                 temporarilyOffline: computer?.temporarilyOffline ?: false,
                 connectTime: computer?.connectTime ?: 0,
                 offlineCause: computer?.offlineCause?.toString()

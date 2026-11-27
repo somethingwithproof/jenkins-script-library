@@ -269,7 +269,6 @@ import com.github.thomasvincent.jenkinsscripts.cloud.AWSNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.AzureNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.KubernetesNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.OracleCloudNodeManager
-import com.github.thomasvincent.jenkinsscripts.cloud.DigitalOceanNodeManager
 import jenkins.model.Jenkins
 
 // Manage EC2 instances
@@ -293,10 +292,6 @@ def ociManager = new OracleCloudNodeManager(Jenkins.get())
 def ociNodes = ociManager.getOCIComputeInstances()
 ociManager.provisionNewInstance("my-oci-template")
 
-// Manage DigitalOcean droplets
-def doManager = new DigitalOceanNodeManager(Jenkins.get())
-def doNodes = doManager.getDigitalOceanNodes()
-doManager.provisionNewDroplet("my-do-template")
 ```
 
 ## అభివృద్ధి
@@ -352,7 +347,6 @@ docker compose -f docker-compose.test.yml run --rm java21
 - **Azure VMs**: Azure వర్చువల్ మెషీన్లను Jenkins ఏజెంట్లుగా నిర్వహించడం
 - **Kubernetes**: Kubernetes పాడ్‌లను Jenkins ఏజెంట్లుగా నిర్వహించడం
 - **Oracle Cloud**: Oracle Cloud Infrastructure (OCI) ఇన్‌స్టాన్స్‌లను Jenkins ఏజెంట్లుగా నిర్వహించడం
-- **DigitalOcean**: DigitalOcean డ్రాప్‌లెట్‌లను Jenkins ఏజెంట్లుగా నిర్వహించడం
 
 ## రాబోయే ఫీచర్లు
 

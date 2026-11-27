@@ -269,7 +269,6 @@ import com.github.thomasvincent.jenkinsscripts.cloud.AWSNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.AzureNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.KubernetesNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.OracleCloudNodeManager
-import com.github.thomasvincent.jenkinsscripts.cloud.DigitalOceanNodeManager
 import jenkins.model.Jenkins
 
 // Manage EC2 instances
@@ -293,10 +292,6 @@ def ociManager = new OracleCloudNodeManager(Jenkins.get())
 def ociNodes = ociManager.getOCIComputeInstances()
 ociManager.provisionNewInstance("my-oci-template")
 
-// Manage DigitalOcean droplets
-def doManager = new DigitalOceanNodeManager(Jenkins.get())
-def doNodes = doManager.getDigitalOceanNodes()
-doManager.provisionNewDroplet("my-do-template")
 ```
 
 ## Haɓakawa
@@ -352,7 +347,6 @@ Laburaren yana goyon bayan masu bayar da sabis na girgije masu zuwa:
 - **Azure VMs**: Sarrafa na'urorin kama-da-wane (virtual machines) na Azure a matsayin wakilan Jenkins
 - **Kubernetes**: Sarrafa pods na Kubernetes a matsayin wakilan Jenkins
 - **Oracle Cloud**: Sarrafa samfuran Oracle Cloud Infrastructure (OCI) a matsayin wakilan Jenkins
-- **DigitalOcean**: Sarrafa droplets na DigitalOcean a matsayin wakilan Jenkins
 
 ## Fasalolin da Ke Tafe
 

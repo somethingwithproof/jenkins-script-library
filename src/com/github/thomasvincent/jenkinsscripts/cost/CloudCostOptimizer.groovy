@@ -31,7 +31,9 @@ import hudson.model.Computer
 import hudson.model.Node
 import hudson.model.labels.LabelAtom
 import jenkins.model.Jenkins
+import com.cloudbees.groovy.cps.NonCPS
 import groovy.transform.CompileStatic
+import com.github.thomasvincent.jenkinsscripts.cloud.CloudInventory
 import java.time.Instant
 import java.time.Duration
 import java.time.temporal.ChronoUnit
@@ -56,6 +58,7 @@ class CloudCostOptimizer {
 
     private static final Logger LOGGER = Logger.getLogger(CloudCostOptimizer.class.name)
 
+    private final CloudInventory inventory
     private final Jenkins jenkins
     private final Map<String, CloudProvider> providers = [:]
     private final Map<String, AgentUsageData> usageData = new ConcurrentHashMap<>()
@@ -65,7 +68,8 @@ class CloudCostOptimizer {
     private static final int IDLE_TIME_THRESHOLD = 30 // minutes
     private static final double SPOT_SAVINGS_THRESHOLD = 0.30 // 30% savings
 
-    CloudCostOptimizer(Jenkins jenkins) {
+    CloudCostOptimizer(Jenkins jenkins, CloudInventory inventory = new CloudInventory()) {
+        this.inventory = inventory
         this.jenkins = jenkins
         initializeProviders()
     }
@@ -73,11 +77,12 @@ class CloudCostOptimizer {
     /**
      * Analyzes cloud costs and generates optimization recommendations.
      */
+    @NonCPS
     Map<String, Object> analyzeCosts(Map<String, Object> options = [:]) {
         Map<String, Object> providerResults = [:]
         Set<String> activeComputerNames = new HashSet<>()
         jenkins.computers.each { Computer c ->
-            if (c?.name != null) {
+            if (c?.name != null && getProvider(c.node) != null) {
                 activeComputerNames.add(c.name)
             }
         }
@@ -105,6 +110,7 @@ class CloudCostOptimizer {
         return analysis
     }
 
+    @NonCPS
     private void pruneRemovedComputers(Set<String> activeComputerNames) {
         usageData.keySet().removeIf { String name -> !activeComputerNames.contains(name) }
     }
@@ -112,11 +118,13 @@ class CloudCostOptimizer {
     /**
      * Optimizes cloud resources based on current usage.
      */
+    @NonCPS
     Map<String, Object> optimizeResources(boolean dryRun = true) {
         List<Map<String, Object>> actions = []
         double estimatedSavings = 0.0d
         Set<String> terminatedAgents = new HashSet<>()
 
+        analyzeCosts()
         // Find idle agents
         List<Map<String, Object>> idleAgents = findIdleAgents()
         idleAgents.each { Map<String, Object> agent ->
@@ -131,9 +139,6 @@ class CloudCostOptimizer {
                 savingsPerHour: hourlyCost
             ] as Map<String, Object>
 
-            if (!dryRun) {
-                terminateAgent(agent)
-            }
 
             terminatedAgents.add(agentName)
             actions.add(action)
@@ -146,7 +151,6 @@ class CloudCostOptimizer {
             double currentCost = ((Number) opp.currentCost).doubleValue()
             double spotCost = ((Number) opp.spotCost).doubleValue()
             double savingsPerHour = currentCost - spotCost
-            double savingsPercent = ((Number) opp.savingsPercent).doubleValue()
             Map<String, Object> action = [
                 type: 'CONVERT_TO_SPOT',
                 agent: opp.agent,
@@ -156,9 +160,6 @@ class CloudCostOptimizer {
                 savingsPerHour: savingsPerHour
             ] as Map<String, Object>
 
-            if (!dryRun && savingsPercent > SPOT_SAVINGS_THRESHOLD) {
-                convertToSpot(opp)
-            }
 
             actions.add(action)
             estimatedSavings += savingsPerHour
@@ -172,6 +173,7 @@ class CloudCostOptimizer {
             double savingsPerHour = currentCost - newCost
             Map<String, Object> action = [
                 type: 'RIGHTSIZE_INSTANCE',
+                provider: opp.provider,
                 agent: opp.agent,
                 currentType: opp.currentType,
                 recommendedType: opp.recommendedType,
@@ -180,18 +182,33 @@ class CloudCostOptimizer {
                 savingsPerHour: savingsPerHour
             ] as Map<String, Object>
 
-            if (!dryRun) {
-                rightsizeInstance(opp)
-            }
 
             actions.add(action)
             estimatedSavings += savingsPerHour
         }
 
+        Map<String, Integer> counts = [planned: 0, applied: 0, unsupported: 0, failed: 0]
+        for (Map<String, Object> action : actions) {
+            Map identity = inventory.owner(jenkins.getComputer(action.agent as String)?.node)
+            if (identity) action.putAll(identity)
+            String status = 'planned'
+            if (!dryRun) {
+                try {
+                    Boolean confirmed = providers[action.provider as String]?.applyAction(action)
+                    status = confirmed == null ? 'unsupported' : (confirmed ? 'applied' : 'failed')
+                } catch (Exception failure) {
+                    status = 'failed'
+                    action.error = failure.class.simpleName
+                }
+            }
+            action.status = status
+            counts[status] = counts[status] + 1
+        }
         return [
             timestamp: Instant.now().toString(),
             dryRun: dryRun,
             actions: actions,
+            counts: counts,
             estimatedSavings: estimatedSavings,
             estimatedMonthlySavings: estimatedSavings * 24.0d * 30.0d
         ] as Map<String, Object>
@@ -200,8 +217,9 @@ class CloudCostOptimizer {
     /**
      * Monitors budget and sends alerts.
      */
+    @NonCPS
     Map<String, Object> monitorBudget(Map<String, Double> budgets) {
-        Map<String, Object> budgetStatus = [:]
+        Map<String, Map<String, Double>> budgetStatus = [:]
         List<Map<String, Object>> alerts = []
 
         Map<String, Double> currentCosts = getCurrentMonthlyCosts()
@@ -213,12 +231,12 @@ class CloudCostOptimizer {
                     ? Math.round((spent / budget * 100.0d) * 100.0d) / 100.0d
                     : (spent > 0.0d ? 100.0d : 0.0d)
 
-            budgetStatus[category] = [
+            budgetStatus.put(category, [
                 budget: budget,
                 spent: spent,
                 remaining: budget - spent,
                 percentUsed: percentUsed
-            ]
+            ])
 
             if (percentUsed >= 90.0d) {
                 alerts.add([
@@ -245,6 +263,7 @@ class CloudCostOptimizer {
     /**
      * Tracks costs by team/project/pipeline.
      */
+    @NonCPS
     Map<String, Object> trackCostAllocation() {
         Map<String, Double> byTeam = [:]
         Map<String, Double> byProject = [:]
@@ -291,6 +310,7 @@ class CloudCostOptimizer {
     /**
      * Analyzes a single cloud provider.
      */
+    @NonCPS
     private Map<String, Object> analyzeProvider(CloudProvider provider) {
         int activeAgents = 0
         double totalCost = 0.0d
@@ -317,6 +337,7 @@ class CloudCostOptimizer {
     /**
      * Analyzes a single instance.
      */
+    @NonCPS
     private Map<String, Object> analyzeInstance(Computer computer, CloudProvider provider) {
         Node node = computer.node
         String instanceType = getInstanceType(node)
@@ -340,6 +361,7 @@ class CloudCostOptimizer {
     /**
      * Finds idle agents that can be terminated.
      */
+    @NonCPS
     private List<Map<String, Object>> findIdleAgents() {
         List<Map<String, Object>> idleAgents = []
 
@@ -361,6 +383,7 @@ class CloudCostOptimizer {
     /**
      * Finds opportunities to use spot instances, skipping excluded agents.
      */
+    @NonCPS
     private List<Map<String, Object>> findSpotOpportunities(Set<String> excludedAgents = Collections.emptySet()) {
         List<Map<String, Object>> opportunities = []
 
@@ -392,6 +415,7 @@ class CloudCostOptimizer {
     /**
      * Finds opportunities to rightsize instances, skipping excluded agents.
      */
+    @NonCPS
     private List<Map<String, Object>> findRightsizeOpportunities(Set<String> excludedAgents = Collections.emptySet()) {
         List<Map<String, Object>> opportunities = []
 
@@ -407,6 +431,7 @@ class CloudCostOptimizer {
                         opportunities.add([
                             agent: name,
                             currentType: currentType,
+                            provider: provider.name,
                             recommendedType: recommendedType,
                             currentCost: provider.getHourlyCost(currentType),
                             newCost: provider.getHourlyCost(recommendedType),
@@ -423,6 +448,7 @@ class CloudCostOptimizer {
     /**
      * Calculates total costs across providers.
      */
+    @NonCPS
     private Map<String, Double> calculateTotalCosts(Map<String, Object> providersMap) {
         double hourly = 0.0d
 
@@ -446,6 +472,7 @@ class CloudCostOptimizer {
     /**
      * Identifies potential savings without double-counting idle agents.
      */
+    @NonCPS
     private Map<String, Double> identifySavings(Map<String, Object> providersMap) {
         double idleAgentsSavings = 0.0d
         double spotSavings = 0.0d
@@ -478,6 +505,7 @@ class CloudCostOptimizer {
     /**
      * Generates cost optimization recommendations.
      */
+    @NonCPS
     private List<Map<String, Object>> generateRecommendations(Map<String, Object> analysis) {
         List<Map<String, Object>> recommendations = []
         Map<String, Double> savings = (Map<String, Double>) analysis.savings
@@ -532,6 +560,7 @@ class CloudCostOptimizer {
     /**
      * Calculates cost allocations.
      */
+    @NonCPS
     private Map<String, Object> calculateCostAllocations() {
         return trackCostAllocation()
     }
@@ -539,6 +568,7 @@ class CloudCostOptimizer {
     /**
      * Gets current monthly costs in a single pass over active cloud computers so total is never double-counted.
      */
+    @NonCPS
     private Map<String, Double> getCurrentMonthlyCosts() {
         Map<String, Double> costs = [:]
         double totalHourly = 0.0d
@@ -572,6 +602,7 @@ class CloudCostOptimizer {
     /**
      * Updates usage data atomically for an instance.
      */
+    @NonCPS
     private void updateUsageData(String name, Map<String, Object> instance) {
         usageData.compute(name) { String key, AgentUsageData existing ->
             AgentUsageData data = existing ?: new AgentUsageData()
@@ -589,38 +620,16 @@ class CloudCostOptimizer {
     /**
      * Gets hourly cost for a cloud node.
      */
+    @NonCPS
     private double getHourlyCost(Node node) {
         CloudProvider provider = getProvider(node)
         return provider.getHourlyCost(getInstanceType(node))
     }
 
     /**
-     * Terminates an idle agent.
-     */
-    private void terminateAgent(Map agent) {
-        LOGGER.info("Terminating idle agent: ${agent.name}")
-        // Implementation would call provider API to terminate
-    }
-
-    /**
-     * Converts instance to spot.
-     */
-    private void convertToSpot(Map opportunity) {
-        LOGGER.info("Converting ${opportunity.agent} to spot instance")
-        // Implementation would call provider API to convert
-    }
-
-    /**
-     * Rightsizes an instance.
-     */
-    private void rightsizeInstance(Map opportunity) {
-        LOGGER.info("Rightsizing ${opportunity.agent} from ${opportunity.currentType} to ${opportunity.recommendedType}")
-        // Implementation would call provider API to resize
-    }
-
-    /**
      * Initializes cloud providers.
      */
+    @NonCPS
     private void initializeProviders() {
         providers['AWS'] = new AWSProvider()
         providers['Azure'] = new AzureProvider()
@@ -631,32 +640,25 @@ class CloudCostOptimizer {
     /**
      * Checks if node is a cloud node.
      */
+    @NonCPS
     private boolean isCloudNode(Node node) {
-        String labels = node.labelString ?: ''
-        return node.class.name.contains('Cloud') ||
-               labels.contains('cloud') ||
-               providers.any { String name, CloudProvider provider -> isProviderNode(node, provider) }
+        return getProvider(node) != null
     }
 
-    /**
-     * Checks if node belongs to a specific provider.
-     */
+    @NonCPS
     private boolean isProviderNode(Node node, CloudProvider provider) {
-        String labels = node.labelString ?: ''
-        return node.class.name.contains(provider.identifier) ||
-               labels.toLowerCase().contains(provider.name.toLowerCase())
+        return getProvider(node) == provider
     }
 
-    /**
-     * Gets the provider for a node.
-     */
+    @NonCPS
     private CloudProvider getProvider(Node node) {
-        return providers.values().find { CloudProvider provider -> isProviderNode(node, provider) } ?: providers['AWS']
+        return providers.get(inventory.owner(node)?.get('provider') as String)
     }
 
     /**
      * Gets instance type from node.
      */
+    @NonCPS
     private String getInstanceType(Node node) {
         return extractLabelValue(node.labelString ?: '', 'instance-type') ?: 'm5.large'
     }
@@ -664,6 +666,7 @@ class CloudCostOptimizer {
     /**
      * Checks if node is a spot instance.
      */
+    @NonCPS
     private boolean isSpotInstance(Node node) {
         String labels = node.labelString ?: ''
         return labels.contains('spot') || labels.contains('preemptible')
@@ -672,6 +675,7 @@ class CloudCostOptimizer {
     /**
      * Gets computer uptime in minutes.
      */
+    @NonCPS
     private int getUptime(Computer computer) {
         long connectTime = computer.connectTime
         if (connectTime > 0L) {
@@ -683,6 +687,7 @@ class CloudCostOptimizer {
     /**
      * Gets idle time in minutes.
      */
+    @NonCPS
     private int getIdleTime(Computer computer) {
         if (computer.isIdle()) {
             long lastBusyTime = computer.idleStartMilliseconds
@@ -696,6 +701,7 @@ class CloudCostOptimizer {
     /**
      * Calculates utilization percentage.
      */
+    @NonCPS
     private double calculateUtilization(Computer computer) {
         def executors = computer.executors
         if (!executors) {
@@ -708,6 +714,7 @@ class CloudCostOptimizer {
     /**
      * Extracts label value.
      */
+    @NonCPS
     private String extractLabelValue(String labels, String key) {
         if (!labels) {
             return null
@@ -735,6 +742,10 @@ class CloudCostOptimizer {
     static abstract class CloudProvider {
         abstract String getName()
         abstract String getIdentifier()
+
+        /** Null means unsupported. True requires confirmation from the provider. */
+        @NonCPS
+        Boolean applyAction(Map<String, Object> action) { return null }
         abstract double getHourlyCost(String instanceType)
         abstract double getSpotPrice(String instanceType)
         abstract String recommendInstanceType(double utilization, String currentType)
@@ -744,9 +755,12 @@ class CloudCostOptimizer {
      * AWS provider implementation.
      */
     static class AWSProvider extends CloudProvider {
+        @NonCPS
         String getName() { 'AWS' }
+        @NonCPS
         String getIdentifier() { 'EC2' }
 
+        @NonCPS
         double getHourlyCost(String instanceType) {
             // Simplified pricing - real implementation would use AWS API
             def prices = [
@@ -763,10 +777,12 @@ class CloudCostOptimizer {
             return prices[instanceType] ?: 0.1
         }
 
+        @NonCPS
         double getSpotPrice(String instanceType) {
             return getHourlyCost(instanceType) * 0.6 // 40% discount average
         }
 
+        @NonCPS
         String recommendInstanceType(double utilization, String currentType) {
             if (utilization < 20 && currentType.contains('large')) {
                 return currentType.replace('large', 'medium')
@@ -781,9 +797,12 @@ class CloudCostOptimizer {
      * Azure provider implementation.
      */
     static class AzureProvider extends CloudProvider {
+        @NonCPS
         String getName() { 'Azure' }
+        @NonCPS
         String getIdentifier() { 'Azure' }
 
+        @NonCPS
         double getHourlyCost(String instanceType) {
             def prices = [
                 'Standard_B1s': 0.0104,
@@ -795,10 +814,12 @@ class CloudCostOptimizer {
             return prices[instanceType] ?: 0.1
         }
 
+        @NonCPS
         double getSpotPrice(String instanceType) {
             return getHourlyCost(instanceType) * 0.5 // 50% discount average
         }
 
+        @NonCPS
         String recommendInstanceType(double utilization, String currentType) {
             if (utilization < 30 && currentType.contains('D4')) {
                 return currentType.replace('D4', 'D2')
@@ -811,9 +832,12 @@ class CloudCostOptimizer {
      * GCP provider implementation.
      */
     static class GCPProvider extends CloudProvider {
+        @NonCPS
         String getName() { 'GCP' }
+        @NonCPS
         String getIdentifier() { 'GCE' }
 
+        @NonCPS
         double getHourlyCost(String instanceType) {
             def prices = [
                 'f1-micro': 0.0076,
@@ -825,10 +849,12 @@ class CloudCostOptimizer {
             return prices[instanceType] ?: 0.1
         }
 
+        @NonCPS
         double getSpotPrice(String instanceType) {
             return getHourlyCost(instanceType) * 0.3 // 70% discount for preemptible
         }
 
+        @NonCPS
         String recommendInstanceType(double utilization, String currentType) {
             if (utilization < 25 && currentType == 'n1-standard-4') {
                 return 'n1-standard-2'
@@ -841,18 +867,23 @@ class CloudCostOptimizer {
      * Kubernetes provider implementation.
      */
     static class KubernetesProvider extends CloudProvider {
+        @NonCPS
         String getName() { 'Kubernetes' }
+        @NonCPS
         String getIdentifier() { 'K8s' }
 
+        @NonCPS
         double getHourlyCost(String instanceType) {
             // Based on underlying node pool costs
             return 0.1
         }
 
+        @NonCPS
         double getSpotPrice(String instanceType) {
             return getHourlyCost(instanceType) * 0.7
         }
 
+        @NonCPS
         String recommendInstanceType(double utilization, String currentType) {
             return currentType // Kubernetes handles resource allocation
         }

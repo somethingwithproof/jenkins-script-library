@@ -269,7 +269,6 @@ import com.github.thomasvincent.jenkinsscripts.cloud.AWSNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.AzureNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.KubernetesNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.OracleCloudNodeManager
-import com.github.thomasvincent.jenkinsscripts.cloud.DigitalOceanNodeManager
 import jenkins.model.Jenkins
 
 // Manage EC2 instances
@@ -293,10 +292,6 @@ def ociManager = new OracleCloudNodeManager(Jenkins.get())
 def ociNodes = ociManager.getOCIComputeInstances()
 ociManager.provisionNewInstance("my-oci-template")
 
-// Manage DigitalOcean droplets
-def doManager = new DigitalOceanNodeManager(Jenkins.get())
-def doNodes = doManager.getDigitalOceanNodes()
-doManager.provisionNewDroplet("my-do-template")
 ```
 
 ## Pag-develop
@@ -352,7 +347,6 @@ Sinusuportahan ng library ang mga sumusunod na cloud provider:
 - **Azure VMs**: Pamahalaan ang mga virtual machine ng Azure bilang mga agent ng Jenkins
 - **Kubernetes**: Pamahalaan ang mga pod ng Kubernetes bilang mga agent ng Jenkins
 - **Oracle Cloud**: Pamahalaan ang mga instance ng Oracle Cloud Infrastructure (OCI) bilang mga agent ng Jenkins
-- **DigitalOcean**: Pamahalaan ang mga droplet ng DigitalOcean bilang mga agent ng Jenkins
 
 ## Mga Paparating na Feature
 

@@ -269,7 +269,6 @@ import com.github.thomasvincent.jenkinsscripts.cloud.AWSNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.AzureNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.KubernetesNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.OracleCloudNodeManager
-import com.github.thomasvincent.jenkinsscripts.cloud.DigitalOceanNodeManager
 import jenkins.model.Jenkins
 
 // Manage EC2 instances
@@ -293,10 +292,6 @@ def ociManager = new OracleCloudNodeManager(Jenkins.get())
 def ociNodes = ociManager.getOCIComputeInstances()
 ociManager.provisionNewInstance("my-oci-template")
 
-// Manage DigitalOcean droplets
-def doManager = new DigitalOceanNodeManager(Jenkins.get())
-def doNodes = doManager.getDigitalOceanNodes()
-doManager.provisionNewDroplet("my-do-template")
 ```
 
 ## 開發
@@ -352,7 +347,6 @@ docker compose -f docker-compose.test.yml run --rm java21
 - **Azure VMs**：將 Azure 虛擬機器管理為 Jenkins 代理程式
 - **Kubernetes**：將 Kubernetes pod 管理為 Jenkins 代理程式
 - **Oracle Cloud**：將 Oracle Cloud Infrastructure (OCI) 執行個體管理為 Jenkins 代理程式
-- **DigitalOcean**：將 DigitalOcean droplet 管理為 Jenkins 代理程式
 
 ## 即將推出的功能
 

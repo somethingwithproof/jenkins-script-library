@@ -270,7 +270,6 @@ import com.github.thomasvincent.jenkinsscripts.cloud.AWSNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.AzureNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.KubernetesNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.OracleCloudNodeManager
-import com.github.thomasvincent.jenkinsscripts.cloud.DigitalOceanNodeManager
 import jenkins.model.Jenkins
 
 // Manage EC2 instances
@@ -294,11 +293,19 @@ def ociManager = new OracleCloudNodeManager(Jenkins.get())
 def ociNodes = ociManager.getOCIComputeInstances()
 ociManager.provisionNewInstance("my-oci-template")
 
-// Manage DigitalOcean droplets
-def doManager = new DigitalOceanNodeManager(Jenkins.get())
-def doNodes = doManager.getDigitalOceanNodes()
-doManager.provisionNewDroplet("my-do-template")
 ```
+
+### Cloud inventory and cost estimates
+
+A trusted Pipeline can call `cloudInventory()` to list configured clouds and their
+agents. Each agent has a provider, the configured cloud name, its Jenkins node ID,
+and its online state. Static agents and agents whose configured cloud is gone
+are omitted. Multiple configurations of the same provider remain distinct.
+
+`optimizeCloudCosts.optimize(dryRun: true)` returns planned actions and estimated
+savings. An apply request reports a status for each action. The bundled cost
+providers currently report unsupported operations. The build description reports
+action counts. Estimated savings are projections based on configured model rates.
 
 ### Controller operations from a trusted Pipeline
 
@@ -388,7 +395,6 @@ The library supports the following cloud providers:
 - **Azure VMs**: Manage Azure virtual machines as Jenkins agents
 - **Kubernetes**: Manage Kubernetes pods as Jenkins agents
 - **Oracle Cloud**: Manage Oracle Cloud Infrastructure (OCI) instances as Jenkins agents
-- **DigitalOcean**: Manage DigitalOcean droplets as Jenkins agents
 
 ## Upcoming Features
 

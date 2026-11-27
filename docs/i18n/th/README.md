@@ -269,7 +269,6 @@ import com.github.thomasvincent.jenkinsscripts.cloud.AWSNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.AzureNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.KubernetesNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.OracleCloudNodeManager
-import com.github.thomasvincent.jenkinsscripts.cloud.DigitalOceanNodeManager
 import jenkins.model.Jenkins
 
 // Manage EC2 instances
@@ -293,10 +292,6 @@ def ociManager = new OracleCloudNodeManager(Jenkins.get())
 def ociNodes = ociManager.getOCIComputeInstances()
 ociManager.provisionNewInstance("my-oci-template")
 
-// Manage DigitalOcean droplets
-def doManager = new DigitalOceanNodeManager(Jenkins.get())
-def doNodes = doManager.getDigitalOceanNodes()
-doManager.provisionNewDroplet("my-do-template")
 ```
 
 ## การพัฒนา
@@ -352,7 +347,6 @@ docker compose -f docker-compose.test.yml run --rm java21
 - **Azure VMs**: จัดการเครื่องเสมือน Azure เป็น Jenkins agent
 - **Kubernetes**: จัดการพ็อด Kubernetes เป็น Jenkins agent
 - **Oracle Cloud**: จัดการอินสแตนซ์ Oracle Cloud Infrastructure (OCI) เป็น Jenkins agent
-- **DigitalOcean**: จัดการ droplet ของ DigitalOcean เป็น Jenkins agent
 
 ## ฟีเจอร์ที่กำลังจะมาถึง
 
