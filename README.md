@@ -20,303 +20,197 @@
 [![License](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/somethingwithproof/jenkins-script-library/badge)](https://scorecard.dev/viewer/?uri=github.com/somethingwithproof/jenkins-script-library)
 
-A collection of Groovy utilities and scripts designed to automate and facilitate various operations within Jenkins environments. This library follows Jenkins-compatible practices and includes unit and integration tests. Supports Jenkins automation for modern environments.
+`jenkins-script-library` is a Groovy library, Jenkins Pipeline shared library (`vars/`), and controller-side script suite for automating Jenkins operations. It is built for Jenkins administrators and platform engineers who manage jobs, plugins, credentials, backups, metrics, and cloud agents across AWS, Azure, Google Cloud, Kubernetes, and Oracle Cloud without maintaining ad-hoc Script Console snippets.
 
-## Features
+The Gradle build compiles all 69 Groovy source files under `src/com/` and `src/hudson/` against Jenkins LTS `2.590` and Groovy `3.0.25`. CI verifies the repository with 226 Spock unit tests across Java 21 and Java 24, controller acceptance tests in a temporary Jenkins home (`./gradlew integrationTest`), Python unit tests for spot-capacity scripts, CodeNarc static analysis, release archive verification, SonarCloud analysis, and OpenSSF Scorecard checks.
 
-- **Job Management**: Enable/disable, clean, migrate, and templatize Jenkins jobs
-- **Cloud Integration**: Manage Jenkins agents on AWS, Azure, and Kubernetes
-- **Security**: Audit and secure Jenkins instances
-- **Performance Optimization**: Monitor and improve Jenkins performance
-- **Configuration Management**: Backup and restore Jenkins configurations
-- **Pipeline Generation**: Create Jenkins pipelines from reusable templates
+## Capabilities
+
+- **Job lifecycle and pipelines**: Clean build history, disable jobs or triggers, copy and templatize jobs, audit job XML configurations, analyze job health and pipeline performance, inspect dependency graphs, manage job parameters, archive inactive jobs, and generate Declarative Pipelines from templates or Groovy DSL.
+- **Controller operations and security**: Audit Jenkins security configuration and plugin drift against a manifest, run area-scoped vulnerability scans, evaluate credential age and usage for rotation, and create or selectively restore controller backups.
+- **Cloud agents and spot capacity**: Inventory configured cloud providers and active agents, manage agents on AWS EC2, Azure VMs, Kubernetes, and Oracle Cloud, estimate agent spend and allocations, request interruptible compute capacity (`provisionSpot`), and run builds on verified spot agents (`withSpotAgent`).
+- **Observability and agent recovery**: Export build, stage, agent, and queue metrics in Prometheus exposition format (`exportPrometheusMetrics`) and run automated offline-agent health checks and recovery (`selfHealingAgents`).
 
 ## Project Structure
 
-The project follows standard Groovy project structure:
+The repository follows the Jenkins Shared Library directory layout so Jenkins loads `vars/`, `resources/`, and `src/` from the same source tree that Gradle compiles:
 
 ```text
 jenkins-script-library/
+├── vars/                                 # 14 Jenkins Pipeline shared library steps and vars/README.md
+├── resources/
+│   └── com/github/thomasvincent/jenkinsscripts/cloud/
+│                                         # Python helpers and pool metadata for spot capacity
 ├── src/
-│   ├── main/groovy/            # Main source code
-│   │   └── com/github/thomasvincent/jenkinsscripts/
-│   │       ├── cloud/          # Cloud provider integrations
-│   │       ├── config/         # Configuration management
-│   │       ├── helm/           # Helm management
-│   │       ├── jobs/           # Job management
-│   │       ├── nodes/          # Node management
-│   │       ├── scripts/        # Command-line script entry points
-│   │       ├── security/       # Security utilities
-│   │       └── util/           # Common utilities
-│   ├── test/groovy/            # Unit tests
-│   └── integration-test/groovy/ # Integration tests
-├── build.gradle                # Gradle build configuration
-├── config/                     # Configuration files
-│   └── codenarc/               # CodeNarc rules for code quality
-├── gradle/wrapper/            # Gradle wrapper files
-├── gradlew                     # Gradle wrapper script
-├── LICENSE                     # MIT License
-├── README.md                   # This file
-└── SECURITY.md                 # Security policy
+│   ├── com/github/thomasvincent/jenkinsscripts/
+│   │   ├── analytics/                    # Pipeline metrics collection and anomaly detection
+│   │   ├── cloud/                        # AWS, Azure, Kubernetes, OCI managers and CloudInventory
+│   │   ├── config/                       # Controller backup, selective restore, and PluginInventory
+│   │   ├── cost/                         # Cloud cost estimation, allocation, and budgets
+│   │   ├── credentials/                  # Credential usage analysis and rotation management
+│   │   ├── dsl/                          # Groovy Pipeline DSL builder
+│   │   ├── groovydoc/                    # Package-level GroovyDoc summary
+│   │   ├── healing/                      # Self-healing offline agent recovery manager
+│   │   ├── helm/                         # Helm tool helper utilities
+│   │   ├── jobs/                         # Cleaning, disabling, templating, auditing, dependencies, scheduling
+│   │   ├── monitoring/                   # Prometheus metrics exporter
+│   │   ├── nodes/                        # Node inspection and offline launcher utilities
+│   │   ├── pipeline/                     # Template-based Jenkinsfile generator
+│   │   ├── scripts/                      # 28 Script Console / Jenkins CLI entry points
+│   │   ├── security/                     # Jenkins security configuration auditor
+│   │   ├── util/                         # Static ErrorHandler, validation, string, and compatibility utilities
+│   │   └── utils/                        # Instance-based ErrorHandler with java.util.logging.Logger
+│   ├── hudson/tools/                     # HelmInstallation Jenkins tool descriptor
+│   ├── test/
+│   │   ├── groovy/                       # Spock unit tests (19 spec files)
+│   │   └── python/                       # Unittest suite for spot provisioning and verification
+│   ├── controller-test/                  # Jenkins controller acceptance tests (jenkins-test-harness)
+│   └── integration-test/                 # Integration test suite
+├── templates/                            # Reusable Jenkinsfile templates
+├── examples/                             # Example Declarative Pipelines
+├── config/                               # CodeNarc rules, plugin manifests, and init.groovy.d examples
+├── scripts/                              # Repository maintenance and release verification scripts
+├── build.gradle                          # Gradle build, test, CodeNarc, and distribution config
+├── docker-compose.test.yml               # Java 21 and Java 24 Docker test services
+├── docker-compose.yml                    # Local Jenkins controller setup
+├── VERSION                               # Library version (1.0.0)
+├── LICENSE                               # MIT License
+└── SECURITY.md                           # Security reporting policy
 ```
 
 ## Installation
 
-Load the shared library from this repository in Jenkins, or use its Gradle artifact. Jenkins loads pipeline steps from `vars/` and packaged classes from `src/com/`. Both use the same source tree.
+### 1. Jenkins Global Shared Library
 
-1. **As a dependency in your Gradle/Maven project**:
+Configure this repository under **Manage Jenkins -> System -> Global Trusted Pipeline Libraries** (for example, named `jenkins-script-library`, pointing at `https://github.com/somethingwithproof/jenkins-script-library.git` on `main`). See [config/init.groovy.d/02-global-library.groovy](config/init.groovy.d/02-global-library.groovy) for an automated Groovy init script example.
 
-   ```groovy
-   // In your build.gradle
-   dependencies {
-       implementation 'com.github.thomasvincent:jenkins-script-library:1.0.0'
-   }
-   ```
-
-2. **As individual scripts to run directly in Jenkins**:
-
-   The scripts in `src/com/github/thomasvincent/jenkinsscripts/scripts/` can be executed directly in Jenkins Script Console or through the Jenkins CLI.
-
-## Usage
-
-### Command-line Scripts
-
-All command-line scripts support the `--help` option to display usage information.
-
-#### Job Management
-
-##### Job Cleaning
-
-```bash
-# Clean build history for a job with limit of 50 builds and reset build number
-groovy CleanBuildHistory.groovy --limit 50 --reset my-jenkins-job
-```
-
-##### Job Enabling/Disabling
-
-```bash
-# Disable a specific job
-groovy DisableJobs.groovy my-jenkins-job
-
-# Disable all buildable jobs
-groovy DisableJobs.groovy --all
-
-# Enable a specific job
-groovy EnableJobs.groovy my-jenkins-job
-```
-
-##### Job Migration
-
-The command-line migration entry point stops before changing jobs. The in-process
-`JobMigrator` API requires two distinct Jenkins controller objects.
-
-##### Job Templating
-
-```bash
-# Create a job from a template
-groovy CreateJobFromTemplate.groovy --template-job template-job --target-job new-job --params-file params.json
-```
-
-##### Pipeline Generation
+Load the library at the top of a `Jenkinsfile`:
 
 ```groovy
-// Generate a Jenkinsfile from template
+@Library('jenkins-script-library') _
+```
+
+Jenkins loads callable steps from `vars/`, helper scripts from `resources/`, and Groovy classes from `src/com/` and `src/hudson/`.
+
+### 2. Compiled JAR or Release Archive
+
+GitHub Releases attach verified `jenkins-script-library-<version>.zip`, `.tar.gz`, and `.jar` artifacts. To install the compiled JAR into your local Maven repository from a clone:
+
+```bash
+./gradlew publishToMavenLocal
+```
+
+Then declare the dependency in Gradle:
+
+```groovy
+dependencies {
+    implementation 'com.github.thomasvincent:jenkins-script-library:1.0.0'
+}
+```
+
+### 3. Controller-Side Scripts
+
+Scripts in `src/com/github/thomasvincent/jenkinsscripts/scripts/` can run directly in the Jenkins Script Console or through `jenkins-cli groovy` when the library classes are on the controller classpath.
+
+## Shared Library Pipeline Steps (`vars/`)
+
+Steps under `vars/` confine Jenkins controller objects inside `@NonCPS` helper methods so only plain serializable `Map`, `List`, or `String` values cross Pipeline CPS suspension boundaries. Boolean parameters preserve explicit `false` values (for example `archive: false`, `compress: false`, `dryRun: false`, `includeRecommendations: false`, and `includeUsage: false`).
+
+| Step | Purpose | Key entry points / parameters |
+| --- | --- | --- |
+| `analyzePipelineMetrics` | Collect build and stage metrics, anomalies, and recommendations | `jobName` (defaults to `env.JOB_NAME`), `historyLimit` (default `100`), `includeRecommendations` (default `true`) |
+| `auditPlugins` | Inspect installed plugins and compare against a manifest | `expected` (manifest text; returns `drift`, `missing`, `extra`, `mismatched`) |
+| `auditSecurity` | Audit controller security settings and optionally archive HTML report | `archive` (default `true`), `failOnCritical`, `emailReport` |
+| `backupJenkinsConfig` | Create controller backups and preview or apply selective restores | `destination` or `destinationDir`, `includeJobs`, `includePlugins`, `includeNodes`, `compress`, `archive`; `.restore(backupFile:, files:, dryRun:, listContents:)` |
+| `cloudInventory` | List configured clouds and online cloud agents | No parameters; returns `[clouds: [...], agents: [...]]` |
+| `disableJobs` | Disable a job, regex-matched jobs, or jobs in a folder | `jobName`, `pattern`, `folderPath`, `dryRun`, `recursive` |
+| `exportPrometheusMetrics` | Record build/stage timings and render Prometheus text format | `call(namespace:, subsystem:, histogramBuckets:)`, `.recordBuild(...)`, `.recordStage(...)`, `.summary()`, `.reset()` |
+| `generatePipeline` | Render a Jenkinsfile from a workspace template file or template string | `template`, `parameters`, `destination` |
+| `optimizeCloudCosts` | Estimate agent costs, check budgets, allocate costs, and plan actions | `action` (`analyze`, `optimize`, `allocate`, `budget`) or `.analyze()`, `.optimize(dryRun:)`, `.getAllocations()`, `.checkBudgets(Map)`, `.generateReport()` |
+| `pipelineDSL` | Generate Declarative Pipeline source via Groovy DSL | Closure builder or `.simpleCIPipeline(Map)`, `.javaPipeline()`, `.mavenPipeline()`, `.nodePipeline()`, `.pythonPipeline()`, `.goPipeline()`, `.multiBranchPipeline(Map)` |
+| `provisionSpot` | Preview or submit a single interruptible VM or Kubernetes Pod request | `provider`, `apply` (default `false`), plus provider-specific inputs |
+| `rotateCredentials` | Analyze credential compliance, detect unused credentials, and rotate | `action` (`analyze`, `rotate`, `unused`) or `.analyze(includeUsage:)`, `.rotate(dryRun:, policy:)`, `.findUnused(days:)`, `.checkCompliance()` |
+| `selfHealingAgents` | Start, inspect, trigger, and stop background offline-agent recovery | `.start(config)`, `.stop()`, `.healthCheck()`, `.statistics()`, `.agentStatuses()`, `.isRunning()` |
+| `withSpotAgent` | Run a closure once on an existing agent with verified spot capacity | `provider`, `label` (default `'spot'`), `pool` (required for `kubernetes`) |
+
+### Pipeline Examples
+
+```groovy
+@Library('jenkins-script-library') _
+
+pipeline {
+    agent any
+    stages {
+        stage('Metrics, Security, and Credentials') {
+            steps {
+                script {
+                    def metrics = analyzePipelineMetrics(
+                        jobName: env.JOB_NAME,
+                        historyLimit: 50,
+                        includeRecommendations: false
+                    )
+                    echo "Success rate: ${metrics.summary.successRate}%"
+
+                    def audit = auditSecurity(archive: false, failOnCritical: true)
+                    echo "Critical findings: ${audit.summary.critical}"
+
+                    def rotation = rotateCredentials.rotate(
+                        dryRun: true,
+                        policy: [PASSWORD: 60, API_KEY: 90]
+                    )
+                    echo "Planned rotations: ${rotation.rotated.size()}"
+                }
+            }
+        }
+
+        stage('Jobs, Prometheus, and Recovery') {
+            steps {
+                script {
+                    disableJobs(pattern: 'deprecated-.*', dryRun: true)
+
+                    exportPrometheusMetrics.recordBuild(env.JOB_NAME, 'SUCCESS', 12345L)
+                    String promText = exportPrometheusMetrics(namespace: 'jenkins', subsystem: 'pipeline')
+                    echo "Exported ${promText.readLines().size()} Prometheus lines"
+
+                    selfHealingAgents.start([
+                        maxRetryAttempts: 5,
+                        retryDelayMs: 60000,
+                        healthCheckIntervalMs: 120000
+                    ])
+                    def stats = selfHealingAgents.statistics()
+                    echo "Tracked agents: ${stats.totalAgents ?: 0}"
+                }
+            }
+        }
+    }
+}
+```
+
+Generating a pipeline from a template or Groovy DSL:
+
+```groovy
 generatePipeline(
     template: 'templates/basic-pipeline.jenkinsfile',
     parameters: [project: 'my-app'],
     destination: 'Jenkinsfile'
 )
+
+String generated = pipelineDSL.simpleCIPipeline([
+    language: 'java',
+    deploy: true,
+    deployCommand: './deploy.sh'
+])
 ```
 
-##### Job Analysis
+### Cloud Inventory, Cost Estimates, and Spot Capacity
 
-```bash
-# Analyze job health
-groovy AnalyzeJobHealth.groovy --job my-jenkins-job
+A trusted Pipeline can call `cloudInventory()` to list configured clouds and their agents. Each agent reports its provider, configured cloud name, Jenkins node ID, and online state. Static agents and agents whose configured cloud no longer exists are omitted. Multiple configurations of the same provider remain distinct. Controllers with the optional Google Compute Engine plugin also report GCE agents and configured instance templates.
 
-# Analyze pipeline performance
-groovy AnalyzePipelinePerformance.groovy --job my-pipeline-job --builds 10
+`optimizeCloudCosts.optimize(dryRun: true)` returns planned actions and estimated savings. Setting `dryRun: false` reports a per-action status; the bundled cost providers currently report unsupported operations for direct mutation and record action counts in the build description. Estimated savings are projections based on configured model rates.
 
-# Audit job configurations
-groovy AuditJobConfigurations.groovy --pattern "*.xml" --output audit-report.json
-```
+To request interruptible capacity, call `provisionSpot` from a Unix agent with Python 3.9+ and the relevant authenticated cloud CLI. It supports EC2 Spot, Azure Spot VMs, Google Spot VMs, OCI preemptible instances, and Kubernetes Pods on managed interruptible pools (`eks`, `aks`, `gke`, `oke`). Preview (`apply: false`) is the default. To run a build on existing agents, call `withSpotAgent` outside a `node` block; it verifies the allocated worker's interruptible capacity before invoking the body. See [provisioning inputs](vars/README.md#spot-capacity) and [existing-agent scheduling](vars/README.md#schedule-a-build-on-existing-spot-agents).
 
-#### Node Management
-
-##### Listing Nodes
-
-```bash
-# List all slave nodes
-groovy ListSlaveNodes.groovy --all
-
-# List a specific slave node with detailed information
-groovy ListSlaveNodes.groovy my-slave-node
-
-# List cloud-based nodes
-groovy ListCloudNodes.groovy --cloud-type aws
-```
-
-##### Node Operations
-
-```bash
-# Start all offline slave nodes
-groovy StartOfflineSlaveNodes.groovy --all
-
-# Start a specific offline slave node
-groovy StartOfflineSlaveNodes.groovy my-slave-node
-```
-
-#### Cloud Provider Management
-
-##### AWS Management
-
-```bash
-# List EC2 instances used as Jenkins agents
-groovy ManageEC2Agents.groovy --list
-
-# Provision a new EC2 instance from template
-groovy ManageEC2Agents.groovy --provision --template "my-ec2-template"
-
-# Terminate an EC2 instance
-groovy ManageEC2Agents.groovy --terminate --instance-id i-1234567890abcdef0
-```
-
-##### Azure Management
-
-```bash
-# List Azure VMs used as Jenkins agents
-groovy ManageAzureVMAgents.groovy --list
-
-# Provision a new Azure VM from template
-groovy ManageAzureVMAgents.groovy --provision --template "my-azure-template"
-
-# Clean up an Azure VM
-groovy ManageAzureVMAgents.groovy --cleanup --node-name azure-agent-01
-```
-
-##### Kubernetes Management
-
-```bash
-# List Kubernetes pods used as Jenkins agents
-groovy ManageKubernetesAgents.groovy --list
-
-# Provision a new Kubernetes pod from template
-groovy ManageKubernetesAgents.groovy --provision --template "my-k8s-template"
-
-# Delete a Kubernetes pod
-groovy ManageKubernetesAgents.groovy --delete --pod-name k8s-agent-xyz123
-```
-
-#### Jenkins Instance Management
-
-##### Health and Security
-
-```bash
-# Perform a Jenkins instance health check
-groovy JenkinsInstanceHealthCheck.groovy
-
-# Audit Jenkins security settings
-groovy AuditJenkinsSecurity.groovy --detailed
-
-# Scan for security vulnerabilities
-groovy SecurityVulnerabilityScan.groovy --critical-only
-```
-
-##### Configuration Management
-
-```bash
-# Backup Jenkins configuration
-groovy BackupJenkinsConfig.groovy --destination /var/backups/jenkins
-
-# Optimize agent resources
-groovy OptimizeAgentResources.groovy --reclaim-idle
-
-# Optimize job scheduling
-groovy OptimizeJobScheduling.groovy --balance-load
-```
-
-### Programmatic API
-
-The library also provides a programmatic API for use in your own Groovy scripts:
-
-#### Job Management
-
-```groovy
-import com.github.thomasvincent.jenkinsscripts.jobs.JobCleaner
-import com.github.thomasvincent.jenkinsscripts.jobs.JobTemplate
-import jenkins.model.Jenkins
-
-// Clean build history for a job
-def jenkins = Jenkins.get()
-def cleaner = new JobCleaner(jenkins, "my-job", true, 100)
-cleaner.clean()
-
-// Create a job from a template
-def template = new JobTemplate(
-    jenkins: jenkins,
-    templateJobName: "template-job",
-    parameters: [
-        'PROJECT_NAME': 'frontend-app',
-        'GIT_URL': 'https://github.com/myorg/frontend-app.git'
-    ]
-)
-template.applyTemplate("new-job")
-```
-
-#### Cloud Management
-
-```groovy
-import com.github.thomasvincent.jenkinsscripts.cloud.AWSNodeManager
-import com.github.thomasvincent.jenkinsscripts.cloud.AzureNodeManager
-import com.github.thomasvincent.jenkinsscripts.cloud.KubernetesNodeManager
-import com.github.thomasvincent.jenkinsscripts.cloud.OracleCloudNodeManager
-import jenkins.model.Jenkins
-
-// Manage EC2 instances
-def awsManager = new AWSNodeManager(Jenkins.get())
-def templates = awsManager.getEC2Templates()
-def nodes = awsManager.getEC2Nodes()
-awsManager.provisionNewInstance("my-ec2-template")
-
-// Manage Azure VMs
-def azureManager = new AzureNodeManager(Jenkins.get())
-def azureNodes = azureManager.getAzureNodesInfo()
-azureManager.provisionNewVM("my-azure-template")
-
-// Manage Kubernetes agents
-def k8sManager = new KubernetesNodeManager(Jenkins.get())
-def k8sNodes = k8sManager.getKubernetesNodes()
-k8sManager.provisionNewPod("my-k8s-template")
-
-// Manage Oracle Cloud instances
-def ociManager = new OracleCloudNodeManager(Jenkins.get())
-def ociNodes = ociManager.getOCIComputeInstances()
-ociManager.provisionNewInstance("my-oci-template")
-
-```
-
-### Cloud inventory and cost estimates
-
-A trusted Pipeline can call `cloudInventory()` to list configured clouds and their
-agents. Each agent has a provider, the configured cloud name, its Jenkins node ID,
-and its online state. Static agents and agents whose configured cloud is gone
-are omitted. Multiple configurations of the same provider remain distinct. Controllers with the optional
-Google Compute Engine plugin also report GCE agents and configured instance templates.
-
-`optimizeCloudCosts.optimize(dryRun: true)` returns planned actions and estimated
-savings. An apply request reports a status for each action. The bundled cost
-providers currently report unsupported operations. The build description reports
-action counts. Estimated savings are projections based on configured model rates.
-
-To request interruptible capacity, call `provisionSpot` from a Pipeline agent.
-It supports EC2 Spot, Azure Spot VMs, Google Spot VMs, OCI preemptible instances
-and Kubernetes Pods on managed interruptible pools. Preview is the default.
-To run a build on agents you already have, use `withSpotAgent`. It verifies the
-allocated worker's interruptible capacity before running your build steps.
-See [provisioning inputs](vars/README.md#spot-capacity) and
-[existing-agent scheduling](vars/README.md#schedule-a-build-on-existing-spot-agents).
-
-### Controller operations from a trusted Pipeline
+### Controller Operations from a Trusted Pipeline
 
 ```groovy
 def inventory = auditPlugins(expected: readFile('config/plugins.txt'))
@@ -324,102 +218,340 @@ if (inventory.drift) {
     error "Plugin drift: missing=${inventory.missing}, extra=${inventory.extra}, mismatched=${inventory.mismatched}"
 }
 
+String backupPath = backupJenkinsConfig(
+    destinationDir: '/var/backups/jenkins',
+    includeJobs: true,
+    includePlugins: true,
+    includeNodes: true,
+    compress: true,
+    archive: false
+)
+
 def entries = backupJenkinsConfig.restore(
-    backupFile: '/var/backups/jenkins/snapshot.zip', files: ['jobs/team/'], dryRun: true
+    backupFile: backupPath,
+    files: ['jobs/team/'],
+    dryRun: true
 )
 echo "Selected ${entries.size()} entries"
 ```
 
-`auditPlugins()` returns a read-only inventory. The expected manifest accepts plugin
-IDs, `id:latest` and `id:version`. The controller-side `AuditPlugins.groovy` script
-accepts `--expected` and `--format json` for automation. A comparison with drift
-fails the command after printing the report.
+`auditPlugins()` returns a read-only inventory. The expected manifest accepts plugin IDs, `id:latest`, and `id:version`. The controller-side `AuditPlugins.groovy` script accepts `--expected` and `--format json` and exits non-zero when drift is found.
 
-Use `BackupJenkinsConfig.groovy --restore ARCHIVE --list-contents` to inspect a
-backup and `--files config.xml,jobs/team/ --dry-run` to preview a selection.
-Omit the preview flags to apply it. ZIPs and directory backups are supported.
-Originals of changed files are saved under a private recovery directory in
-`JENKINS_HOME`. Reviewing and reloading the restored configuration is a separate
-administrator action. Archive and restore paths refer to the controller filesystem.
+For Pipeline backups, `destination` selects the exact output file or directory and `destinationDir` selects the parent directory for generated names (default: `JENKINS_HOME/backups`). Originals of files overwritten during a non-dry-run restore are saved under a private recovery directory in `JENKINS_HOME`; reloading restored configuration is a separate administrator action. See [backup options and artifact access](vars/README.md#controller-administration).
 
-For Pipeline backups, `destination` selects the exact output and `destinationDir`
-selects the parent for generated names. The default is `JENKINS_HOME/backups`.
-See [backup options and artifact access](vars/README.md#controller-administration).
+## Command-Line and Script Console Entry Points
 
-## Development
+The 28 scripts under `src/com/github/thomasvincent/jenkinsscripts/scripts/` support `--help` (or `-h`) to print usage. Commands below assume the compiled library JAR and Jenkins runtime classpath are available (for example via `jenkins-cli groovy` on the controller).
 
-### Building the Project
+### Job Management
 
 ```bash
-./gradlew build
+# Clean up to 50 builds and reset the build number to 1
+groovy CleanBuildHistory.groovy --limit 50 --reset my-jenkins-job
+
+# Disable a specific job or all buildable jobs
+groovy DisableJobs.groovy my-jenkins-job
+groovy DisableJobs.groovy --all
+
+# Preview disabling jobs matching a regex pattern
+groovy DisableJobTriggers.groovy --pattern "test-.*" --dry-run
+
+# Copy a job with a dry run
+groovy CopyJob.groovy -s Folder/source-job -n new-job --dryRun
+
+# Create a job from an existing template job with parameters
+groovy CreateJobFromTemplate.groovy \
+  --template-job template-job \
+  --job new-job \
+  --param PROJECT_NAME=frontend \
+  --param GIT_URL=https://github.com/myorg/frontend.git
+
+# Or batch-create jobs from a JSON definition file
+groovy CreateJobFromTemplate.groovy --template-job template-job --jobs-file jobs.json
+
+# Archive a job with metadata
+groovy ArchiveJobs.groovy --job old-job --reason "Retired" --archive-dir /var/jenkins_archives
+
+# Analyze job health and pipeline performance
+groovy AnalyzeJobHealth.groovy --job my-jenkins-job
+groovy AnalyzePipelinePerformance.groovy --job my-pipeline-job --builds 10
+groovy AnalyzePipelineMetrics.groovy my-pipeline-job 50 summary
+
+# Audit job configurations matching a job-name pattern as JSON
+groovy AuditJobConfigurations.groovy --pattern "deploy.*" --json --output audit-report.json
+
+# Detect circular dependencies or export a Graphviz DOT diagram
+groovy ManageJobDependencies.groovy --circular
+groovy ManageJobDependencies.groovy --diagram --output dependencies.dot
+
+# Inventory job parameters across jobs
+groovy ManageJobParameters.groovy --inventory --json
 ```
 
-### Running Tests
+**Job migration note:** `MigrateJobs.groovy` stops with an `AbortException` without modifying jobs because a remote URL cannot supply the second in-process `Jenkins` controller object required by `JobMigrator`.
+
+### Node and Cloud Management
 
 ```bash
-# Run unit tests
+# List static/agent nodes or start offline nodes
+groovy ListSlaveNodes.groovy --all
+groovy ListSlaveNodes.groovy --json my-slave-node
+groovy StartOfflineSlaveNodes.groovy --all
+groovy StartOfflineSlaveNodes.groovy my-slave-node
+
+# List cloud nodes by provider or summary statistics
+groovy ListCloudNodes.groovy --aws
+groovy ListCloudNodes.groovy --kubernetes --json
+groovy ListCloudNodes.groovy --stats
+
+# AWS EC2 agents
+groovy ManageEC2Agents.groovy --list
+groovy ManageEC2Agents.groovy --provision "my-ec2-template"
+groovy ManageEC2Agents.groovy --terminate i-1234567890abcdef0
+
+# Azure VM agents
+groovy ManageAzureVMAgents.groovy --list
+groovy ManageAzureVMAgents.groovy --provision "my-azure-template"
+groovy ManageAzureVMAgents.groovy --cleanup azure-agent-01
+
+# Kubernetes pod agents
+groovy ManageKubernetesAgents.groovy --list
+groovy ManageKubernetesAgents.groovy --provision "my-k8s-template"
+groovy ManageKubernetesAgents.groovy --terminate jenkins-agent-xyz123
+
+# Helm tool installations
+groovy ManageHelmInstallation.groovy --list
+groovy ManageHelmInstallation.groovy --version 3.14.0
+```
+
+### Security, Credentials, Backup, and Scheduling
+
+```bash
+# Audit Jenkins security settings and export HTML
+groovy AuditJenkinsSecurity.groovy --format html --output security-report.html
+groovy AuditJenkinsSecurity.groovy --categories authentication,csrf,agents
+
+# Compare installed plugins against a manifest
+groovy AuditPlugins.groovy --expected config/plugins.txt --format json
+
+# Scan specific security areas at a minimum severity threshold
+groovy SecurityVulnerabilityScan.groovy --areas plugins,credentials,scripts --severity critical --detailed
+
+# Analyze, preview rotation, or find unused credentials
+groovy ManageCredentials.groovy analyze --include-usage
+groovy ManageCredentials.groovy rotate --dry-run
+groovy ManageCredentials.groovy unused --days 60
+
+# Back up Jenkins configuration and retain the 5 newest archives
+groovy BackupJenkinsConfig.groovy --destination /var/backups/jenkins --keep 5
+
+# Inspect or preview a selective restore from a ZIP or directory backup
+groovy BackupJenkinsConfig.groovy --restore /var/backups/jenkins/snapshot.zip --list-contents
+groovy BackupJenkinsConfig.groovy --restore /var/backups/jenkins/snapshot.zip --files config.xml,jobs/team/ --dry-run
+
+# Analyze or dry-run cloud agent scaling and cost optimization
+groovy OptimizeAgentResources.groovy --analyze --json
+groovy OptimizeAgentResources.groovy --scale --provider aws --min 2 --max 10 --dry-run
+groovy OptimizeCloudCosts.groovy analyze --include-allocations
+groovy OptimizeCloudCosts.groovy optimize --dry-run
+
+# Analyze build queue load or throttle concurrent builds for a job
+groovy OptimizeJobScheduling.groovy --analyze
+groovy OptimizeJobScheduling.groovy --throttle-job my-job --max 3
+groovy OptimizeJobScheduling.groovy --recommendations
+```
+
+## Programmatic Groovy API
+
+The packaged classes under `src/com/github/thomasvincent/jenkinsscripts/` can be imported directly in Jenkins Script Console scripts, init hooks, or custom Groovy tooling.
+
+### Jobs and Dependencies
+
+```groovy
+import com.github.thomasvincent.jenkinsscripts.jobs.JobCleaner
+import com.github.thomasvincent.jenkinsscripts.jobs.JobDependencyManager
+import com.github.thomasvincent.jenkinsscripts.jobs.JobTemplate
+import jenkins.model.Jenkins
+
+def jenkins = Jenkins.get()
+
+// Clean up to 100 builds (25-job folder recursion cap) and reset build number to 1
+def cleaner = new JobCleaner(jenkins, 'my-job', true, 25, 100)
+cleaner.clean()
+
+// Create a job from an existing template job (templateXml = null loads from templateJobName)
+def template = new JobTemplate(
+    jenkins,
+    null,
+    'template-job',
+    [
+        PROJECT_NAME: 'frontend-app',
+        GIT_URL: 'https://github.com/myorg/frontend-app.git'
+    ]
+)
+template.applyTemplate('new-job')
+
+// Inspect job dependencies and detect cycles
+def depManager = new JobDependencyManager(jenkins)
+List<List<String>> cycles = depManager.findCircularDependencies()
+List<String> orphaned = depManager.findOrphanedJobs()
+```
+
+### Cloud Agents and Inventory
+
+```groovy
+import com.github.thomasvincent.jenkinsscripts.cloud.AWSNodeManager
+import com.github.thomasvincent.jenkinsscripts.cloud.AzureNodeManager
+import com.github.thomasvincent.jenkinsscripts.cloud.CloudInventory
+import com.github.thomasvincent.jenkinsscripts.cloud.KubernetesNodeManager
+import com.github.thomasvincent.jenkinsscripts.cloud.OracleCloudNodeManager
+import jenkins.model.Jenkins
+
+def jenkins = Jenkins.get()
+
+// Inventory all configured clouds and active cloud agents
+Map inventory = new CloudInventory().inspect(jenkins)
+
+// AWS EC2
+def awsManager = new AWSNodeManager(jenkins)
+def ec2Templates = awsManager.getEC2Templates()
+def ec2Nodes = awsManager.getEC2Nodes()
+awsManager.provisionNewInstance('my-ec2-template')
+
+// Azure VMs
+def azureManager = new AzureNodeManager(jenkins)
+def azureNodes = azureManager.getAzureNodesInfo()
+azureManager.provisionNewVM('my-azure-template')
+
+// Kubernetes pods
+def k8sManager = new KubernetesNodeManager(jenkins)
+def k8sNodes = k8sManager.getKubernetesNodes()
+k8sManager.provisionNewPod('my-k8s-template')
+
+// Oracle Cloud Infrastructure
+def ociManager = new OracleCloudNodeManager(jenkins)
+def ociNodes = ociManager.getOracleCloudNodes()
+def ociTemplates = ociManager.getOracleCloudTemplates()
+ociManager.provisionNewInstance('my-oci-template')
+```
+
+### Backups, Cost Analysis, Monitoring, Recovery, and Error Handling
+
+```groovy
+import com.github.thomasvincent.jenkinsscripts.config.JenkinsConfigBackup
+import com.github.thomasvincent.jenkinsscripts.cost.CloudCostOptimizer
+import com.github.thomasvincent.jenkinsscripts.healing.SelfHealingAgentManager
+import com.github.thomasvincent.jenkinsscripts.monitoring.PrometheusMetricsExporter
+import com.github.thomasvincent.jenkinsscripts.util.ErrorHandler
+import java.util.logging.Logger
+import jenkins.model.Jenkins
+
+def jenkins = Jenkins.get()
+def logger = Logger.getLogger('jenkins-ops')
+
+// Controller backup and dry-run restore preview
+def backup = new JenkinsConfigBackup(jenkins)
+String archivePath = backup.performBackup('/var/backups/jenkins', true, true, true, true, true)
+Map preview = backup.restore(archivePath, [files: ['config.xml'], dryRun: true])
+
+// Cost analysis and optimization planning
+def costOptimizer = new CloudCostOptimizer(jenkins)
+Map costReport = costOptimizer.analyzeCosts()
+Map plan = costOptimizer.optimizeResources(true)
+
+// Self-healing agent manager
+def healer = new SelfHealingAgentManager([maxRetryAttempts: 5, healthCheckIntervalMs: 120000], jenkins)
+healer.start()
+Map healingStats = healer.getStatistics()
+healer.stop()
+
+// Prometheus metrics export
+def exporter = new PrometheusMetricsExporter('jenkins', 'pipeline', 10)
+exporter.recordBuildCompletion('my-job', 'SUCCESS', 12345L)
+String metricsText = exporter.exportMetrics()
+
+// Static error handling helper (an instance-based ErrorHandler also exists in ...jenkinsscripts.utils)
+def safeResult = ErrorHandler.withErrorHandling('load job count', {
+    jenkins.getAllItems().size()
+}, logger, 0)
+```
+
+## Cloud Provider Support
+
+| Provider | `CloudInventory` | `CloudNodesManager` subclass | `provisionSpot` | `withSpotAgent` |
+| --- | --- | --- | --- | --- |
+| AWS (EC2) | Available | `AWSNodeManager` | Available (EC2 Spot) | Available (IMDSv2) |
+| Azure (VMs) | Available | `AzureNodeManager` | Available (Spot VMs) | Available (IMDS) |
+| Kubernetes | Available | `KubernetesNodeManager` | Available (`eks`, `aks`, `gke`, `oke`) | Available (Pod UID + worker label) |
+| Oracle Cloud (OCI) | Available | `OracleCloudNodeManager` | Available (preemptible instances) | Available (OCI metadata + CLI) |
+| Google Cloud (GCP) | Available (optional GCE plugin) | Planned | Available (GCE Spot VMs) | Available (GCE metadata) |
+
+Planned work not yet implemented:
+
+- Dedicated GCP `CloudNodesManager` subclass for GCE node lifecycle management outside `provisionSpot`.
+- AWS ECS/Fargate container-agent management.
+- Direct cloud-provider mutation backends for `CloudCostOptimizer.optimizeResources(false)`.
+
+## Development, Testing, and Releases
+
+### Requirements
+
+- **Java 21** (CI baseline; the unit test suite is also tested on **Java 24** in Docker)
+- **Gradle 8.14.2** (bundled via `./gradlew`)
+- **Python 3.9+** (required for `testSpotRequests`, `verifyRelease`, and `provisionSpot` / `withSpotAgent` execution)
+
+### Gradle Commands
+
+```bash
+# Clean, compile all 69 Groovy source files, run 226 Spock unit tests, and run CodeNarc
+./gradlew clean check
+
+# Compile and assemble JAR + ZIP/TAR.GZ distributions without running tests
+./gradlew build -x test
+
+# Run Spock unit tests only
 ./gradlew test
 
-# Run controller operations against a temporary Jenkins home
+# Run Python spot tests and Jenkins controller acceptance tests (Jenkins LTS 2.590)
 ./gradlew integrationTest
 
-# Run all configured checks
-./gradlew check
+# Run CodeNarc static analysis reports (HTML reports under build/reports/codenarc/)
+./gradlew codenarcMain codenarcTest
+
+# Assemble and verify versioned release distributions (.zip, .tar.gz) and JAR
+./gradlew verifyRelease -PreleaseTag=v1.0.0
 ```
 
-> **Note**: There's a known issue with the JFFI native dependency (jffi-1.2.17-native.jar) that may cause test failures. If you encounter this, you can skip tests with:
->
-> ```bash
-> ./gradlew build -x test
-> ```
->
-> The GitHub Actions tests are currently configured to skip problematic tests.
+`codenarc` is configured with `ignoreFailures = true` in [build.gradle](build.gradle) so lint findings produce HTML reports without blocking compilation.
 
-#### Docker Testing Environment
+### Docker Testing and Local Jenkins Environment
 
-The Compose services run the Gradle test suite on Java 21 and Java 24.
+Run the Gradle unit test suite inside pinned JDK containers using [docker-compose.test.yml](docker-compose.test.yml):
 
-[`java24`](Dockerfile.test) → `eclipse-temurin:24-jdk`
+- `java24` ([Dockerfile.test](Dockerfile.test)): `eclipse-temurin:24-jdk` with Gradle 8.14.2
+- `java21` ([Dockerfile.java21](Dockerfile.java21)): `eclipse-temurin:21-jdk` with Gradle 8.14.2
 
-[`java21`](Dockerfile.java21) → `eclipse-temurin:21-jdk`
-
-```sh
+```bash
 docker compose -f docker-compose.test.yml run --rm java24
 docker compose -f docker-compose.test.yml run --rm java21
 ```
 
-### Code Quality
+A `java17` service alias remains under the `legacy` Compose profile pointing to the `java24` definition for backwards compatibility with older invocations.
 
-This project uses CodeNarc for Groovy code quality checks:
+To start a local Jenkins controller with the library mounted read-only (exposed at `http://localhost:8080/jenkins` and agent port `50000`) using [docker-compose.yml](docker-compose.yml):
 
 ```bash
-./gradlew codenarcMain codenarcTest
+docker compose up -d
 ```
-
-## Available Cloud Integrations
-
-The library supports the following cloud providers:
-
-- **AWS EC2**: Manage EC2 instances as Jenkins agents
-- **Azure VMs**: Manage Azure virtual machines as Jenkins agents
-- **Kubernetes**: Manage Kubernetes pods as Jenkins agents
-- **Oracle Cloud**: Manage Oracle Cloud Infrastructure (OCI) instances as Jenkins agents
-
-## Upcoming Features
-
-- **Google Cloud Integration**: Manage Jenkins agents on Google Cloud Platform
-- **AWS ECS/Fargate Support**: Support for container-based agents in AWS
-- **Multi-Jenkins Management**: Enhanced tools for managing multiple Jenkins instances
-- **Cross-Cloud Migration**: Tools for migrating agents between cloud providers
 
 ## Contributing
 
-Contributions are welcome! Please follow our [Contributing Guidelines](CONTRIBUTING.md).
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request, and sign off commits with `git commit -s` for DCO verification.
 
 ## Security
 
-For security concerns, please review our [Security Policy](SECURITY.md).
+Report security vulnerabilities privately following [SECURITY.md](SECURITY.md). Do not open public issues for unpatched security flaws.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
