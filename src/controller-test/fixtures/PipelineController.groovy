@@ -73,6 +73,7 @@ void afterRestart() {
     run.getAction(InputAction).getExecution('Resume').proceed(null)
     rule.assertBuildStatusSuccess(rule.waitForCompletion(run))
     rule.assertLogContains('Inventory survived restart', run)
-    new GroovyShell(rule.jenkins.pluginManager.uberClassLoader, binding)
-        .evaluate(new File(project, 'src/controller-test/fixtures/CloudOwnership.groovy'))
+    def shell = new GroovyShell(rule.jenkins.pluginManager.uberClassLoader, binding)
+    shell.evaluate(new File(project, 'src/controller-test/fixtures/SpotScheduling.groovy'))
+    shell.evaluate(new File(project, 'src/controller-test/fixtures/CloudOwnership.groovy'))
 }

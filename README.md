@@ -311,7 +311,10 @@ action counts. Estimated savings are projections based on configured model rates
 To request interruptible capacity, call `provisionSpot` from a Pipeline agent.
 It supports EC2 Spot, Azure Spot VMs, Google Spot VMs, OCI preemptible instances
 and Kubernetes Pods on managed interruptible pools. Preview is the default.
-See [provider inputs and submission examples](vars/README.md#spot-capacity).
+To run a build on agents you already have, use `withSpotAgent`. It verifies the
+allocated worker's interruptible capacity before running your build steps.
+See [provisioning inputs](vars/README.md#spot-capacity) and
+[existing-agent scheduling](vars/README.md#schedule-a-build-on-existing-spot-agents).
 
 ### Controller operations from a trusted Pipeline
 

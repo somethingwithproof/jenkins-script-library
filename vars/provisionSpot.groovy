@@ -16,6 +16,7 @@ def call(Map options = [:]) {
         try {
             sh 'chmod 700 .'
             writeFile file: 'provision.py', text: libraryResource('com/github/thomasvincent/jenkinsscripts/cloud/provision_spot.py')
+            writeFile file: 'spot_pools.json', text: libraryResource('com/github/thomasvincent/jenkinsscripts/cloud/spot_pools.json')
             writeFile file: 'request.json', text: JsonOutput.toJson(config)
             String command = apply ? 'python3 provision.py request.json --apply' : 'python3 provision.py request.json'
             result = sh(script: command, returnStdout: true).trim()

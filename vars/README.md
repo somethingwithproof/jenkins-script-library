@@ -113,3 +113,34 @@ Use a stable request ID or resource name for the same logical request. After an
 ambiguous provider response, check that target before retrying. Actual cloud
 charges depend on the resource lifecycle and the provider's bill. Existing agents
 are neither replaced nor terminated by this step.
+
+### Schedule a build on existing spot agents
+
+Call `withSpotAgent` outside an agent allocation. Its `label` option is a Jenkins
+label expression and defaults to `spot`. The step takes a snapshot of online,
+task-accepting agents matching that expression and queues work by their node names.
+A busy candidate can wait in the Jenkins queue. An enclosing Pipeline timeout
+can bound that wait and the build together.
+
+```groovy
+timeout(time: 30, unit: 'MINUTES') {
+    withSpotAgent(provider: 'aws', label: 'linux && spot') {
+        checkout scm
+        sh './gradlew test'
+    }
+}
+```
+
+The step checks capacity on the allocated Unix agent before invoking the body.
+It skips candidates whose capacity is regular or cannot be verified, and fails
+if it exhausts the candidate set. The body runs once and its return value, errors,
+and interruptions propagate to the caller. Handle retrying interrupted builds
+in the calling Pipeline, according to whether its workload can safely be repeated.
+
+| Provider | Agent verification requirements |
+| --- | --- |
+| `aws` | Python 3 and EC2 IMDSv2 access to the instance lifecycle field. |
+| `azure` | Python 3 and Azure Instance Metadata Service access to the VM priority field. |
+| `gcp` | Python 3 and Compute Engine metadata access to the VM preemptible scheduling flag. |
+| `oracle` | Python 3, OCI instance metadata, and an authenticated OCI CLI with permission to read the current instance. The instance OCID and region come from metadata. |
+| `kubernetes` | Python 3 and kubectl with permission to get the agent Pod and its worker Node. Set `pool` to `eks`, `aks`, `gke` or `oke`. Expose `POD_NAME`, `POD_NAMESPACE` and `POD_UID` from `metadata.name`, `metadata.namespace` and `metadata.uid` via the Downward API. The verifier checks that the Pod UID matches and reads the capacity label on its assigned worker. |

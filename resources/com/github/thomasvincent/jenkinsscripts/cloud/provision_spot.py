@@ -11,12 +11,7 @@ import sys
 import tempfile
 
 
-POOL_SELECTORS = {
-    "eks": ("eks.amazonaws.com/capacityType", "SPOT"),
-    "gke": ("cloud.google.com/gke-spot", "true"),
-    "aks": ("kubernetes.azure.com/scalesetpriority", "spot"),
-    "oke": ("oci.oraclecloud.com/oke-is-preemptible", "true"),
-}
+POOL_SELECTORS = json.loads(Path(__file__).with_name("spot_pools.json").read_text(encoding="utf-8"))
 
 
 def identifier(config, key):
