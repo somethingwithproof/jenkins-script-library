@@ -5,8 +5,13 @@ name: Release
 
 on:
   release:
-    types: [created]
-  workflow_dispatch: # Allow manual execution
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Version tag for a build rehearsal (e.g. v1.2.3)'
+        required: true
+        type: string
 
 # Cancel previous runs on the same PR
 concurrency:
@@ -19,7 +24,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      packages: write
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
 
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -35,25 +41,24 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    - name: Build with Gradle
-      run: ./gradlew clean build -x test
+    - name: Build and verify release artifacts
+      run: ./gradlew clean build verifyRelease -x test "-PreleaseTag=$RELEASE_TAG"
 
-    - name: Build distributions
-      run: ./gradlew assembleDist
-
-    - name: Upload Release Asset
-      uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3
-      with:
-        files: |
-          build/distributions/jenkins-script-library-*.zip
-          build/distributions/jenkins-script-library-*.tar.gz
-          build/libs/jenkins-script-library-*.jar
-
-    - name: Build and push Docker image
+    - name: Build Docker image
       uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
       with:
         context: .
         push: false
         tags: |
           jenkins-script-library:latest
-          jenkins-script-library:${{ github.event.release.tag_name }}
+          jenkins-script-library:${{ env.RELEASE_TAG }}
+
+    - name: Upload Release Asset
+      if: github.event_name == 'release'
+      uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3
+      with:
+        fail_on_unmatched_files: true
+        files: |
+          build/distributions/jenkins-script-library-*.zip
+          build/distributions/jenkins-script-library-*.tar.gz
+          build/libs/jenkins-script-library-*.jar
