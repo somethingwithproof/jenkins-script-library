@@ -14,7 +14,7 @@ void beforeRestart() {
     library.defaultVersion = 'main'
     GlobalLibraries.get().libraries = [library]
 
-    ['Jenkinsfile', 'templates/basic-pipeline.jenkinsfile', 'examples/advanced-pipeline.jenkinsfile'].each { name ->
+    ['Jenkinsfile', 'templates/basic-pipeline.jenkinsfile', 'examples/advanced-pipeline.jenkinsfile', 'examples/Jenkinsfile'].each { name ->
         assert Converter.scriptToPipelineDef(new File(project, name).getText('UTF-8')) != null : name
     }
 

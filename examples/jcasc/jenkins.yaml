@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Thomas Vincent <thomasvincent@gmail.com>
+# SPDX-License-Identifier: MIT
+#
+# Declarative Jenkins Configuration as Code (JCasC) example for registering
+# jenkins-script-library as a Global Trusted Pipeline Library.
+#
+# Load via CASC_JENKINS_CONFIG=/var/jenkins_home/casc_configs/jenkins.yaml
+# with the configuration-as-code and pipeline-groovy-lib plugins installed.
+
+unclassified:
+  globalLibraries:
+    libraries:
+      - name: "jenkins-script-library"
+        defaultVersion: "v1.0.0"
+        implicit: false
+        allowVersionOverride: true
+        includeInChangesets: false
+        retriever:
+          modernSCM:
+            scm:
+              git:
+                remote: "https://github.com/somethingwithproof/jenkins-script-library.git"
+                traits:
+                  - gitBranchDiscovery
+                  - gitTagDiscovery

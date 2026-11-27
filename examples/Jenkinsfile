@@ -1,0 +1,65 @@
+// SPDX-FileCopyrightText: 2026 Thomas Vincent <thomasvincent@gmail.com>
+// SPDX-License-Identifier: MIT
+
+@Library('jenkins-script-library') _
+
+pipeline {
+    agent any
+
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        timeout(time: 30, unit: 'MINUTES')
+        timestamps()
+    }
+
+    parameters {
+        string(name: 'HELM_RELEASE', defaultValue: 'sample-service', description: 'Helm release name')
+        string(name: 'HELM_CHART', defaultValue: './charts/sample-service', description: 'Path to Helm chart')
+        string(name: 'K8S_NAMESPACE', defaultValue: 'staging', description: 'Target Kubernetes namespace')
+        booleanParam(name: 'DRY_RUN', defaultValue: true, description: 'Preview Helm upgrade without applying')
+    }
+
+    stages {
+        stage('Generate Pipeline Template') {
+            steps {
+                script {
+                    String preview = generatePipeline(
+                        template: 'templates/basic-pipeline.jenkinsfile',
+                        parameters: [project: params.HELM_RELEASE]
+                    )
+                    echo "Rendered ${preview.readLines().size()} lines from template"
+                }
+            }
+        }
+
+        stage('Lint and Deploy with Helm') {
+            steps {
+                script {
+                    def deployment = helmDeploy(
+                        release: params.HELM_RELEASE,
+                        chart: params.HELM_CHART,
+                        namespace: params.K8S_NAMESPACE,
+                        lint: true,
+                        dryRun: params.DRY_RUN,
+                        atomic: true,
+                        wait: true,
+                        timeout: '5m'
+                    )
+                    echo "Helm deployment status: ${deployment.status}"
+                }
+            }
+        }
+
+        stage('Export Build Metrics') {
+            steps {
+                script {
+                    exportPrometheusMetrics.recordStage(env.JOB_NAME ?: 'sample', 'Lint and Deploy with Helm', 2500L, true)
+                    exportPrometheusMetrics.recordBuild(env.JOB_NAME ?: 'sample', currentBuild.currentResult ?: 'SUCCESS', 5000L)
+                    String metrics = exportPrometheusMetrics()
+                    writeFile file: 'build-metrics.prom', text: metrics
+                    archiveArtifacts artifacts: 'build-metrics.prom', fingerprint: true
+                }
+            }
+        }
+    }
+}
