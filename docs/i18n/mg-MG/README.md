@@ -269,7 +269,6 @@ import com.github.thomasvincent.jenkinsscripts.cloud.AWSNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.AzureNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.KubernetesNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.OracleCloudNodeManager
-import com.github.thomasvincent.jenkinsscripts.cloud.DigitalOceanNodeManager
 import jenkins.model.Jenkins
 
 // Manage EC2 instances
@@ -293,10 +292,6 @@ def ociManager = new OracleCloudNodeManager(Jenkins.get())
 def ociNodes = ociManager.getOCIComputeInstances()
 ociManager.provisionNewInstance("my-oci-template")
 
-// Manage DigitalOcean droplets
-def doManager = new DigitalOceanNodeManager(Jenkins.get())
-def doNodes = doManager.getDigitalOceanNodes()
-doManager.provisionNewDroplet("my-do-template")
 ```
 
 ## Fampandrosoana
@@ -352,7 +347,6 @@ Manohana ireto mpanome rahona ireto ity tranomboky ity:
 - **Azure VMs**: Mitantana milina virtoaly Azure ho mpiasa Jenkins
 - **Kubernetes**: Mitantana pod Kubernetes ho mpiasa Jenkins
 - **Oracle Cloud**: Mitantana tranga Oracle Cloud Infrastructure (OCI) ho mpiasa Jenkins
-- **DigitalOcean**: Mitantana droplet DigitalOcean ho mpiasa Jenkins
 
 ## Endri-javatra ho avy
 

@@ -31,14 +31,14 @@ import jenkins.model.Jenkins
 
 /**
  * Pipeline step for cloud cost optimization across multiple providers.
- * 
+ *
  * This step provides Jenkins Pipeline integration for cloud cost analysis,
  * optimization recommendations, and budget monitoring.
- * 
+ *
  * Usage in Pipeline:
- * 
+ *
  * @Library('jenkins-script-library') _
- * 
+ *
  * pipeline {
  *     agent any
  *     triggers {
@@ -52,23 +52,23 @@ import jenkins.model.Jenkins
  *                     // Analyze current costs
  *                     def costs = optimizeCloudCosts.analyze()
  *                     echo "Total monthly cost: \$${costs.totalCost.monthly}"
- *                     
+ *
  *                     // Check for savings opportunities
  *                     if (costs.savings.total > 100) {
  *                         echo "Potential savings: \$${costs.savings.monthlyTotal}/month"
- *                         
+ *
  *                         // Apply optimizations (with safety check)
  *                         def optimized = optimizeCloudCosts.optimize(dryRun: false)
- *                         echo "Applied ${optimized.actions.size()} optimizations"
+ *                         echo "Applied ${optimized.counts.applied} optimizations"
  *                     }
- *                     
+ *
  *                     // Monitor budgets
  *                     def budgets = optimizeCloudCosts.checkBudgets([
  *                         'total': 5000,
  *                         'team:platform': 2000,
  *                         'team:apps': 3000
  *                     ])
- *                     
+ *
  *                     budgets.alerts.each { alert ->
  *                         if (alert.severity == 'HIGH') {
  *                             error "Budget alert: ${alert.message}"
@@ -112,7 +112,7 @@ def call(Map args = [:]) {
             case 'optimize':
                 boolean dryRun = args.dryRun != false
 
-                echo "[optimizeCloudCosts] ${dryRun ? 'Finding' : 'Applying'} cost optimizations..."
+                echo "[optimizeCloudCosts] ${dryRun ? 'Planning' : 'Checking provider support for'} cost optimizations..."
                 Map results = optimizeResourcesNonCps(dryRun)
 
                 echo "[optimizeCloudCosts] Optimization results:"
@@ -120,7 +120,7 @@ def call(Map args = [:]) {
                 echo "  Estimated savings: \$${formatCurrency(results.estimatedMonthlySavings)}/month"
 
                 if (!dryRun) {
-                    currentBuild.description = "Saved \$${formatCurrency(results.estimatedMonthlySavings)}/month"
+                    currentBuild.description = "Cloud actions: ${results.counts.applied} applied, ${results.counts.unsupported} unsupported, ${results.counts.failed} failed"
                 }
 
                 return results
@@ -226,22 +226,22 @@ def checkBudgets(Map budgets) {
 def generateReport(Map args = [:]) {
     def analysis = analyze(args)
     def report = new StringBuilder()
-    
+
     report << "Jenkins Cloud Cost Report\n"
     report << "========================\n\n"
     report << "Generated: ${analysis.timestamp}\n\n"
-    
+
     report << "TOTAL COSTS:\n"
     report << "  Hourly:  \$${formatCurrency(analysis.totalCost.hourly)}\n"
     report << "  Daily:   \$${formatCurrency(analysis.totalCost.daily)}\n"
     report << "  Monthly: \$${formatCurrency(analysis.totalCost.monthly)}\n"
     report << "  Yearly:  \$${formatCurrency(analysis.totalCost.yearly)}\n\n"
-    
+
     report << "PROVIDER BREAKDOWN:\n"
     analysis.providers.each { name, provider ->
         report << "  ${name}: \$${formatCurrency(provider.monthlyCost)}/month (${provider.activeAgents} agents)\n"
     }
-    
+
     if (analysis.savings.total > 0) {
         report << "\nPOTENTIAL SAVINGS:\n"
         report << "  Monthly: \$${formatCurrency(analysis.savings.monthlyTotal)}\n"
@@ -249,14 +249,14 @@ def generateReport(Map args = [:]) {
         report << "  - Spot instances: \$${formatCurrency(analysis.savings.spotInstances * 24 * 30)}\n"
         report << "  - Right-sizing: \$${formatCurrency(analysis.savings.rightsizing * 24 * 30)}\n"
     }
-    
+
     if (analysis.recommendations) {
         report << "\nRECOMMENDATIONS:\n"
         analysis.recommendations.each { rec ->
             report << "  [${rec.priority}] ${rec.message}\n"
         }
     }
-    
+
     return report.toString()
 }
 

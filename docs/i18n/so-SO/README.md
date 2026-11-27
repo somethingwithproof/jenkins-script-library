@@ -269,7 +269,6 @@ import com.github.thomasvincent.jenkinsscripts.cloud.AWSNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.AzureNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.KubernetesNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.OracleCloudNodeManager
-import com.github.thomasvincent.jenkinsscripts.cloud.DigitalOceanNodeManager
 import jenkins.model.Jenkins
 
 // Manage EC2 instances
@@ -293,10 +292,6 @@ def ociManager = new OracleCloudNodeManager(Jenkins.get())
 def ociNodes = ociManager.getOCIComputeInstances()
 ociManager.provisionNewInstance("my-oci-template")
 
-// Manage DigitalOcean droplets
-def doManager = new DigitalOceanNodeManager(Jenkins.get())
-def doNodes = doManager.getDigitalOceanNodes()
-doManager.provisionNewDroplet("my-do-template")
 ```
 
 ## Horumarinta
@@ -352,7 +347,6 @@ Maktabaddu waxay taageertaa bixiyeyaasha daruurta ee soo socda:
 - **Azure VMs**: Maamul mashiinnada dalwaddii (virtual machines) ee Azure iyagoo ah wakiillo Jenkins
 - **Kubernetes**: Maamul pod-yada Kubernetes iyagoo ah wakiillo Jenkins
 - **Oracle Cloud**: Maamul dhacdooyinka Oracle Cloud Infrastructure (OCI) iyagoo ah wakiillo Jenkins
-- **DigitalOcean**: Maamul droplet-yada DigitalOcean iyagoo ah wakiillo Jenkins
 
 ## Sifooyinka Soo Socda
 

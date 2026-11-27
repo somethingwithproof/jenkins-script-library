@@ -269,7 +269,6 @@ import com.github.thomasvincent.jenkinsscripts.cloud.AWSNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.AzureNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.KubernetesNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.OracleCloudNodeManager
-import com.github.thomasvincent.jenkinsscripts.cloud.DigitalOceanNodeManager
 import jenkins.model.Jenkins
 
 // Manage EC2 instances
@@ -293,10 +292,6 @@ def ociManager = new OracleCloudNodeManager(Jenkins.get())
 def ociNodes = ociManager.getOCIComputeInstances()
 ociManager.provisionNewInstance("my-oci-template")
 
-// Manage DigitalOcean droplets
-def doManager = new DigitalOceanNodeManager(Jenkins.get())
-def doNodes = doManager.getDigitalOceanNodes()
-doManager.provisionNewDroplet("my-do-template")
 ```
 
 ## Sviluppo
@@ -352,7 +347,6 @@ La libreria supporta i seguenti provider cloud:
 - **Azure VMs**: Gestisce macchine virtuali Azure come agent Jenkins
 - **Kubernetes**: Gestisce pod Kubernetes come agent Jenkins
 - **Oracle Cloud**: Gestisce istanze Oracle Cloud Infrastructure (OCI) come agent Jenkins
-- **DigitalOcean**: Gestisce droplet DigitalOcean come agent Jenkins
 
 ## Funzionalità future
 

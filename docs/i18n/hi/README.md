@@ -269,7 +269,6 @@ import com.github.thomasvincent.jenkinsscripts.cloud.AWSNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.AzureNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.KubernetesNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.OracleCloudNodeManager
-import com.github.thomasvincent.jenkinsscripts.cloud.DigitalOceanNodeManager
 import jenkins.model.Jenkins
 
 // Manage EC2 instances
@@ -293,10 +292,6 @@ def ociManager = new OracleCloudNodeManager(Jenkins.get())
 def ociNodes = ociManager.getOCIComputeInstances()
 ociManager.provisionNewInstance("my-oci-template")
 
-// Manage DigitalOcean droplets
-def doManager = new DigitalOceanNodeManager(Jenkins.get())
-def doNodes = doManager.getDigitalOceanNodes()
-doManager.provisionNewDroplet("my-do-template")
 ```
 
 ## विकास
@@ -352,7 +347,6 @@ docker compose -f docker-compose.test.yml run --rm java21
 - **Azure VMs**: Azure वर्चुअल मशीनों को Jenkins एजेंट के रूप में प्रबंधित करें
 - **Kubernetes**: Kubernetes पॉड्स को Jenkins एजेंट के रूप में प्रबंधित करें
 - **Oracle Cloud**: Oracle Cloud Infrastructure (OCI) इंस्टेंस को Jenkins एजेंट के रूप में प्रबंधित करें
-- **DigitalOcean**: DigitalOcean ड्रॉपलेट्स को Jenkins एजेंट के रूप में प्रबंधित करें
 
 ## आगामी विशेषताएँ
 

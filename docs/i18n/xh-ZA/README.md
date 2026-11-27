@@ -269,7 +269,6 @@ import com.github.thomasvincent.jenkinsscripts.cloud.AWSNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.AzureNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.KubernetesNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.OracleCloudNodeManager
-import com.github.thomasvincent.jenkinsscripts.cloud.DigitalOceanNodeManager
 import jenkins.model.Jenkins
 
 // Manage EC2 instances
@@ -293,10 +292,6 @@ def ociManager = new OracleCloudNodeManager(Jenkins.get())
 def ociNodes = ociManager.getOCIComputeInstances()
 ociManager.provisionNewInstance("my-oci-template")
 
-// Manage DigitalOcean droplets
-def doManager = new DigitalOceanNodeManager(Jenkins.get())
-def doNodes = doManager.getDigitalOceanNodes()
-doManager.provisionNewDroplet("my-do-template")
 ```
 
 ## Uphuhliso
@@ -352,7 +347,6 @@ Eli thala lixhasa aba baboneleli belifu balandelayo:
 - **Azure VMs**: Lawula ii-virtual machine ze-Azure njengee-arhente ze-Jenkins
 - **Kubernetes**: Lawula ii-pod ze-Kubernetes njengee-arhente ze-Jenkins
 - **Oracle Cloud**: Lawula iimeko ze-Oracle Cloud Infrastructure (OCI) njengee-arhente ze-Jenkins
-- **DigitalOcean**: Lawula ii-droplet ze-DigitalOcean njengee-arhente ze-Jenkins
 
 ## Iimpawu ezizayo
 

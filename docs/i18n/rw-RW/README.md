@@ -269,7 +269,6 @@ import com.github.thomasvincent.jenkinsscripts.cloud.AWSNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.AzureNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.KubernetesNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.OracleCloudNodeManager
-import com.github.thomasvincent.jenkinsscripts.cloud.DigitalOceanNodeManager
 import jenkins.model.Jenkins
 
 // Manage EC2 instances
@@ -293,10 +292,6 @@ def ociManager = new OracleCloudNodeManager(Jenkins.get())
 def ociNodes = ociManager.getOCIComputeInstances()
 ociManager.provisionNewInstance("my-oci-template")
 
-// Manage DigitalOcean droplets
-def doManager = new DigitalOceanNodeManager(Jenkins.get())
-def doNodes = doManager.getDigitalOceanNodes()
-doManager.provisionNewDroplet("my-do-template")
 ```
 
 ## Iterambere
@@ -352,7 +347,6 @@ Iri soko ry'ibikoresho rishyigikira abatanga serivisi za cloud bakurikira:
 - **Azure VMs**: Gucunga imashini nyabugenge z'ikoranabuhanga (VMs) za Azure nk'abakozi (agents) ba Jenkins
 - **Kubernetes**: Gucunga pod za Kubernetes nk'abakozi (agents) ba Jenkins
 - **Oracle Cloud**: Gucunga ingero za Oracle Cloud Infrastructure (OCI) nk'abakozi (agents) ba Jenkins
-- **DigitalOcean**: Gucunga droplet za DigitalOcean nk'abakozi (agents) ba Jenkins
 
 ## Ibiranga biri imbere
 

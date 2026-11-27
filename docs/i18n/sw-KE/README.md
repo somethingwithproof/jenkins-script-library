@@ -269,7 +269,6 @@ import com.github.thomasvincent.jenkinsscripts.cloud.AWSNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.AzureNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.KubernetesNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.OracleCloudNodeManager
-import com.github.thomasvincent.jenkinsscripts.cloud.DigitalOceanNodeManager
 import jenkins.model.Jenkins
 
 // Manage EC2 instances
@@ -293,10 +292,6 @@ def ociManager = new OracleCloudNodeManager(Jenkins.get())
 def ociNodes = ociManager.getOCIComputeInstances()
 ociManager.provisionNewInstance("my-oci-template")
 
-// Manage DigitalOcean droplets
-def doManager = new DigitalOceanNodeManager(Jenkins.get())
-def doNodes = doManager.getDigitalOceanNodes()
-doManager.provisionNewDroplet("my-do-template")
 ```
 
 ## Uendelezaji
@@ -352,7 +347,6 @@ Maktaba inasaidia watoa huduma wa wingu wafuatao:
 - **Azure VMs**: Simamia mashine pepe za Azure kama mawakala wa Jenkins
 - **Kubernetes**: Simamia podi za Kubernetes kama mawakala wa Jenkins
 - **Oracle Cloud**: Simamia mifumo ya Oracle Cloud Infrastructure (OCI) kama mawakala wa Jenkins
-- **DigitalOcean**: Simamia droplets za DigitalOcean kama mawakala wa Jenkins
 
 ## Vipengele Vijavyo
 

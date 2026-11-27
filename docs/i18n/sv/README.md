@@ -269,7 +269,6 @@ import com.github.thomasvincent.jenkinsscripts.cloud.AWSNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.AzureNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.KubernetesNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.OracleCloudNodeManager
-import com.github.thomasvincent.jenkinsscripts.cloud.DigitalOceanNodeManager
 import jenkins.model.Jenkins
 
 // Manage EC2 instances
@@ -293,10 +292,6 @@ def ociManager = new OracleCloudNodeManager(Jenkins.get())
 def ociNodes = ociManager.getOCIComputeInstances()
 ociManager.provisionNewInstance("my-oci-template")
 
-// Manage DigitalOcean droplets
-def doManager = new DigitalOceanNodeManager(Jenkins.get())
-def doNodes = doManager.getDigitalOceanNodes()
-doManager.provisionNewDroplet("my-do-template")
 ```
 
 ## Utveckling
@@ -352,7 +347,6 @@ Biblioteket stöder följande molnleverantörer:
 - **Azure VMs**: Hantera virtuella Azure-maskiner som Jenkins-agenter
 - **Kubernetes**: Hantera Kubernetes-poddar som Jenkins-agenter
 - **Oracle Cloud**: Hantera Oracle Cloud Infrastructure-instanser (OCI) som Jenkins-agenter
-- **DigitalOcean**: Hantera DigitalOcean-droplets som Jenkins-agenter
 
 ## Kommande funktioner
 

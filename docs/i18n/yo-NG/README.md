@@ -269,7 +269,6 @@ import com.github.thomasvincent.jenkinsscripts.cloud.AWSNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.AzureNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.KubernetesNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.OracleCloudNodeManager
-import com.github.thomasvincent.jenkinsscripts.cloud.DigitalOceanNodeManager
 import jenkins.model.Jenkins
 
 // Manage EC2 instances
@@ -293,10 +292,6 @@ def ociManager = new OracleCloudNodeManager(Jenkins.get())
 def ociNodes = ociManager.getOCIComputeInstances()
 ociManager.provisionNewInstance("my-oci-template")
 
-// Manage DigitalOcean droplets
-def doManager = new DigitalOceanNodeManager(Jenkins.get())
-def doNodes = doManager.getDigitalOceanNodes()
-doManager.provisionNewDroplet("my-do-template")
 ```
 
 ## Ìdàgbàsókè
@@ -352,7 +347,6 @@ Iṣẹ́ àkànṣe yìí ń lo CodeNarc fún àwọn ìṣàyẹ̀wò dídára
 - **Azure VMs**: Ṣàkóso àwọn ẹ̀rọ àfọwọ́ṣe Azure gẹ́gẹ́ bí àwọn aṣojú Jenkins
 - **Kubernetes**: Ṣàkóso àwọn pọ́ọ̀dù Kubernetes gẹ́gẹ́ bí àwọn aṣojú Jenkins
 - **Oracle Cloud**: Ṣàkóso àwọn àpẹẹrẹ Oracle Cloud Infrastructure (OCI) gẹ́gẹ́ bí àwọn aṣojú Jenkins
-- **DigitalOcean**: Ṣàkóso àwọn drọ́púlẹ́ẹ̀tì DigitalOcean gẹ́gẹ́ bí àwọn aṣojú Jenkins
 
 ## Àwọn Ẹ̀yà-iṣẹ́ Tí Ń Bọ̀
 

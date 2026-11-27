@@ -269,7 +269,6 @@ import com.github.thomasvincent.jenkinsscripts.cloud.AWSNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.AzureNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.KubernetesNodeManager
 import com.github.thomasvincent.jenkinsscripts.cloud.OracleCloudNodeManager
-import com.github.thomasvincent.jenkinsscripts.cloud.DigitalOceanNodeManager
 import jenkins.model.Jenkins
 
 // Manage EC2 instances
@@ -293,10 +292,6 @@ def ociManager = new OracleCloudNodeManager(Jenkins.get())
 def ociNodes = ociManager.getOCIComputeInstances()
 ociManager.provisionNewInstance("my-oci-template")
 
-// Manage DigitalOcean droplets
-def doManager = new DigitalOceanNodeManager(Jenkins.get())
-def doNodes = doManager.getDigitalOceanNodes()
-doManager.provisionNewDroplet("my-do-template")
 ```
 
 ## Rozwój
@@ -352,7 +347,6 @@ Biblioteka obsługuje następujących dostawców chmury:
 - **Azure VMs**: zarządzanie maszynami wirtualnymi Azure jako agentami Jenkins
 - **Kubernetes**: zarządzanie podami Kubernetes jako agentami Jenkins
 - **Oracle Cloud**: zarządzanie instancjami Oracle Cloud Infrastructure (OCI) jako agentami Jenkins
-- **DigitalOcean**: zarządzanie dropletami DigitalOcean jako agentami Jenkins
 
 ## Planowane funkcje
 
