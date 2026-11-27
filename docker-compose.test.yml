@@ -2,8 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 services:
-  # Java 17 (Main Testing Environment)
-  java17:
+  java24: &java24
     build:
       context: .
       dockerfile: Dockerfile.test
@@ -25,8 +24,13 @@ services:
       - SKIP_CLEAN=true   # Skip clean task to avoid permission issues
     working_dir: /app
     command: ["./gradlew", "test", "--no-daemon"]
-  
-  # Java 21 (Future Compatibility)
+
+  # Preserve the previous service name for existing callers.
+  java17:
+    <<: *java24
+    profiles: [legacy]
+
+  # Controller baseline
   java21:
     build:
       context: .
@@ -49,7 +53,7 @@ services:
       - SKIP_CLEAN=true   # Skip clean task to avoid permission issues
     working_dir: /app
     command: ["./gradlew", "test", "--no-daemon"]
-      
+
   # Code Quality Analysis
   sonarqube:
     image: sonarqube:lts

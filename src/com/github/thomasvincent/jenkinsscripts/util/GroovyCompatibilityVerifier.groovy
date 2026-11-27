@@ -1,0 +1,242 @@
+#!/usr/bin/env groovy
+// SPDX-FileCopyrightText: 2025-2026 Thomas Vincent <thomasvincent@gmail.com>
+// SPDX-License-Identifier: MIT
+
+/*
+ * MIT License
+ *
+ * Copyright (c) 2023-2025 Thomas Vincent
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+package com.github.thomasvincent.jenkinsscripts.util
+
+/**
+ * Groovy compatibility verification for Jenkins scripts.
+ *
+ * Provides utilities to verify Groovy and Java version compatibility
+ * with required runtime environments for Jenkins Script Library.
+ *
+ * @author Thomas Vincent
+ * @since 1.0
+ */
+class GroovyCompatibilityVerifier {
+
+    static final String MINIMUM_GROOVY_VERSION = "2.4.0"
+    static final String MINIMUM_JAVA_VERSION = "11.0.0"
+
+    // String constants to avoid duplication
+    private static final String JAVA_VERSION_PROPERTY = "java.version"
+    private static final String NON_DIGIT_REGEX = "\\D"
+    private static final String TEST_NAME = "Test"
+    private static final String ADULT_CATEGORY = "adult"
+    private static final String EMPTY_STRING = ""
+    private static final String DOT = "."
+
+    /**
+     * Main method to run the verifier.
+     *
+     * Performs version checks and feature tests then prints results.
+     *
+     * ```groovy
+     * groovy GroovyCompatibilityVerifier.groovy
+     * ```
+     */
+    static void main(String[] args) {
+        println "Jenkins Script Library Compatibility Verifier"
+        println "=============================================="
+        println EMPTY_STRING
+
+        def details = getEnvironmentDetails()
+
+        println "Current environment:"
+        println "  Groovy version: ${details.groovyVersion}"
+        println "  Java version:   ${details.javaVersion}"
+        println "  Java vendor:    ${details.javaVendor}"
+        println "  OS:             ${details.osName}"
+        println EMPTY_STRING
+
+        // Check Groovy version compatibility
+        if (isCompatibleGroovyVersion()) {
+            println "✅ Groovy version is compatible (${MINIMUM_GROOVY_VERSION}+)"
+        } else {
+            println "❌ Groovy version is not compatible! Please use Groovy ${MINIMUM_GROOVY_VERSION} or later."
+        }
+
+        // Check Java version compatibility
+        if (isCompatibleJavaVersion()) {
+            println "✅ Java version is compatible (${MINIMUM_JAVA_VERSION}+)"
+        } else {
+            println "❌ Java version is not compatible! Please use Java ${MINIMUM_JAVA_VERSION} or later."
+        }
+
+        // Test Groovy 4.0 features
+        println EMPTY_STRING
+        println "Testing Groovy 4.0 features..."
+        if (testGroovy40Features()) {
+            println "✅ All Groovy 4.0 features are working correctly"
+        } else {
+            println "❌ Some Groovy 4.0 features are not working"
+        }
+
+        println EMPTY_STRING
+        println "Overall result:"
+        if (isCompatibleGroovyVersion() && isCompatibleJavaVersion() && testGroovy40Features()) {
+            println "✅ Your environment is fully compatible with Jenkins Script Library"
+        } else {
+            println "❌ Your environment is not fully compatible with Jenkins Script Library"
+        }
+    }
+
+    /**
+     * Tests if the current Groovy version is compatible.
+     *
+     * Compares current Groovy version against the minimum required version.
+     *
+     * ```groovy
+     * GroovyCompatibilityVerifier.isCompatibleGroovyVersion()  // true if Groovy 4.0.0+
+     * ```
+     */
+    static boolean isCompatibleGroovyVersion() {
+        def currentVersion = GroovySystem.version
+        return compareVersions(currentVersion, MINIMUM_GROOVY_VERSION) >= 0
+    }
+
+    /**
+     * Tests if the current Java version is compatible.
+     *
+     * Compares current Java version against the minimum required version.
+     *
+     * ```groovy
+     * GroovyCompatibilityVerifier.isCompatibleJavaVersion()  // true if Java 17.0.0+
+     * ```
+     */
+    static boolean isCompatibleJavaVersion() {
+        def currentVersion = System.getProperty(JAVA_VERSION_PROPERTY)
+        return compareVersions(currentVersion, MINIMUM_JAVA_VERSION) >= 0
+    }
+
+    /**
+     * Compares two version strings.
+     *
+     * Uses Groovy's tokenize method to compare version segments numerically.
+     *
+     * ```groovy
+     * GroovyCompatibilityVerifier.compareVersions("4.0.0", "3.0.15")  // positive (first > second)
+     * GroovyCompatibilityVerifier.compareVersions("1.8.0", "11.0.2")  // negative (first < second)
+     * ```
+     */
+    static int compareVersions(String version1, String version2) {
+        return StringUtils.compareVersions(version1, version2)
+    }
+
+    /**
+     * Internal record class for testing Groovy 4.0 features.
+     *
+     * Used to verify record support in the Groovy runtime.
+     */
+    static class Person {
+        String name
+        int age
+
+        Person(String name, int age) {
+            this.name = name
+            this.age = age
+        }
+    }
+
+    /**
+     * Tests Groovy 4.0 specific features.
+     *
+     * Verifies that critical Groovy 4.0 features work in the current runtime.
+     *
+     * ```groovy
+     * GroovyCompatibilityVerifier.testGroovy40Features()  // true if all features work
+     * ```
+     */
+    static boolean testGroovy40Features() {
+        try {
+            // Create a record
+            def person = new GroovyCompatibilityVerifier.Person(TEST_NAME, 42)
+
+            // Test property accessors
+            if (person.name != TEST_NAME || person.age != 42) {
+                return false
+            }
+
+            // Test traditional switch statements
+            def result
+            switch(person.age) {
+                case 0..17:
+                    result = "child"
+                    break
+                case 18..64:
+                    result = ADULT_CATEGORY
+                    break
+                default:
+                    result = "senior"
+            }
+
+            if (result != ADULT_CATEGORY) {
+                return false
+            }
+
+            // Test pattern matching with instanceof
+            def value = "test"
+            def typeResult = EMPTY_STRING
+
+            if (value instanceof String) {
+                typeResult = "string of length ${value.length()}"
+            } else if (value instanceof Number) {
+                typeResult = "number with value ${value}"
+            } else {
+                typeResult = "unknown type"
+            }
+
+            if (typeResult != "string of length 4") {
+                return false
+            }
+
+            return true
+        } catch (ClassCastException | NullPointerException | AssertionError e) {
+            println "Error testing Groovy 4.0 features: ${e.message}"
+            return false
+        }
+    }
+
+    /**
+     * Returns details about the current environment.
+     *
+     * Collects version information about Groovy, Java, and the operating system.
+     *
+     * ```groovy
+     * def details = GroovyCompatibilityVerifier.getEnvironmentDetails()
+     * println details.groovyVersion  // "4.0.6" (example)
+     * ```
+     */
+    static Map<String, String> getEnvironmentDetails() {
+        return [
+            'groovyVersion': GroovySystem.version,
+            'javaVersion': System.getProperty(JAVA_VERSION_PROPERTY),
+            'javaVendor': System.getProperty("java.vendor"),
+            'osName': System.getProperty("os.name"),
+        ]
+    }
+}

@@ -75,7 +75,7 @@ jenkins-script-library/
 
 2. **В виде отдельных скриптов для непосредственного запуска в Jenkins**:
 
-   Скрипты в `src/main/groovy/com/github/thomasvincent/jenkinsscripts/scripts/` можно выполнять напрямую в Jenkins Script Console или через Jenkins CLI.
+   Скрипты в `src/com/github/thomasvincent/jenkinsscripts/scripts/` можно выполнять напрямую в Jenkins Script Console или через Jenkins CLI.
 
 ## Использование
 
@@ -107,7 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### Миграция задач
 
-Перенос на удалённый контроллер недоступен. Даже если указать целевой URL, скрипт использует текущий контроллер Jenkins.
+Перенос на удалённый контроллер недоступен.
 
 ##### Шаблонизация задач
 
@@ -238,10 +238,6 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 Библиотека также предоставляет программный API для использования в собственных скриптах Groovy:
 
-JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
-
-`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
-
 #### Управление задачами
 
 ```groovy
@@ -331,12 +327,12 @@ doManager.provisionNewDroplet("my-do-template")
 
 #### Тестовая среда Docker
 
-[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+[`java24`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
 
-[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:21-jdk`
 
 ```sh
-docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java24
 docker compose -f docker-compose.test.yml run --rm java21
 ```
 

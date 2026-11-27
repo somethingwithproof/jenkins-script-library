@@ -87,7 +87,8 @@ dependencies {
 sourceSets {
     main {
         groovy {
-            srcDirs = ['src/main/groovy']
+            srcDirs = ['src']
+            include 'com/**/*.groovy', 'hudson/**/*.groovy'
         }
     }
     test {
@@ -95,6 +96,13 @@ sourceSets {
             srcDirs = ['src/test/groovy']
         }
     }
+}
+
+tasks.named('codenarcMain') {
+    compilationClasspath = sourceSets.main.output + sourceSets.main.compileClasspath
+}
+tasks.named('codenarcTest') {
+    compilationClasspath = sourceSets.test.output + sourceSets.test.compileClasspath
 }
 
 test {
@@ -107,5 +115,36 @@ publishing {
         maven(MavenPublication) {
             from components.java
         }
+    }
+}
+
+// Controller acceptance tests use the same Jenkins core as the published library.
+sourceSets {
+    controllerTest {
+        groovy.srcDirs = ['src/controller-test/groovy']
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+configurations {
+    controllerTestImplementation.extendsFrom testImplementation
+    controllerTestRuntimeOnly.extendsFrom testRuntimeOnly
+    controllerWar
+}
+dependencies {
+    controllerTestImplementation('org.jenkins-ci.main:jenkins-test-harness:2589.v1b_b_c221c5335') {
+        exclude group: 'org.jenkins-ci.main', module: 'jenkins-war'
+    }
+    controllerWar "org.jenkins-ci.main:jenkins-war:${jenkinsLtsVersion}@war"
+}
+tasks.register('integrationTest', Test) {
+    description = 'Run controller acceptance tests in a temporary Jenkins home.'
+    group = 'verification'
+    testClassesDirs = sourceSets.controllerTest.output.classesDirs
+    classpath = sourceSets.controllerTest.runtimeClasspath
+    useJUnit()
+    doFirst {
+        systemProperty 'buildDirectory', layout.buildDirectory.dir('controller-harness').get().asFile.absolutePath
+        systemProperty 'jth.jenkins-war.path', configurations.controllerWar.singleFile.absolutePath
     }
 }

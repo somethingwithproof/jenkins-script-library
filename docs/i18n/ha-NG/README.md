@@ -75,7 +75,7 @@ Ana iya amfani da wannan laburare ta hanyoyi biyu:
 
 2. **A matsayin rubutun umarni guda-guda da za a gudanar kai tsaye a cikin Jenkins**:
 
-   Ana iya gudanar da rubutun da ke cikin `src/main/groovy/com/github/thomasvincent/jenkinsscripts/scripts/` kai tsaye a cikin Jenkins Script Console ko ta hanyar Jenkins CLI.
+   Ana iya gudanar da rubutun da ke cikin `src/com/github/thomasvincent/jenkinsscripts/scripts/` kai tsaye a cikin Jenkins Script Console ko ta hanyar Jenkins CLI.
 
 ## Amfani
 
@@ -107,7 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### Ƙaurar Ayyuka
 
-Ba a iya ƙaura zuwa wata na’urar sarrafa Jenkins mai nisa. Ko da an ba da URL na inda za a je, rubutun yana amfani da na’urar sarrafawa ta yanzu.
+Ba a iya ƙaura zuwa wata na’urar sarrafa Jenkins mai nisa.
 
 ##### Samfurin Ayyuka
 
@@ -238,10 +238,6 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 Laburaren yana kuma samar da API na shirye-shirye don amfani a cikin naka rubutun Groovy:
 
-JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
-
-`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
-
 #### Sarrafa Ayyuka
 
 ```groovy
@@ -331,12 +327,12 @@ doManager.provisionNewDroplet("my-do-template")
 
 #### Muhallin Gwajin Docker
 
-[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+[`java24`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
 
-[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:21-jdk`
 
 ```sh
-docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java24
 docker compose -f docker-compose.test.yml run --rm java21
 ```
 

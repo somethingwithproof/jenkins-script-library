@@ -6,7 +6,7 @@ This directory contains global variables that can be used in Jenkins pipelines w
 
 ## Usage
 
-To use this shared library in your Jenkins pipeline:
+A trusted Pipeline can compare installed plugins with a manifest checked into the workspace.
 
 ```groovy
 @Library('jenkins-script-library') _
@@ -14,10 +14,14 @@ To use this shared library in your Jenkins pipeline:
 pipeline {
     agent any
     stages {
-        stage('Example') {
+        stage('Audit controller plugins') {
             steps {
-                // Call any global variable defined in this directory
-                echo "Using Jenkins Script Library"
+                script {
+                    def report = auditPlugins(expected: readFile('config/plugins.txt'))
+                    if (report.drift) {
+                        error "Plugin drift: missing=${report.missing}, extra=${report.extra}, mismatched=${report.mismatched}"
+                    }
+                }
             }
         }
     }
@@ -40,3 +44,15 @@ Example structure:
 3. Use proper error handling
 4. Follow Groovy naming conventions
 5. Test your shared library variables thoroughly
+
+## Controller administration
+
+Call `auditPlugins()` from a trusted Jenkinsfile to return the installed plugins.
+Pass manifest text with `auditPlugins(expected: readFile('config/plugins.txt'))`
+to compare versions. The step returns plain lists and maps for use after a
+Pipeline suspension. The caller decides whether drift fails the build.
+
+To preview a selective restore on the controller, call
+`backupJenkinsConfig.restore(backupFile: archive, files: ['config.xml'], dryRun: true)`.
+The preview returns the selected paths. Applying the restore requires Jenkins
+administrator permission and preserves copies of changed files.

@@ -41,7 +41,7 @@ The integration tests verify:
 
 ### Using Gradle
 
-Integration tests can be run using the Gradle integration test task:
+The Gradle task runs the [controller acceptance suite](../controller-test/groovy/). It starts disposable Jenkins controllers for the inventory, restore and migration entry points. This directory contains additional integration fixtures.
 
 ```bash
 ./gradlew integrationTest
@@ -52,7 +52,7 @@ Integration tests can be run using the Gradle integration test task:
 To run specific integration tests:
 
 ```bash
-./gradlew integrationTest --tests "com.github.thomasvincent.jenkinsscripts.jobs.*"
+./gradlew integrationTest --tests "*ControllerOperationsTest"
 ```
 
 ### Test Environment

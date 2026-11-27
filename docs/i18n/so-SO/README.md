@@ -75,7 +75,7 @@ Maktabaddan waxaa loo isticmaali karaa laba hab:
 
 2. **Iyadoo ah qoraallo gaar-gaar ah oo si toos ah loogu socodsiiyo Jenkins**:
 
-   Qoraallada ku jira `src/main/groovy/com/github/thomasvincent/jenkinsscripts/scripts/` waxaa si toos ah loogu fulin karaa Jenkins Script Console ama iyadoo la marayo Jenkins CLI.
+   Qoraallada ku jira `src/com/github/thomasvincent/jenkinsscripts/scripts/` waxaa si toos ah loogu fulin karaa Jenkins Script Console ama iyadoo la marayo Jenkins CLI.
 
 ## Isticmaalka
 
@@ -107,7 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### Raridda Shaqooyinka
 
-U guurista kontaroole fog lama heli karo. Xataa haddii URL bartilmaameed la bixiyo, qoraalku wuxuu adeegsadaa kontaroolaha Jenkins ee hadda jira.
+U guurista kontaroole fog lama heli karo.
 
 ##### Qaab-dhismeedka Shaqooyinka
 
@@ -238,10 +238,6 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 Maktabaddu waxay sidoo kale bixisaa API barnaamij oo aad ku isticmaali karto qoraalladaada Groovy:
 
-JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
-
-`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
-
 #### Maamulka Shaqooyinka
 
 ```groovy
@@ -331,12 +327,12 @@ doManager.provisionNewDroplet("my-do-template")
 
 #### Deegaanka Tijaabada ee Docker
 
-[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+[`java24`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
 
-[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:21-jdk`
 
 ```sh
-docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java24
 docker compose -f docker-compose.test.yml run --rm java21
 ```
 

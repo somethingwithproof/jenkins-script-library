@@ -75,7 +75,7 @@ A lè lo àkójọpọ̀ yìí ní ọ̀nà méjì:
 
 2. **Gẹ́gẹ́ bí àwọn ìwé-àṣẹ kọ̀ọ̀kan láti ṣiṣẹ́ tààrà nínú Jenkins**:
 
-   A lè ṣiṣẹ́ àwọn ìwé-àṣẹ tí ó wà nínú `src/main/groovy/com/github/thomasvincent/jenkinsscripts/scripts/` tààrà nínú Jenkins Script Console tàbí nípasẹ̀ Jenkins CLI.
+   A lè ṣiṣẹ́ àwọn ìwé-àṣẹ tí ó wà nínú `src/com/github/thomasvincent/jenkinsscripts/scripts/` tààrà nínú Jenkins Script Console tàbí nípasẹ̀ Jenkins CLI.
 
 ## Ìlò
 
@@ -107,7 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### Ìṣíkiri Iṣẹ́
 
-Kò ṣeé gbé iṣẹ́ lọ sí olùdarí Jenkins tó jìnnà. Bí o tilẹ̀ fi URL ibi tí o fẹ́ lọ sí sílẹ̀, script náà máa ń lo olùdarí Jenkins tó wà lọ́wọ́.
+Kò ṣeé gbé iṣẹ́ lọ sí olùdarí Jenkins tó jìnnà.
 
 ##### Ìṣẹ̀dá Àwòkọ́ṣe Iṣẹ́
 
@@ -238,10 +238,6 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 Àkójọpọ̀ náà tún ń pèsè API ìṣètò-èdè fún ìlò nínú àwọn ìwé-àṣẹ Groovy tìrẹ fúnra rẹ:
 
-JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
-
-`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
-
 #### Ìṣàkóso Iṣẹ́
 
 ```groovy
@@ -331,12 +327,12 @@ doManager.provisionNewDroplet("my-do-template")
 
 #### Àyíká Ìdánwò Docker
 
-[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+[`java24`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
 
-[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:21-jdk`
 
 ```sh
-docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java24
 docker compose -f docker-compose.test.yml run --rm java21
 ```
 

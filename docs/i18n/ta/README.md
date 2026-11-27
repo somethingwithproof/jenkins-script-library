@@ -75,7 +75,7 @@ jenkins-script-library/
 
 2. **Jenkins-இல் நேரடியாக இயக்க தனிப்பட்ட ஸ்கிரிப்டுகளாக**:
 
-   `src/main/groovy/com/github/thomasvincent/jenkinsscripts/scripts/`-இல் உள்ள ஸ்கிரிப்டுகளை Jenkins Script Console-இல் அல்லது Jenkins CLI மூலம் நேரடியாக இயக்கலாம்.
+   `src/com/github/thomasvincent/jenkinsscripts/scripts/`-இல் உள்ள ஸ்கிரிப்டுகளை Jenkins Script Console-இல் அல்லது Jenkins CLI மூலம் நேரடியாக இயக்கலாம்.
 
 ## பயன்பாடு
 
@@ -107,7 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### பணி இடம்பெயர்வு
 
-தொலைநிலைக் கட்டுப்படுத்திக்கு இடமாற்றம் செய்ய முடியாது. இலக்கு URL கொடுத்தாலும், ஸ்கிரிப்ட் தற்போதைய Jenkins கட்டுப்படுத்தியையே பயன்படுத்தும்.
+தொலைநிலைக் கட்டுப்படுத்திக்கு இடமாற்றம் செய்ய முடியாது.
 
 ##### பணி வார்ப்புருவாக்கம்
 
@@ -238,10 +238,6 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 உங்கள் சொந்த Groovy ஸ்கிரிப்டுகளில் பயன்படுத்துவதற்கான நிரல் API-ஐயும் இந்த நூலகம் வழங்குகிறது:
 
-JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
-
-`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
-
 #### பணி மேலாண்மை
 
 ```groovy
@@ -331,12 +327,12 @@ doManager.provisionNewDroplet("my-do-template")
 
 #### Docker சோதனைச் சூழல்
 
-[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+[`java24`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
 
-[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:21-jdk`
 
 ```sh
-docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java24
 docker compose -f docker-compose.test.yml run --rm java21
 ```
 

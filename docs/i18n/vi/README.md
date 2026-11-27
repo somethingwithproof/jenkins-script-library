@@ -75,7 +75,7 @@ Thư viện này có thể được sử dụng theo hai cách:
 
 2. **Dưới dạng các kịch bản riêng lẻ để chạy trực tiếp trong Jenkins**:
 
-   Các kịch bản trong `src/main/groovy/com/github/thomasvincent/jenkinsscripts/scripts/` có thể được thực thi trực tiếp trong Jenkins Script Console hoặc thông qua Jenkins CLI.
+   Các kịch bản trong `src/com/github/thomasvincent/jenkinsscripts/scripts/` có thể được thực thi trực tiếp trong Jenkins Script Console hoặc thông qua Jenkins CLI.
 
 ## Hướng dẫn sử dụng
 
@@ -107,7 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### Di chuyển Job
 
-Chưa hỗ trợ di chuyển sang bộ điều khiển từ xa. Ngay cả khi cung cấp URL đích, tập lệnh vẫn dùng bộ điều khiển Jenkins hiện tại.
+Chưa hỗ trợ di chuyển sang bộ điều khiển từ xa.
 
 ##### Tạo mẫu Job
 
@@ -238,10 +238,6 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 Thư viện cũng cung cấp API lập trình để sử dụng trong các kịch bản Groovy của riêng bạn:
 
-JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
-
-`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
-
 #### Quản lý Job
 
 ```groovy
@@ -331,12 +327,12 @@ doManager.provisionNewDroplet("my-do-template")
 
 #### Môi trường kiểm thử Docker
 
-[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+[`java24`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
 
-[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:21-jdk`
 
 ```sh
-docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java24
 docker compose -f docker-compose.test.yml run --rm java21
 ```
 

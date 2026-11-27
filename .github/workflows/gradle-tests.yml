@@ -75,21 +75,21 @@ jobs:
     - name: Build Docker test images
       run: |
         echo "Building Docker test images..."
-        docker compose -f docker-compose.test.yml build java17
+        docker compose -f docker-compose.test.yml build java24
         docker compose -f docker-compose.test.yml build java21
 
-    - name: Run Java 17 tests
-      id: java17-tests
+    - name: Run Java 24 tests
+      id: java24-tests
       run: |
         # Create .gradle directory with proper permissions
         mkdir -p .gradle
         chmod -R 777 .gradle
 
-        # Run tests with Java 17
+        # Run tests with Java 24
         docker compose -f docker-compose.test.yml run --rm \
           -e DOCKER_USER_ID=$(id -u) \
           -e DOCKER_GROUP_ID=$(id -g) \
-          java17 ./gradlew test --no-daemon
+          java24 ./gradlew test --no-daemon
 
         # Fix permissions for generated files
         sudo chown -R $(id -u):$(id -g) build
@@ -97,7 +97,7 @@ jobs:
 
     - name: Run Java 21 tests
       id: java21-tests
-      if: success() || failure()  # Run even if Java 17 tests fail, but not if they error
+      if: success() || failure()  # Run even if Java 24 tests fail, but not if they error
       run: |
         # Run tests with Java 21
         docker compose -f docker-compose.test.yml run --rm \
@@ -121,7 +121,7 @@ jobs:
         docker compose -f docker-compose.test.yml run --rm \
           -e DOCKER_USER_ID=$(id -u) \
           -e DOCKER_GROUP_ID=$(id -g) \
-          java17 ./gradlew compileGroovy --info
+          java24 ./gradlew compileGroovy --info
 
         # Fix permissions after running
         sudo chown -R $(id -u):$(id -g) build || true
@@ -135,7 +135,7 @@ jobs:
         docker compose -f docker-compose.test.yml run --rm \
           -e DOCKER_USER_ID=$(id -u) \
           -e DOCKER_GROUP_ID=$(id -g) \
-          java17 ./gradlew codenarcMain codenarcTest --no-daemon
+          java24 ./gradlew codenarcMain codenarcTest --no-daemon
 
         # Fix permissions for any new generated files
         sudo chown -R $(id -u):$(id -g) build
@@ -148,10 +148,10 @@ jobs:
         name: test-results
         path: |
           build/reports/tests/test/**
-          build/reports/tests/testJava17/**
+          build/reports/tests/testJava24/**
           build/reports/tests/testJava21/**
           build/test-results/test/**
-          build/test-results/testJava17/**
+          build/test-results/testJava24/**
           build/test-results/testJava21/**
 
     - name: Publish Code Analysis Reports

@@ -75,7 +75,7 @@ jenkins-script-library/
 
 2. **Jenkins で直接実行する個別スクリプトとして使用する**:
 
-   `src/main/groovy/com/github/thomasvincent/jenkinsscripts/scripts/` 配下のスクリプトは、Jenkins Script Console または Jenkins CLI から直接実行できます。
+   `src/com/github/thomasvincent/jenkinsscripts/scripts/` 配下のスクリプトは、Jenkins Script Console または Jenkins CLI から直接実行できます。
 
 ## 使用方法
 
@@ -107,7 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### ジョブの移行
 
-リモートへの移行はできません。移行先の URL を指定しても、スクリプトは現在の Jenkins コントローラーを使用します。
+リモートへの移行はできません。
 
 ##### ジョブのテンプレート化
 
@@ -238,10 +238,6 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 このライブラリは、独自の Groovy スクリプトから利用できるプログラマティック API も提供しています。
 
-JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
-
-`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
-
 #### ジョブ管理
 
 ```groovy
@@ -331,12 +327,12 @@ doManager.provisionNewDroplet("my-do-template")
 
 #### Docker テスト環境
 
-[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+[`java24`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
 
-[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:21-jdk`
 
 ```sh
-docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java24
 docker compose -f docker-compose.test.yml run --rm java21
 ```
 

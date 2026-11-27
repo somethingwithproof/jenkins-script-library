@@ -75,7 +75,7 @@ Le layibhrari ingasetshenziswa ngezindlela ezimbili:
 
 2. **Njengemibhalo eyodwa yokusebenza ngqo ku-Jenkins**:
 
-   Imibhalo eku-`src/main/groovy/com/github/thomasvincent/jenkinsscripts/scripts/` ingasetshenziswa ngqo ku-Jenkins Script Console noma nge-Jenkins CLI.
+   Imibhalo eku-`src/com/github/thomasvincent/jenkinsscripts/scripts/` ingasetshenziswa ngqo ku-Jenkins Script Console noma nge-Jenkins CLI.
 
 ## Ukusetshenziswa
 
@@ -107,7 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### Ukuthuthwa Kwemisebenzi
 
-Ukuthuthela imisebenzi kusilawuli esikude akutholakali. Noma unikeza i-URL okuqondiswe kuyo, iskripthi sisebenzisa isilawuli se-Jenkins samanje.
+Ukuthuthela imisebenzi kusilawuli esikude akutholakali.
 
 ##### Ukwenza Amathemphulethi Emisebenzi
 
@@ -238,10 +238,6 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 Le layibhrari iphinde inikeze i-API yohlelo ongayisebenzisa emibhalweni yakho ye-Groovy:
 
-JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
-
-`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
-
 #### Ukuphathwa Kwemisebenzi
 
 ```groovy
@@ -331,12 +327,12 @@ doManager.provisionNewDroplet("my-do-template")
 
 #### Indawo Yokuhlola Ye-Docker
 
-[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+[`java24`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
 
-[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:21-jdk`
 
 ```sh
-docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java24
 docker compose -f docker-compose.test.yml run --rm java21
 ```
 

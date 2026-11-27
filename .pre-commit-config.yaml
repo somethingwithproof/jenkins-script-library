@@ -57,7 +57,15 @@ repos:
         name: groovy syntax check
         language: system
         entry: groovy -e
-        args: ["import org.codehaus.groovy.control.*; new GroovyShell(new CompilerConfiguration(scriptBaseClass: 'groovy.lang.Script')).parse(new File('$1'));"]
+        args:
+          - |
+            args.each { path ->
+                def source = org.codehaus.groovy.control.SourceUnit.create(path, new File(path).getText('UTF-8'))
+                source.parse()
+                source.completePhase()
+                source.nextPhase()
+                source.convert()
+            }
         files: '\.groovy$'
 
   # Gradle validation

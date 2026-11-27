@@ -75,7 +75,7 @@ jenkins-script-library/
 
 2. **כסקריפטים בודדים להרצה ישירה ב-Jenkins**:
 
-   ניתן להריץ את הסקריפטים בתיקייה `src/main/groovy/com/github/thomasvincent/jenkinsscripts/scripts/` ישירות ב-Jenkins Script Console או באמצעות Jenkins CLI.
+   ניתן להריץ את הסקריפטים בתיקייה `src/com/github/thomasvincent/jenkinsscripts/scripts/` ישירות ב-Jenkins Script Console או באמצעות Jenkins CLI.
 
 ## שימוש
 
@@ -107,7 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### הגירת משימות
 
-העברה לבקר מרוחק אינה זמינה. גם אם מציינים כתובת יעד, הסקריפט משתמש בבקר Jenkins הנוכחי.
+העברה לבקר מרוחק אינה זמינה.
 
 ##### יצירת תבניות למשימות
 
@@ -238,10 +238,6 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 הספרייה מספקת גם ממשק API תכנותי לשימוש בסקריפטי Groovy משלכם:
 
-JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
-
-`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
-
 #### ניהול משימות
 
 ```groovy
@@ -331,12 +327,12 @@ doManager.provisionNewDroplet("my-do-template")
 
 #### סביבת בדיקות ב-Docker
 
-[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+[`java24`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
 
-[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:21-jdk`
 
 ```sh
-docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java24
 docker compose -f docker-compose.test.yml run --rm java21
 ```
 

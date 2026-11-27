@@ -75,7 +75,7 @@ jenkins-script-library/
 
 2. **كسكربتات منفصلة تتشغّل مباشرة جوه Jenkins**:
 
-   السكربتات الموجودة في `src/main/groovy/com/github/thomasvincent/jenkinsscripts/scripts/` تقدر تشغّلها مباشرة في Jenkins Script Console أو عن طريق Jenkins CLI.
+   السكربتات الموجودة في `src/com/github/thomasvincent/jenkinsscripts/scripts/` تقدر تشغّلها مباشرة في Jenkins Script Console أو عن طريق Jenkins CLI.
 
 ## الاستخدام
 
@@ -107,7 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### ترحيل المهام
 
-الترحيل لوحدة تحكّم بعيدة مش متاح. حتى لو حدّدت عنوان URL للوجهة، السكربت بيستخدم وحدة تحكّم Jenkins الحالية.
+الترحيل لوحدة تحكّم بعيدة مش متاح.
 
 ##### تحويل المهام لقوالب
 
@@ -238,10 +238,6 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 المكتبة كمان بتوفّر واجهة برمجية (API) تقدر تستخدمها في سكربتات Groovy بتاعتك:
 
-JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
-
-`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
-
 #### إدارة المهام
 
 ```groovy
@@ -331,12 +327,12 @@ doManager.provisionNewDroplet("my-do-template")
 
 #### بيئة الاختبار بـ Docker
 
-[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+[`java24`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
 
-[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:21-jdk`
 
 ```sh
-docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java24
 docker compose -f docker-compose.test.yml run --rm java21
 ```
 

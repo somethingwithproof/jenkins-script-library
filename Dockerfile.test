@@ -4,7 +4,7 @@
 # Jenkins Script Library Testing Image
 #
 # This Dockerfile creates an environment for testing the Jenkins Script Library.
-# It includes Java 17, Gradle, and all necessary testing tools.
+# It includes Java 24, Gradle, and all necessary testing tools.
 
 FROM eclipse-temurin:24-jdk
 

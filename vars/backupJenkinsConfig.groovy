@@ -13,12 +13,12 @@ import com.cloudbees.groovy.cps.NonCPS
 
 /**
  * Pipeline step to backup Jenkins configuration.
- * 
+ *
  * Usage in Pipeline:
  * ```groovy
  * // Backup to workspace
  * def backupFile = backupJenkinsConfig()
- * 
+ *
  * // Backup to specific location
  * backupJenkinsConfig(
  *     destination: '/backup/jenkins-config.zip',
@@ -26,7 +26,7 @@ import com.cloudbees.groovy.cps.NonCPS
  *     includePlugins: true,
  *     compress: true
  * )
- * 
+ *
  * // Archive the backup
  * backupJenkinsConfig(archive: true)
  * ```
@@ -76,19 +76,12 @@ def restore(Map args = [:]) {
         error "backupFile parameter is required for restore"
     }
 
-    echo "[backupJenkinsConfig] WARNING: Restoring Jenkins configuration from: ${args.backupFile}"
-    echo "[backupJenkinsConfig] WARNING: This will overwrite current configuration!"
-
-    boolean success = performRestoreNonCps(args.backupFile as String)
-
-    if (success) {
-        echo "[backupJenkinsConfig] Restore completed successfully"
-        echo "[backupJenkinsConfig] WARNING: Jenkins restart may be required for all changes to take effect"
-    } else {
-        error "Restore failed - check logs for details"
-    }
-
-    return success
+    boolean preview = args.dryRun == true || args.listContents == true
+    def report = performRestoreNonCps(args.backupFile as String, args.files ?: [], preview)
+    if (preview) return report.entries
+    if (report.recoveryDirectory) echo "[backupJenkinsConfig] Originals: ${report.recoveryDirectory}"
+    echo '[backupJenkinsConfig] Restore complete. Reload configuration explicitly to apply changes.'
+    return true
 }
 
 @NonCPS
@@ -109,8 +102,8 @@ private Map performBackupNonCps(String destination, boolean includeJobs, boolean
 }
 
 @NonCPS
-private boolean performRestoreNonCps(String backupFilePath) {
+private Map performRestoreNonCps(String backupFilePath, List files, boolean preview) {
     def jenkins = Jenkins.get()
     def backup = new JenkinsConfigBackup(jenkins)
-    return backup.restoreBackup(backupFilePath)
+    return backup.restore(backupFilePath, [files: files, dryRun: preview])
 }
