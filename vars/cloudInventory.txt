@@ -1,0 +1,4 @@
+Return a read-only inventory of configured Jenkins clouds and online cloud agents.
+Takes no parameters and returns a plain serializable map with clouds and agents lists.
+Static agents and agents whose configured cloud no longer exists are omitted.
+Requires a trusted shared library because it inspects controller cloud state.

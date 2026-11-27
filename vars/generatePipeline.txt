@@ -1,0 +1,4 @@
+Generate a Jenkinsfile from a workspace template file path or inline template text.
+Parameters: template (required; file path in the workspace or raw template string),
+parameters (optional map of template substitutions), and destination (optional workspace file
+path to write the rendered output). Returns the rendered pipeline text as a String.

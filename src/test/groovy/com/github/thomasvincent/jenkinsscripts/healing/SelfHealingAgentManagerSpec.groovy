@@ -136,4 +136,35 @@ class SelfHealingAgentManagerSpec extends Specification {
         runningAfterStart
         !manager.isRunning()
     }
+
+    def "singlePass mode attempts reconnect synchronously without starting background scheduler"() {
+        given:
+        def jenkins = Mock(Jenkins)
+        def agent = Mock(Computer)
+        agent.name >> 'single-pass-agent'
+        agent.isOffline() >> true
+        agent.isOnline() >> false
+        agent.offlineCause >> null
+        jenkins.toComputer() >> null
+        jenkins.computers >> ([agent] as Computer[])
+
+        def manager = new SelfHealingAgentManager([
+            maxRetryAttempts   : 1,
+            enableAutoReconnect: true,
+            enableAutoRestart  : false,
+            singlePass         : true
+        ], jenkins)
+
+        when:
+        manager.performHealthCheck()
+
+        then:
+        1 * agent.connect(true)
+        !manager.isRunning()
+        manager.statistics.totalAttempts == 1
+        manager.statistics.agents['single-pass-agent'].status == 'RECOVERING'
+
+        cleanup:
+        manager.stop()
+    }
 }

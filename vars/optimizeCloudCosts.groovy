@@ -224,7 +224,12 @@ def checkBudgets(Map budgets) {
  * Generate a formatted cost report.
  */
 def generateReport(Map args = [:]) {
-    def analysis = analyze(args)
+    Map analysis = analyze(args)
+    return formatCostReport(analysis)
+}
+
+@NonCPS
+private String formatCostReport(Map analysis) {
     def report = new StringBuilder()
 
     report << "Jenkins Cloud Cost Report\n"

@@ -46,6 +46,8 @@ class SelfHealingAgentManager {
     private final boolean enableAutoReconnect
     private final boolean enableAutoRestart
     private final boolean enableAutoReplace
+    private final boolean singlePass
+    private final boolean readOnly
     private final Jenkins injectedJenkins
 
     // State tracking
@@ -73,6 +75,8 @@ class SelfHealingAgentManager {
         this.enableAutoReconnect = config.enableAutoReconnect != false
         this.enableAutoRestart = config.enableAutoRestart != false
         this.enableAutoReplace = (config.enableAutoReplace as Boolean) ?: false
+        this.singlePass = (config.singlePass as Boolean) ?: false
+        this.readOnly = (config.readOnly as Boolean) ?: false
         this.injectedJenkins = jenkins
     }
 
@@ -245,6 +249,11 @@ class SelfHealingAgentManager {
             return
         }
 
+        if (readOnly) {
+            LOGGER.fine("Agent ${agentName} is offline (read-only check, skipping recovery)")
+            return
+        }
+
         // Transition once into FAILED/REPLACING per outage episode
         if (state.status == AgentStatus.FAILED || state.status == AgentStatus.REPLACING) {
             LOGGER.fine("Agent ${agentName} already in terminal outage state ${state.status}, skipping duplicate failure handling")
@@ -297,6 +306,13 @@ class SelfHealingAgentManager {
             try {
                 LOGGER.info("Attempting to reconnect agent ${agentName}")
                 computer.connect(true)
+
+                if (singlePass) {
+                    if (!computer.isOnline() && enableAutoRestart) {
+                        attemptRestart(computer, state)
+                    }
+                    return
+                }
 
                 scheduleRecoveryTask(agentName, retryDelayMs) {
                     if (computer.isOnline()) {
@@ -365,12 +381,21 @@ class SelfHealingAgentManager {
                 if (node != null) {
                     slaveComputer.disconnect(new OfflineCause.ByCLI("Self-healing restart"))
 
-                    scheduleRecoveryTask(agentName, 5000L) {
+                    if (singlePass) {
                         try {
                             slaveComputer.connect(true)
                             LOGGER.info("Restart initiated for agent ${agentName}")
                         } catch (Exception e) {
                             LOGGER.log(Level.WARNING, "Failed to restart agent ${agentName}", e)
+                        }
+                    } else {
+                        scheduleRecoveryTask(agentName, 5000L) {
+                            try {
+                                slaveComputer.connect(true)
+                                LOGGER.info("Restart initiated for agent ${agentName}")
+                            } catch (Exception e) {
+                                LOGGER.log(Level.WARNING, "Failed to restart agent ${agentName}", e)
+                            }
                         }
                     }
                 }

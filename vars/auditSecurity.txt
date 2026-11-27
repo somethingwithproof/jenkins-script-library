@@ -1,0 +1,5 @@
+Audit Jenkins controller security settings and report findings by severity.
+Parameters: archive (default: true; writes and archives security-audit-report.html),
+failOnCritical (default: false; fails the build when critical findings exist), and
+emailReport (optional recipient address sent via emailext). Returns a plain serializable
+map containing findings and summary counts.

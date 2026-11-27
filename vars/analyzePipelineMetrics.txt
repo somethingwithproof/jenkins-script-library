@@ -1,0 +1,4 @@
+Analyze build history, stage timings, anomalies, and recommendations for a Jenkins Pipeline job.
+Accepts jobName (default: env.JOB_NAME), historyLimit (default: 100), and includeRecommendations
+(default: true). Can also be invoked with a single job name string: analyzePipelineMetrics('my-job').
+Returns a plain serializable map with summary, anomalies, and recommendations.

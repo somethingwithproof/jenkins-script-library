@@ -236,14 +236,15 @@ class JenkinsSecurityAuditor {
     void checkUserPermissions() {
         // Look for anonymous permissions
         def strategy = jenkins.getAuthorizationStrategy()
-        if (strategy.getACL(jenkins).hasPermission(ACL.ANONYMOUS, Jenkins.ADMINISTER)) {
+        def rootAcl = strategy.getACL(jenkins)
+        if (rootAcl.hasPermission2(Jenkins.ANONYMOUS2, Jenkins.ADMINISTER)) {
             addFinding(
                 FindingCategory.AUTHORIZATION,
                 FindingSeverity.CRITICAL,
                 "Anonymous Admin Access",
                 "Anonymous users have administrator permissions."
             )
-        } else if (strategy.getACL(jenkins).hasPermission(ACL.ANONYMOUS, Jenkins.READ)) {
+        } else if (rootAcl.hasPermission2(Jenkins.ANONYMOUS2, Jenkins.READ)) {
             addFinding(
                 FindingCategory.AUTHORIZATION,
                 FindingSeverity.MEDIUM,
@@ -255,7 +256,7 @@ class JenkinsSecurityAuditor {
         // Check admin accounts
         int adminCount = 0
         User.getAll().each { user ->
-            if (strategy.getACL(jenkins).hasPermission(user.impersonate(), Jenkins.ADMINISTER)) {
+            if (rootAcl.hasPermission2(user.impersonate2(), Jenkins.ADMINISTER)) {
                 adminCount++
             }
         }

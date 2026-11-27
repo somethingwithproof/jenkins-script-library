@@ -1,0 +1,4 @@
+Generate Declarative Pipeline definitions using the bundled Groovy PipelineDSL builder.
+Call pipelineDSL { ... } with a builder closure or use preset helpers: .simpleCIPipeline(Map),
+.javaPipeline(Map), .mavenPipeline(Map), .nodePipeline(Map), .pythonPipeline(Map),
+.goPipeline(Map), and .multiBranchPipeline(Map). Returns the generated Jenkinsfile as a String.
