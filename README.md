@@ -22,14 +22,25 @@
 
 `jenkins-script-library` is a Groovy library, Jenkins Pipeline shared library (`vars/`), and controller-side script suite for automating Jenkins operations. It is built for Jenkins administrators and platform engineers who manage jobs, plugins, credentials, backups, metrics, and cloud agents across AWS, Azure, Google Cloud, Kubernetes, and Oracle Cloud without maintaining ad-hoc Script Console snippets.
 
-The Gradle build compiles all 69 Groovy source files under `src/com/` and `src/hudson/` against Jenkins LTS `2.590` and Groovy `3.0.25`. CI verifies the repository with 226 Spock unit tests across Java 21 and Java 24, controller acceptance tests in a temporary Jenkins home (`./gradlew integrationTest`), Python unit tests for spot-capacity scripts, CodeNarc static analysis, release archive verification, SonarCloud analysis, and OpenSSF Scorecard checks.
+The Gradle build compiles all 68 Groovy source files under `src/com/` and packages `resources/` against Jenkins LTS `2.590` and Groovy `3.0.25`. CI verifies the repository with 278 unit tests (262 Spock unit and validation tests plus 16 `JenkinsPipelineUnit` tests covering all 15 `vars/` steps) across Java 21 and Java 24, controller acceptance tests in a temporary Jenkins home (`./gradlew integrationTest`), Python unit tests for spot-capacity scripts, CodeNarc static analysis, release archive verification, SonarCloud analysis, and OpenSSF Scorecard checks.
+
+## Architectural Boundaries
+
+Jenkins enforces distinct execution models for Pipeline builds, controller administration, declarative configuration, and core extensions. This repository separates those layers explicitly:
+
+1. **Shared Library (`@Library`)**: `src/com/`, `vars/*.groovy` (each paired with a `vars/*.txt` Pipeline Syntax Global Variables Reference help file), and `resources/`. Build-scoped steps such as `helmDeploy`, `generatePipeline`, `pipelineDSL`, `exportPrometheusMetrics`, `provisionSpot`, and `withSpotAgent` run within Pipeline builds without mutating global controller state or spawning long-lived background threads.
+2. **Controller Admin Scripts (`admin-scripts/` and `src/com/.../scripts/`)**: Thin entry scripts for privileged controller-level operations (`Jenkins.get()`, controller backups, security audits, job cleanup, and agent fleet inspection) meant for the Jenkins Script Console (`Manage Jenkins -> Script Console`) or `jenkins-cli.jar groovy =`. See [admin-scripts/README.md](admin-scripts/README.md).
+3. **JCasC, Job DSL, and Maven `.hpi` Plugins**:
+   - Register the shared library declaratively with JCasC ([examples/jcasc/jenkins.yaml](examples/jcasc/jenkins.yaml)) and define multibranch seed jobs with Job DSL ([examples/job-dsl/seed.groovy](examples/job-dsl/seed.groovy)).
+   - Jenkins only discovers `@Extension` classes compiled with annotation processing inside installed `.hpi` plugins, never from a Shared Library or Script Console. Components that require `ToolInstallation`, `AsyncPeriodicWork`, or `RootAction` belong in a dedicated Maven `.hpi` plugin rather than a Shared Library. For that reason, the former non-functional `hudson.tools.HelmInstallation` extension stub was removed, `HelmHelper` / `helmDeploy` operate directly on build agents, `selfHealingAgents` executes a single-pass check per invocation instead of spawning a daemon thread pool, and `exportPrometheusMetrics` keeps state scoped to each build script instance.
 
 ## Capabilities
 
 - **Job lifecycle and pipelines**: Clean build history, disable jobs or triggers, copy and templatize jobs, audit job XML configurations, analyze job health and pipeline performance, inspect dependency graphs, manage job parameters, archive inactive jobs, and generate Declarative Pipelines from templates or Groovy DSL.
 - **Controller operations and security**: Audit Jenkins security configuration and plugin drift against a manifest, run area-scoped vulnerability scans, evaluate credential age and usage for rotation, and create or selectively restore controller backups.
 - **Cloud agents and spot capacity**: Inventory configured cloud providers and active agents, manage agents on AWS EC2, Azure VMs, Kubernetes, and Oracle Cloud, estimate agent spend and allocations, request interruptible compute capacity (`provisionSpot`), and run builds on verified spot agents (`withSpotAgent`).
-- **Observability and agent recovery**: Export build, stage, agent, and queue metrics in Prometheus exposition format (`exportPrometheusMetrics`) and run automated offline-agent health checks and recovery (`selfHealingAgents`).
+- **Observability and agent recovery**: Export build-scoped Prometheus metrics (`exportPrometheusMetrics`) without global static state and run single-pass offline-agent health checks and recovery (`selfHealingAgents`).
+- **Build-scoped Helm workflows**: Lint, configure, and deploy Helm charts on build agents with validated, shell-escaped arguments (`helmDeploy` and `HelmHelper`).
 
 ## Project Structure
 
@@ -37,10 +48,11 @@ The repository follows the Jenkins Shared Library directory layout so Jenkins lo
 
 ```text
 jenkins-script-library/
-├── vars/                                 # 14 Jenkins Pipeline shared library steps and vars/README.md
+├── vars/                                 # 15 Pipeline shared library steps (.groovy + .txt help files) and vars/README.md
 ├── resources/
 │   └── com/github/thomasvincent/jenkinsscripts/cloud/
 │                                         # Python helpers and pool metadata for spot capacity
+├── admin-scripts/                        # Thin Script Console / jenkins-cli controller admin scripts and README
 ├── src/
 │   ├── com/github/thomasvincent/jenkinsscripts/
 │   │   ├── analytics/                    # Pipeline metrics collection and anomaly detection
@@ -50,24 +62,27 @@ jenkins-script-library/
 │   │   ├── credentials/                  # Credential usage analysis and rotation management
 │   │   ├── dsl/                          # Groovy Pipeline DSL builder
 │   │   ├── groovydoc/                    # Package-level GroovyDoc summary
-│   │   ├── healing/                      # Self-healing offline agent recovery manager
-│   │   ├── helm/                         # Helm tool helper utilities
+│   │   ├── healing/                      # Single-pass and scheduled offline-agent recovery manager
+│   │   ├── helm/                         # Build-scoped Helm CLI helper
 │   │   ├── jobs/                         # Cleaning, disabling, templating, auditing, dependencies, scheduling
 │   │   ├── monitoring/                   # Prometheus metrics exporter
 │   │   ├── nodes/                        # Node inspection and offline launcher utilities
 │   │   ├── pipeline/                     # Template-based Jenkinsfile generator
-│   │   ├── scripts/                      # 28 Script Console / Jenkins CLI entry points
+│   │   ├── scripts/                      # 28 CLI / Script Console entry points
 │   │   ├── security/                     # Jenkins security configuration auditor
 │   │   ├── util/                         # Static ErrorHandler, validation, string, and compatibility utilities
 │   │   └── utils/                        # Instance-based ErrorHandler with java.util.logging.Logger
-│   ├── hudson/tools/                     # HelmInstallation Jenkins tool descriptor
 │   ├── test/
-│   │   ├── groovy/                       # Spock unit tests (19 spec files)
+│   │   ├── groovy/                       # 20 Spock and JenkinsPipelineUnit test specs (278 tests)
 │   │   └── python/                       # Unittest suite for spot provisioning and verification
 │   ├── controller-test/                  # Jenkins controller acceptance tests (jenkins-test-harness)
 │   └── integration-test/                 # Integration test suite
 ├── templates/                            # Reusable Jenkinsfile templates
-├── examples/                             # Example Declarative Pipelines
+├── examples/
+│   ├── Jenkinsfile                       # Build-scoped Declarative Pipeline using @Library steps
+│   ├── advanced-pipeline.jenkinsfile     # Scheduled operations pipeline example
+│   ├── jcasc/jenkins.yaml                # Declarative JCasC Global Trusted Pipeline Library config
+│   └── job-dsl/seed.groovy               # Declarative Job DSL multibranch pipeline seed
 ├── config/                               # CodeNarc rules, plugin manifests, and init.groovy.d examples
 ├── scripts/                              # Repository maintenance and release verification scripts
 ├── build.gradle                          # Gradle build, test, CodeNarc, and distribution config
@@ -82,7 +97,7 @@ jenkins-script-library/
 
 ### 1. Jenkins Global Shared Library
 
-Configure this repository under **Manage Jenkins -> System -> Global Trusted Pipeline Libraries** (for example, named `jenkins-script-library`, pointing at `https://github.com/somethingwithproof/jenkins-script-library.git` on `main`). See [config/init.groovy.d/02-global-library.groovy](config/init.groovy.d/02-global-library.groovy) for an automated Groovy init script example.
+Configure this repository under **Manage Jenkins -> System -> Global Trusted Pipeline Libraries** (for example, named `jenkins-script-library`, pointing at `https://github.com/somethingwithproof/jenkins-script-library.git` on a pinned tag or `main`). For declarative setup, use [examples/jcasc/jenkins.yaml](examples/jcasc/jenkins.yaml); see [config/init.groovy.d/02-global-library.groovy](config/init.groovy.d/02-global-library.groovy) for a Groovy init script alternative.
 
 Load the library at the top of a `Jenkinsfile`:
 
@@ -90,7 +105,7 @@ Load the library at the top of a `Jenkinsfile`:
 @Library('jenkins-script-library') _
 ```
 
-Jenkins loads callable steps from `vars/`, helper scripts from `resources/`, and Groovy classes from `src/com/` and `src/hudson/`.
+Jenkins loads callable steps and Pipeline Syntax help files from `vars/`, helper scripts from `resources/`, and Groovy classes from `src/com/`.
 
 ### 2. Compiled JAR or Release Archive
 
@@ -108,30 +123,31 @@ dependencies {
 }
 ```
 
-### 3. Controller-Side Scripts
+### 3. Controller-Side Admin Scripts
 
-Scripts in `src/com/github/thomasvincent/jenkinsscripts/scripts/` can run directly in the Jenkins Script Console or through `jenkins-cli groovy` when the library classes are on the controller classpath.
+Run thin administrative scripts from [admin-scripts/](admin-scripts/) (`backup-controller.groovy`, `audit-security.groovy`, `cleanup-jobs.groovy`, `optimize-agents.groovy`) or CLI scripts in `src/com/github/thomasvincent/jenkinsscripts/scripts/` via the Jenkins Script Console or `jenkins-cli.jar groovy =` when the library classes are on the controller classpath.
 
 ## Shared Library Pipeline Steps (`vars/`)
 
-Steps under `vars/` confine Jenkins controller objects inside `@NonCPS` helper methods so only plain serializable `Map`, `List`, or `String` values cross Pipeline CPS suspension boundaries. Boolean parameters preserve explicit `false` values (for example `archive: false`, `compress: false`, `dryRun: false`, `includeRecommendations: false`, and `includeUsage: false`).
+Every `vars/<step>.groovy` file has a matching `vars/<step>.txt` help file rendered automatically in Jenkins' Pipeline Syntax Global Variables Reference. Steps that access Jenkins controller APIs confine controller objects inside `@NonCPS` helper methods so only plain serializable `Map`, `List`, or `String` values cross Pipeline CPS suspension boundaries. Boolean parameters preserve explicit `false` values (for example `archive: false`, `atomic: false`, `wait: false`, `compress: false`, `dryRun: false`, `includeRecommendations: false`, and `includeUsage: false`).
 
-| Step | Purpose | Key entry points / parameters |
-| --- | --- | --- |
-| `analyzePipelineMetrics` | Collect build and stage metrics, anomalies, and recommendations | `jobName` (defaults to `env.JOB_NAME`), `historyLimit` (default `100`), `includeRecommendations` (default `true`) |
-| `auditPlugins` | Inspect installed plugins and compare against a manifest | `expected` (manifest text; returns `drift`, `missing`, `extra`, `mismatched`) |
-| `auditSecurity` | Audit controller security settings and optionally archive HTML report | `archive` (default `true`), `failOnCritical`, `emailReport` |
-| `backupJenkinsConfig` | Create controller backups and preview or apply selective restores | `destination` or `destinationDir`, `includeJobs`, `includePlugins`, `includeNodes`, `compress`, `archive`; `.restore(backupFile:, files:, dryRun:, listContents:)` |
-| `cloudInventory` | List configured clouds and online cloud agents | No parameters; returns `[clouds: [...], agents: [...]]` |
-| `disableJobs` | Disable a job, regex-matched jobs, or jobs in a folder | `jobName`, `pattern`, `folderPath`, `dryRun`, `recursive` |
-| `exportPrometheusMetrics` | Record build/stage timings and render Prometheus text format | `call(namespace:, subsystem:, histogramBuckets:)`, `.recordBuild(...)`, `.recordStage(...)`, `.summary()`, `.reset()` |
-| `generatePipeline` | Render a Jenkinsfile from a workspace template file or template string | `template`, `parameters`, `destination` |
-| `optimizeCloudCosts` | Estimate agent costs, check budgets, allocate costs, and plan actions | `action` (`analyze`, `optimize`, `allocate`, `budget`) or `.analyze()`, `.optimize(dryRun:)`, `.getAllocations()`, `.checkBudgets(Map)`, `.generateReport()` |
-| `pipelineDSL` | Generate Declarative Pipeline source via Groovy DSL | Closure builder or `.simpleCIPipeline(Map)`, `.javaPipeline()`, `.mavenPipeline()`, `.nodePipeline()`, `.pythonPipeline()`, `.goPipeline()`, `.multiBranchPipeline(Map)` |
-| `provisionSpot` | Preview or submit a single interruptible VM or Kubernetes Pod request | `provider`, `apply` (default `false`), plus provider-specific inputs |
-| `rotateCredentials` | Analyze credential compliance, detect unused credentials, and rotate | `action` (`analyze`, `rotate`, `unused`) or `.analyze(includeUsage:)`, `.rotate(dryRun:, policy:)`, `.findUnused(days:)`, `.checkCompliance()` |
-| `selfHealingAgents` | Start, inspect, trigger, and stop background offline-agent recovery | `.start(config)`, `.stop()`, `.healthCheck()`, `.statistics()`, `.agentStatuses()`, `.isRunning()` |
-| `withSpotAgent` | Run a closure once on an existing agent with verified spot capacity | `provider`, `label` (default `'spot'`), `pool` (required for `kubernetes`) |
+| Step | Scope | Purpose | Key entry points / parameters |
+| --- | --- | --- | --- |
+| `helmDeploy` | Build agent | Lint, install Helm, and run shell-escaped `helm upgrade --install` | `release`, `chart`, `namespace`, `valuesFiles`, `setValues`, `atomic`, `wait`, `timeout`, `dryRun`, `lint`, `version`, `toolName`; `.setup()`, `.lint()` |
+| `generatePipeline` | Build agent | Render a Jenkinsfile from a workspace template file or template string | `template`, `parameters`, `destination` |
+| `pipelineDSL` | Build agent | Generate Declarative Pipeline source via Groovy DSL | Closure builder or `.simpleCIPipeline(Map)`, `.javaPipeline()`, `.mavenPipeline()`, `.nodePipeline()`, `.pythonPipeline()`, `.goPipeline()`, `.multiBranchPipeline(Map)` |
+| `exportPrometheusMetrics` | Build-scoped | Record build/stage timings per build instance and render Prometheus text format | `call(namespace:, subsystem:, histogramBuckets:)`, `.recordBuild(...)`, `.recordStage(...)`, `.summary()`, `.reset()` |
+| `provisionSpot` | Build agent | Preview or submit a single interruptible VM or Kubernetes Pod request | `provider`, `apply` (default `false`), plus provider-specific inputs |
+| `withSpotAgent` | Build + controller | Run a closure once on an existing agent with verified spot capacity | `provider`, `label` (default `'spot'`), `pool` (required for `kubernetes`) |
+| `analyzePipelineMetrics` | Trusted controller | Collect build and stage metrics, anomalies, and recommendations | `jobName` (defaults to `env.JOB_NAME`), `historyLimit` (default `100`), `includeRecommendations` (default `true`) |
+| `auditPlugins` | Trusted controller | Inspect installed plugins and compare against a manifest | `expected` (manifest text; returns `drift`, `missing`, `extra`, `mismatched`) |
+| `auditSecurity` | Trusted controller | Audit controller security settings and optionally archive HTML report | `archive` (default `true`), `failOnCritical`, `emailReport` |
+| `backupJenkinsConfig` | Trusted controller | Create controller backups and preview or apply selective restores | `destination` or `destinationDir`, `includeJobs`, `includePlugins`, `includeNodes`, `compress`, `archive`; `.restore(backupFile:, files:, dryRun:, listContents:)` |
+| `cloudInventory` | Trusted controller | List configured clouds and online cloud agents | No parameters; returns `[clouds: [...], agents: [...]]` |
+| `disableJobs` | Trusted controller | Disable a job, regex-matched jobs, or jobs in a folder | `jobName`, `pattern`, `folderPath`, `dryRun`, `recursive` |
+| `optimizeCloudCosts` | Trusted controller | Estimate agent costs, check budgets, allocate costs, and plan actions | `action` (`analyze`, `optimize`, `allocate`, `budget`) or `.analyze()`, `.optimize(dryRun:)`, `.getAllocations()`, `.checkBudgets(Map)`, `.generateReport()` |
+| `rotateCredentials` | Trusted controller | Analyze credential compliance, detect unused credentials, and rotate | `action` (`analyze`, `rotate`, `unused`) or `.analyze(includeUsage:)`, `.rotate(dryRun:, policy:)`, `.findUnused(days:)`, `.checkCompliance()` |
+| `selfHealingAgents` | Trusted controller | Run a single-pass offline-agent health check and recovery cycle | `call(config)`, `.healthCheck(config)`, `.statistics(config)`, `.agentStatuses(config)` |
 
 ### Pipeline Examples
 
@@ -163,22 +179,24 @@ pipeline {
             }
         }
 
-        stage('Jobs, Prometheus, and Recovery') {
+        stage('Helm, Prometheus, and Single-Pass Agent Check') {
             steps {
                 script {
-                    disableJobs(pattern: 'deprecated-.*', dryRun: true)
+                    def deployment = helmDeploy(
+                        release: 'sample-service',
+                        chart: './charts/sample-service',
+                        namespace: 'staging',
+                        lint: true,
+                        dryRun: true
+                    )
+                    echo "Helm status: ${deployment.status}"
 
                     exportPrometheusMetrics.recordBuild(env.JOB_NAME, 'SUCCESS', 12345L)
                     String promText = exportPrometheusMetrics(namespace: 'jenkins', subsystem: 'pipeline')
                     echo "Exported ${promText.readLines().size()} Prometheus lines"
 
-                    selfHealingAgents.start([
-                        maxRetryAttempts: 5,
-                        retryDelayMs: 60000,
-                        healthCheckIntervalMs: 120000
-                    ])
-                    def stats = selfHealingAgents.statistics()
-                    echo "Tracked agents: ${stats.totalAgents ?: 0}"
+                    def health = selfHealingAgents(enableAutoReconnect: true, enableAutoRestart: false)
+                    echo "Inspected ${health.agentStatuses.size()} agents (${health.totalAttempts} recovery attempts)"
                 }
             }
         }
@@ -503,13 +521,13 @@ Planned work not yet implemented:
 ### Gradle Commands
 
 ```bash
-# Clean, compile all 69 Groovy source files, run 226 Spock unit tests, and run CodeNarc
+# Clean, compile all 68 Groovy source files, run 278 Spock + JenkinsPipelineUnit tests, and run CodeNarc
 ./gradlew clean check
 
 # Compile and assemble JAR + ZIP/TAR.GZ distributions without running tests
 ./gradlew build -x test
 
-# Run Spock unit tests only
+# Run Spock and JenkinsPipelineUnit tests only
 ./gradlew test
 
 # Run Python spot tests and Jenkins controller acceptance tests (Jenkins LTS 2.590)

@@ -48,7 +48,7 @@ class CodeNarcConventionPlugin implements Plugin<Project> {
     }
     
     private void configureMainSourceSet(CodeNarc task, Project project) {
-        FileTree sourceFiles = project.fileTree(dir: 'src/main/groovy', includes: ['**/*.groovy'])
+        FileTree sourceFiles = project.fileTree(dir: 'src', includes: ['com/**/*.groovy'])
         task.source = sourceFiles
     }
     

@@ -1,0 +1,4 @@
+Inspect installed Jenkins plugins and optionally compare them against a manifest.
+Pass expected (manifest text such as readFile('config/plugins.txt')) to detect drift.
+Returns a plain serializable map with installed, missing, extra, and mismatched lists, plus a boolean drift flag.
+Requires a trusted shared library because it inspects the controller PluginManager.

@@ -1,0 +1,5 @@
+Create a Jenkins controller configuration backup or preview/apply a selective restore.
+Parameters: destination (exact archive or directory path) or destinationDir (parent directory),
+includeJobs (default: true), includePlugins (default: true), includeNodes (default: true),
+compress (default: true), and archive (default: false). Call backupJenkinsConfig.restore(
+backupFile:, files:, dryRun:, listContents:) to inspect or restore entries on the controller.

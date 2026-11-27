@@ -26,8 +26,8 @@ distributions {
     main {
         contents {
             from('.') {
-                include 'src/com/**/*.groovy', 'src/hudson/**/*.groovy', 'vars/**', 'resources/**',
-                    'templates/*.jenkinsfile', 'examples/*.jenkinsfile', 'README.md', 'LICENSE'
+                include 'src/com/**/*.groovy', 'vars/**', 'resources/**', 'admin-scripts/**',
+                    'templates/*.jenkinsfile', 'examples/**', 'README.md', 'LICENSE'
                 exclude '**/__pycache__/**', '**/*.pyc'
             }
         }
@@ -104,6 +104,10 @@ dependencies {
     testImplementation('org.jenkins-ci.plugins:ec2:2068.vd80935072db_b_@jar')
     testImplementation('org.csanchez.jenkins.plugins:kubernetes:4560.vc25b_83890c34@jar')
     testImplementation 'org.spockframework:spock-core:2.5-groovy-3.0'
+    testImplementation('com.lesfurets:jenkins-pipeline-unit:1.29') {
+        exclude group: 'org.codehaus.groovy'
+        exclude group: 'org.apache.groovy'
+    }
     testImplementation 'org.mockito:mockito-core:5.17.0'
     testImplementation 'net.bytebuddy:byte-buddy:1.17.5'
     testImplementation 'org.objenesis:objenesis:3.4'
@@ -116,7 +120,10 @@ sourceSets {
     main {
         groovy {
             srcDirs = ['src']
-            include 'com/**/*.groovy', 'hudson/**/*.groovy'
+            include 'com/**/*.groovy'
+        }
+        resources {
+            srcDirs = ['resources']
         }
     }
     test {
@@ -186,8 +193,9 @@ tasks.register('integrationTest', Test) {
     classpath = sourceSets.controllerTest.runtimeClasspath
     useJUnit()
     dependsOn prepareControllerPlugins, testSpotRequests
-    inputs.files(prepareControllerPlugins, fileTree('src/controller-test/fixtures'), fileTree('resources'), 'Jenkinsfile', fileTree('examples') { include '**/*.jenkinsfile' },
-        fileTree('templates') { include '**/*.jenkinsfile' }, fileTree('vars'), fileTree('src/com'), fileTree('src/hudson'))
+    inputs.files(prepareControllerPlugins, fileTree('src/controller-test/fixtures'), fileTree('resources'), 'Jenkinsfile',
+        fileTree('examples') { include '**/*.jenkinsfile', 'Jenkinsfile' },
+        fileTree('templates') { include '**/*.jenkinsfile' }, fileTree('vars'), fileTree('src/com'))
     doFirst {
         systemProperty 'pipeline.pluginDir', prepareControllerPlugins.get().destinationDir.absolutePath
         systemProperty 'pipeline.testClasspath', classpath.asPath

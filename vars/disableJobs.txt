@@ -1,0 +1,4 @@
+Disable a single Jenkins job, jobs matching a regex pattern, or jobs inside a folder.
+Requires one of jobName, pattern, or folderPath. Optional parameters: dryRun (default: false;
+applies to jobName, pattern, and folderPath without mutating jobs) and recursive (default: false,
+applies to folderPath). Returns a plain serializable list of maps describing each affected job.

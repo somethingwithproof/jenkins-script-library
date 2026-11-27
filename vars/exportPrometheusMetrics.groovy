@@ -3,119 +3,111 @@
 
 /*
  * MIT License
- * Copyright (c) 2024 Thomas Vincent
+ * Copyright (c) 2024-2026 Thomas Vincent
  *
- * Jenkins Pipeline shared library step for exporting Prometheus metrics.
+ * Jenkins Pipeline shared library step for exporting build-scoped Prometheus metrics.
  */
 
 import com.cloudbees.groovy.cps.NonCPS
 import com.github.thomasvincent.jenkinsscripts.monitoring.PrometheusMetricsExporter
-import java.util.concurrent.ConcurrentHashMap
+import java.util.logging.Level
+import java.util.logging.Logger
 
 /**
- * Export Jenkins metrics in Prometheus format.
+ * Exports Jenkins build, stage, agent, queue, and JVM metrics in Prometheus text format.
  *
- * Usage:
- *   // Get all metrics as string
- *   def metrics = exportPrometheusMetrics()
- *
- *   // Record a build completion
- *   exportPrometheusMetrics.recordBuild('my-job', 'SUCCESS', 12345)
- *
- *   // Get metrics summary
- *   def summary = exportPrometheusMetrics.summary()
+ * Metrics state is scoped to the current pipeline script instance rather than a
+ * shared static singleton, so concurrent builds never overwrite or reset one another.
  */
 
 @groovy.transform.Field
-private static final PrometheusMetricsExporter DEFAULT_EXPORTER = new PrometheusMetricsExporter()
+private transient PrometheusMetricsExporter buildExporter
 
 @groovy.transform.Field
-private static final ConcurrentHashMap<String, PrometheusMetricsExporter> SCOPED_EXPORTERS = new ConcurrentHashMap<>()
+private static final Logger LOGGER = Logger.getLogger('com.github.thomasvincent.jenkinsscripts.vars.exportPrometheusMetrics')
 
-def call() {
-    return exportWithNonCps(DEFAULT_EXPORTER)
-}
-
-def call(Map params) {
-    if (!params || (!params.namespace && !params.subsystem && !params.histogramBuckets)) {
-        return exportWithNonCps(DEFAULT_EXPORTER)
+def call(Map params = [:]) {
+    try {
+        if (!params || (!params.namespace && !params.subsystem && !params.histogramBuckets)) {
+            return exportBuildScopedNonCps()
+        }
+        String namespace = (params.namespace ?: 'jenkins') as String
+        String subsystem = (params.subsystem ?: 'pipeline') as String
+        int histogramBuckets = (params.histogramBuckets ?: 10) as int
+        return exportWithOptionsNonCps(namespace, subsystem, histogramBuckets)
+    } catch (Exception e) {
+        LOGGER.log(Level.WARNING, 'Failed to export Prometheus metrics', e)
+        throw e
     }
-    PrometheusMetricsExporter target = resolveExporter(
-        (params.namespace ?: 'jenkins') as String,
-        (params.subsystem ?: 'pipeline') as String,
-        (params.histogramBuckets ?: 10) as int
-    )
-    return exportWithNonCps(target)
 }
 
 /**
- * Record a build completion event.
+ * Records a build completion event in the current build's exporter.
  */
 def recordBuild(String jobName, String result, long durationMs) {
     recordBuildNonCps(jobName, result, durationMs)
 }
 
 /**
- * Record a stage execution.
+ * Records a stage execution in the current build's exporter.
  */
 def recordStage(String jobName, String stageName, long durationMs, boolean success = true) {
     recordStageNonCps(jobName, stageName, durationMs, success)
 }
 
 /**
- * Get metrics summary as a map.
+ * Returns a plain serializable summary of metrics recorded in this build.
  */
 def summary() {
     return summaryNonCps()
 }
 
 /**
- * Reset all metrics.
+ * Resets metrics recorded in the current build's exporter.
  */
 def reset() {
     resetNonCps()
 }
 
-/**
- * Get the default exporter instance for advanced usage.
- */
 @NonCPS
-def getExporter() {
-    return DEFAULT_EXPORTER
+private PrometheusMetricsExporter getOrCreateExporter() {
+    if (buildExporter == null) {
+        buildExporter = new PrometheusMetricsExporter()
+    }
+    return buildExporter
 }
 
 @NonCPS
-private PrometheusMetricsExporter resolveExporter(String namespace, String subsystem, int histogramBuckets) {
+private String exportBuildScopedNonCps() {
+    return getOrCreateExporter().exportMetrics()
+}
+
+@NonCPS
+private String exportWithOptionsNonCps(String namespace, String subsystem, int histogramBuckets) {
     if (namespace == 'jenkins' && subsystem == 'pipeline' && histogramBuckets == 10) {
-        return DEFAULT_EXPORTER
+        return getOrCreateExporter().exportMetrics()
     }
-    String key = "${namespace}\u0000${subsystem}\u0000${histogramBuckets}"
-    return SCOPED_EXPORTERS.computeIfAbsent(key) {
-        new PrometheusMetricsExporter(namespace, subsystem, histogramBuckets)
-    }
-}
-
-@NonCPS
-private String exportWithNonCps(PrometheusMetricsExporter target) {
-    return target.exportMetrics()
+    // Create an isolated exporter for custom naming/buckets without mutating buildExporter.
+    PrometheusMetricsExporter scoped = new PrometheusMetricsExporter(namespace, subsystem, histogramBuckets)
+    return scoped.exportMetrics()
 }
 
 @NonCPS
 private void recordBuildNonCps(String jobName, String result, long durationMs) {
-    DEFAULT_EXPORTER.recordBuildCompletion(jobName, result, durationMs)
+    getOrCreateExporter().recordBuildCompletion(jobName, result, durationMs)
 }
 
 @NonCPS
 private void recordStageNonCps(String jobName, String stageName, long durationMs, boolean success) {
-    DEFAULT_EXPORTER.recordStageExecution(jobName, stageName, durationMs, success)
+    getOrCreateExporter().recordStageExecution(jobName, stageName, durationMs, success)
 }
 
 @NonCPS
 private Map summaryNonCps() {
-    return DEFAULT_EXPORTER.getMetricsSummary()
+    return getOrCreateExporter().getMetricsSummary()
 }
 
 @NonCPS
 private void resetNonCps() {
-    DEFAULT_EXPORTER.resetMetrics()
+    getOrCreateExporter().resetMetrics()
 }

@@ -32,19 +32,21 @@ def call(Map args = [:]) {
         error "Must specify either jobName, pattern, or folderPath"
     }
 
+    boolean dryRun = args.dryRun == true
+    String actionLabel = dryRun ? 'Previewing (dry-run)' : 'Disabling'
     if (args.jobName) {
-        echo "[disableJobs] Disabling job: ${args.jobName}"
+        echo "[disableJobs] ${actionLabel} job: ${args.jobName}"
     } else if (args.pattern) {
-        echo "[disableJobs] Disabling jobs matching pattern: ${args.pattern}"
+        echo "[disableJobs] ${actionLabel} jobs matching pattern: ${args.pattern}"
     } else if (args.folderPath) {
-        echo "[disableJobs] Disabling jobs in folder: ${args.folderPath}"
+        echo "[disableJobs] ${actionLabel} jobs in folder: ${args.folderPath}"
     }
 
     Map outcome = disableJobsNonCps(
         args.jobName as String,
         args.pattern as String,
         args.folderPath as String,
-        args.dryRun == true,
+        dryRun,
         args.recursive == true
     )
 
@@ -53,7 +55,7 @@ def call(Map args = [:]) {
     }
 
     List results = outcome.results as List
-    echo "[disableJobs] Disabled ${results.size()} jobs"
+    echo "[disableJobs] ${dryRun ? 'Matched (dry-run)' : 'Disabled'} ${results.size()} jobs"
     return results
 }
 
@@ -64,7 +66,7 @@ private Map disableJobsNonCps(String jobName, String pattern, String folderPath,
     List<Map<String, Object>> results = []
 
     if (jobName) {
-        boolean success = disabler.disableJob(jobName)
+        boolean success = disabler.disableJob(jobName, dryRun)
         results.add([job: jobName, success: success])
     } else if (pattern) {
         List<String> disabledJobs = disabler.disableJobsByPattern(pattern, dryRun)
@@ -76,7 +78,7 @@ private Map disableJobsNonCps(String jobName, String pattern, String folderPath,
         if (!folder) {
             return [results: [], errorMessage: "Folder not found: ${folderPath}"]
         }
-        List<String> disabledJobs = disabler.disableJobsInFolder(folder, recursive)
+        List<String> disabledJobs = disabler.disableJobsInFolder(folder, recursive, dryRun)
         disabledJobs.each { String name ->
             results.add([job: name, success: true])
         }

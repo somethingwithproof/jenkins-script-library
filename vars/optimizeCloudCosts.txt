@@ -1,0 +1,4 @@
+Analyze Jenkins cloud agent costs, check budgets, inspect allocations, or plan optimizations.
+Parameters: action (analyze, optimize, allocate, or budget; default: analyze), dryRun (default: true
+for optimize), and budgets (map of scope to budget amount for budget). Helper methods: .analyze(),
+.optimize(dryRun:), .getAllocations(), .checkBudgets(Map), and .generateReport().

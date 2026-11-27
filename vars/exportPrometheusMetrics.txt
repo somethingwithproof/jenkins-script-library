@@ -1,0 +1,5 @@
+Record build and stage timings and render metrics in Prometheus text exposition format.
+Metrics state is scoped to the current build script instance and never mutates global static state.
+Call exportPrometheusMetrics(namespace:, subsystem:, histogramBuckets:) to render metrics text,
+or use .recordBuild(jobName, result, durationMs), .recordStage(jobName, stageName, durationMs, success),
+.summary(), and .reset().

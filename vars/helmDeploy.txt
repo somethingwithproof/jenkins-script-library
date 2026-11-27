@@ -1,0 +1,6 @@
+Lint and deploy a Helm chart from the current build agent using validated, shell-escaped flags.
+Required parameters: release and chart. Optional parameters: namespace (default: default),
+valuesFiles (list of YAML paths), setValues (map of literal overrides escaped for Helm --set), atomic (default: true),
+wait (default: true), timeout (default: 5m), createNamespace (default: false), dryRun (default: false),
+lint (default: false), version (install Helm into agent temp dir), toolName (Jenkins tool name),
+and helmBin (default: helm). Also exposes helmDeploy.setup(version) and helmDeploy.lint(chart:).

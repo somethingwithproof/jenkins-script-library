@@ -1,0 +1,5 @@
+Run a single-pass health check and recovery cycle against offline Jenkins agents.
+Executes synchronously within the build without spawning background scheduler threads or keeping
+global static state. Optional parameters: maxRetryAttempts (default: 1), enableAutoReconnect
+(default: true), enableAutoRestart (default: true), and enableAutoReplace (default: false).
+Helper methods: .healthCheck(config), .statistics(config), and .agentStatuses(config).

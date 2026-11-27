@@ -32,6 +32,7 @@ import hudson.security.Permission
 import hudson.model.User
 import hudson.security.ACL
 import hudson.security.AuthorizationStrategy
+import org.springframework.security.core.userdetails.UsernameNotFoundException
 //import hudson.plugins.warnings.PluginsUtils
 
 import java.util.logging.Logger
@@ -236,14 +237,15 @@ class JenkinsSecurityAuditor {
     void checkUserPermissions() {
         // Look for anonymous permissions
         def strategy = jenkins.getAuthorizationStrategy()
-        if (strategy.getACL(jenkins).hasPermission(ACL.ANONYMOUS, Jenkins.ADMINISTER)) {
+        def rootAcl = strategy.getACL(jenkins)
+        if (rootAcl.hasPermission2(Jenkins.ANONYMOUS2, Jenkins.ADMINISTER)) {
             addFinding(
                 FindingCategory.AUTHORIZATION,
                 FindingSeverity.CRITICAL,
                 "Anonymous Admin Access",
                 "Anonymous users have administrator permissions."
             )
-        } else if (strategy.getACL(jenkins).hasPermission(ACL.ANONYMOUS, Jenkins.READ)) {
+        } else if (rootAcl.hasPermission2(Jenkins.ANONYMOUS2, Jenkins.READ)) {
             addFinding(
                 FindingCategory.AUTHORIZATION,
                 FindingSeverity.MEDIUM,
@@ -255,8 +257,18 @@ class JenkinsSecurityAuditor {
         // Check admin accounts
         int adminCount = 0
         User.getAll().each { user ->
-            if (strategy.getACL(jenkins).hasPermission(user.impersonate(), Jenkins.ADMINISTER)) {
-                adminCount++
+            try {
+                if (rootAcl.hasPermission2(user.impersonate2(), Jenkins.ADMINISTER)) {
+                    adminCount++
+                }
+            } catch (UsernameNotFoundException e) {
+                LOGGER.warning("Skipping permission check for user '${user.id}' not found in security realm: ${e.message}")
+                addFinding(
+                    FindingCategory.AUTHORIZATION,
+                    FindingSeverity.INFO,
+                    "Unresolved User Account: ${user.id}",
+                    "User '${user.id}' exists in Jenkins but could not be resolved in the current security realm; admin permission check was skipped."
+                )
             }
         }
 
@@ -517,7 +529,7 @@ class JenkinsSecurityAuditor {
             </head>
             <body>
                 <h1>Jenkins Security Audit Report</h1>
-                <p>Generated on ${new Date().format("yyyy-MM-dd HH:mm:ss")}</p>
+                <p>Generated on ${new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date())}</p>
 
                 <div class="summary">
                     <h2>Summary</h2>
@@ -583,12 +595,24 @@ class JenkinsSecurityAuditor {
      */
     private void appendFindingHtml(StringBuilder builder, SecurityFinding finding, String severityClass) {
         builder.append("""
-            <div class="finding ${severityClass}">
-                <div class="finding-title">${finding.title}</div>
-                <div class="finding-meta">Category: ${finding.category}</div>
-                <div class="finding-desc">${finding.description}</div>
+            <div class="finding ${escapeHtml(severityClass)}">
+                <div class="finding-title">${escapeHtml(finding.title)}</div>
+                <div class="finding-meta">Category: ${escapeHtml(finding.category?.name())}</div>
+                <div class="finding-desc">${escapeHtml(finding.description)}</div>
             </div>
         """)
+    }
+
+    static String escapeHtml(String value) {
+        if (value == null) {
+            return ''
+        }
+        return value
+            .replace('&', '&amp;')
+            .replace('<', '&lt;')
+            .replace('>', '&gt;')
+            .replace('"', '&quot;')
+            .replace("'", '&#39;')
     }
 
     /**

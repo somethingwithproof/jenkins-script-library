@@ -4,9 +4,17 @@
 package com.github.thomasvincent.jenkinsscripts.healing
 
 import hudson.model.Computer
+import hudson.model.Slave
+import hudson.slaves.OfflineCause
+import hudson.slaves.SlaveComputer
 import jenkins.model.Jenkins
 import spock.lang.Specification
 import spock.lang.Subject
+
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.Future
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 @Subject(SelfHealingAgentManager)
 class SelfHealingAgentManagerSpec extends Specification {
@@ -124,7 +132,7 @@ class SelfHealingAgentManagerSpec extends Specification {
         manager.performHealthCheck()
 
         then: "only one reconnect attempt is dispatched while delayed task is pending"
-        1 * agent.connect(true)
+        1 * agent.connect(false)
         manager.statistics.totalAttempts == 1
 
         when: "start and stop lifecycle runs"
@@ -135,5 +143,157 @@ class SelfHealingAgentManagerSpec extends Specification {
         then:
         runningAfterStart
         !manager.isRunning()
+    }
+
+    def "singlePass mode attempts reconnect synchronously without starting background scheduler"() {
+        given:
+        def jenkins = Mock(Jenkins)
+        def agent = Mock(Computer)
+        agent.name >> 'single-pass-agent'
+        agent.isOffline() >> true
+        agent.isOnline() >> false
+        agent.offlineCause >> null
+        jenkins.toComputer() >> null
+        jenkins.computers >> ([agent] as Computer[])
+
+        def manager = new SelfHealingAgentManager([
+            maxRetryAttempts   : 1,
+            enableAutoReconnect: true,
+            enableAutoRestart  : false,
+            singlePass         : true
+        ], jenkins)
+
+        when:
+        manager.performHealthCheck()
+
+        then:
+        1 * agent.connect(false)
+        !manager.isRunning()
+        manager.statistics.totalAttempts == 1
+        manager.statistics.agents['single-pass-agent'].status == 'RECOVERING'
+
+        cleanup:
+        manager.stop()
+    }
+
+    def "readOnly mode records OFFLINE status without recovery attempts or callbacks"() {
+        given:
+        def jenkins = Mock(Jenkins)
+        def agent = Mock(Computer)
+        boolean offline = false
+        agent.name >> 'ro-agent'
+        agent.isOffline() >> { offline }
+        agent.isOnline() >> { !offline }
+        agent.offlineCause >> null
+        agent.getMonitorData() >> [:]
+        jenkins.toComputer() >> null
+        jenkins.computers >> ([agent] as Computer[])
+
+        int callbacks = 0
+        def manager = new SelfHealingAgentManager([
+            readOnly           : true,
+            singlePass         : true,
+            enableAutoReconnect: true,
+            enableAutoRestart  : true
+        ], jenkins)
+        manager.onRecoveryStart { name, attempt -> callbacks++ }
+        manager.onRecoveryFailure { name, reason -> callbacks++ }
+
+        when: "agent is observed online then offline"
+        manager.performHealthCheck()
+        String statusWhenOnline = manager.statistics.agents['ro-agent'].status
+        offline = true
+        manager.performHealthCheck()
+
+        then: "status updates from HEALTHY to OFFLINE without calling connect"
+        0 * agent.connect(_)
+        statusWhenOnline == 'HEALTHY'
+        manager.statistics.agents['ro-agent'].status == 'OFFLINE'
+        manager.statistics.totalAttempts == 0
+        callbacks == 0
+
+        cleanup:
+        manager.stop()
+    }
+
+    def "singlePass mode does not restart while reconnect future is still pending"() {
+        given:
+        def jenkins = Mock(Jenkins)
+        def agent = Mock(SlaveComputer)
+        def pendingFuture = new CompletableFuture<Void>()
+        agent.name >> 'pending-agent'
+        agent.isOffline() >> true
+        agent.isOnline() >> false
+        agent.offlineCause >> null
+        agent.node >> Mock(Slave)
+        jenkins.toComputer() >> null
+        jenkins.computers >> ([agent] as Computer[])
+
+        def manager = new SelfHealingAgentManager([
+            maxRetryAttempts   : 1,
+            enableAutoReconnect: true,
+            enableAutoRestart  : true,
+            singlePass         : true
+        ], jenkins)
+
+        when:
+        manager.performHealthCheck()
+
+        then:
+        1 * agent.connect(false) >> pendingFuture
+        0 * agent.disconnect(_)
+        manager.hasPendingRecovery('pending-agent')
+        manager.statistics.agents['pending-agent'].status == 'RECOVERING'
+
+        when: "stop is called while launch is in flight"
+        manager.stop()
+
+        then: "external connect future is not cancelled"
+        !pendingFuture.isCancelled()
+    }
+
+    def "singlePass restart uses non-UserCause disconnect and schedules deferred reconnect when disconnect times out"() {
+        given:
+        def jenkins = Mock(Jenkins)
+        def agent = Mock(SlaveComputer)
+        def slowDisconnect = new CompletableFuture<Void>()
+        OfflineCause recordedCause = null
+        agent.name >> 'restart-agent'
+        agent.isOffline() >> true
+        agent.isOnline() >> false
+        agent.offlineCause >> { recordedCause }
+        agent.node >> Mock(Slave)
+        jenkins.toComputer() >> null
+        jenkins.computers >> ([agent] as Computer[])
+
+        def manager = new SelfHealingAgentManager([
+            maxRetryAttempts   : 1,
+            retryDelayMs       : 50L,
+            enableAutoReconnect: false,
+            enableAutoRestart  : true,
+            singlePass         : true
+        ], jenkins)
+
+        when: "disconnect takes longer than the bounded wait"
+        manager.performHealthCheck()
+
+        then: "disconnect used a non-UserCause and deferred reconnect is tracked without premature connect"
+        1 * agent.disconnect(_ as SelfHealingAgentManager.SelfHealingRestartCause) >> { OfflineCause c ->
+            recordedCause = c
+            return slowDisconnect
+        }
+        !(recordedCause instanceof OfflineCause.UserCause)
+        0 * agent.connect(_)
+        manager.hasPendingRecovery('restart-agent')
+
+        when: "disconnect finally completes"
+        slowDisconnect.complete(null)
+
+        then: "deferred reconnect executes and clears pending recovery"
+        1 * agent.connect(false)
+        !manager.hasPendingRecovery('restart-agent')
+
+        cleanup:
+        manager.stop()
     }
 }

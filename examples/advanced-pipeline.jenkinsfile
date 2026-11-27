@@ -80,7 +80,7 @@ pipeline {
             when {
                 anyOf {
                     triggeredBy 'TimerTrigger'  // Daily runs
-                    changeset 'src/main/groovy/**/*.groovy'  // Code changes
+                    changeset 'src/com/**/*.groovy'  // Code changes
                 }
             }
             steps {
