@@ -6,7 +6,7 @@ import hudson.model.Label
 import hudson.model.labels.LabelAtom
 import jenkins.model.Jenkins
 
-/** Run the body once, on an existing agent whose interruptible capacity was verified. */
+/** Run the body on a verified interruptible agent, optionally recovering from agent loss. */
 def call(Map options = [:], Closure body) {
     String provider = options.provider
     String pool = options.pool
@@ -14,11 +14,23 @@ def call(Map options = [:], Closure body) {
     if (!(provider in ['aws', 'azure', 'gcp', 'oracle', 'kubernetes'])) {
         error 'withSpotAgent requires provider aws, azure, gcp, oracle or kubernetes'
     }
-    if (provider == 'kubernetes' && !(pool in ['eks', 'aks', 'gke', 'oke'])) {
-        error 'Kubernetes scheduling requires pool eks, aks, gke or oke'
+    if (provider == 'kubernetes' && !(pool in ['eks', 'aks', 'gke', 'oke', 'doks'])) {
+        error 'Kubernetes scheduling requires pool eks, aks, gke, oke or doks'
     }
 
-    List remaining = onlineAgents(label)
+    def attempts = options.containsKey('maxAttempts') ? options.maxAttempts : 1
+    if (!(attempts instanceof Integer) || attempts < 1) {
+        error 'maxAttempts must be a positive integer'
+    }
+    List visited = []
+    if (attempts == 1) return runOnCandidate(provider, pool, label, visited, body)
+    return retry(count: attempts, conditions: [agent()]) {
+        runOnCandidate(provider, pool, label, visited, body)
+    }
+}
+
+private def runOnCandidate(String provider, String pool, String label, List visited, Closure body) {
+    List remaining = onlineAgents(label) - visited
     while (remaining) {
         String selected
         boolean matched = false
@@ -28,6 +40,7 @@ def call(Map options = [:], Closure body) {
             if (!remaining.contains(selected)) {
                 error 'Jenkins allocated an agent outside the existing candidate set'
             }
+            visited.add(selected)
             int status = verifyCapacity(provider, pool)
             if (status == 0) {
                 matched = true

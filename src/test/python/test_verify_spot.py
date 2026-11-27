@@ -64,7 +64,8 @@ class CapacityTests(unittest.TestCase):
                 self.assertIn(instance, cli.call_args.args[0])
 
     def test_pod_uid_and_actual_worker_label(self):
-        for pool, key, spot in (("eks", "eks.amazonaws.com/capacityType", "SPOT"),
+        for pool, key, spot in (("doks", "doks.digitalocean.com/capacity-type", "spot"),
+                                ("eks", "eks.amazonaws.com/capacityType", "SPOT"),
                                 ("aks", "kubernetes.azure.com/scalesetpriority", "spot"),
                                 ("gke", "cloud.google.com/gke-spot", "true"),
                                 ("oke", "oci.oraclecloud.com/oke-is-preemptible", "true")):

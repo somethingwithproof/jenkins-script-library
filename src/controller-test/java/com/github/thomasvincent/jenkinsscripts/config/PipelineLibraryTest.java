@@ -23,6 +23,7 @@ public class PipelineLibraryTest {
         .withWar(new File(System.getProperty("jth.jenkins-war.path")))
         .includeTestClasspathPlugins(false)
         .javaOptions("-Dhudson.plugins.git.GitSCM.ALLOW_LOCAL_CHECKOUT=true")
+        .javaOptions("-Dorg.jenkinsci.plugins.workflow.support.pickles.ExecutorPickle.timeoutForNodeMillis=1500")
         .withTimeout(180);
 
     @Test public void loadLibraryValidatePipelinesAndResumeBuild() throws Throwable {

@@ -95,7 +95,7 @@ def launch_request(config, payload):
     if provider == "kubernetes":
         pool = config.get("pool")
         if pool not in POOL_SELECTORS:
-            raise ValueError("pool must be eks, gke, aks or oke")
+            raise ValueError("pool must be eks, gke, aks, oke or doks")
         if body.get("kind") != "Pod" or body.get("apiVersion") != "v1":
             raise ValueError("Kubernetes requires a v1 Pod")
         metadata = body.get("metadata", {})

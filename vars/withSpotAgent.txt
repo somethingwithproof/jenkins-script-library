@@ -1,4 +1,7 @@
 Run a Pipeline body on an existing verified interruptible agent. Set provider to
 aws, azure, gcp, oracle or kubernetes. Optionally supply a Jenkins label expression
-(default: spot). Kubernetes also requires pool eks, aks, gke or oke. The step
+(default: spot). Kubernetes also requires pool eks, aks, gke, oke or doks. The step
 returns the body's result and propagates build failures and interruptions.
+For retry-safe work, set maxAttempts to a positive integer (default 1). Jenkins
+restarts the entire body on a different verified agent after a retryable agent
+failure. Application errors and user aborts propagate to the caller.
