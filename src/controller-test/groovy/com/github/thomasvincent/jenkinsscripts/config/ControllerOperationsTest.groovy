@@ -50,6 +50,8 @@ class ControllerOperationsTest {
 
     @Test void inspectAndRecoverControllerConfiguration() {
         def jenkins = controller.jenkins
+        assertNull(jenkins.pluginManager.getPlugin('google-compute-engine'))
+        assertTrue(new com.github.thomasvincent.jenkinsscripts.cloud.CloudInventory().inspect(jenkins).clouds.empty)
         def report = PluginInventory.inspect(jenkins, 'example-uninstalled:latest')
         assertTrue(report.drift)
         assertEquals(['example-uninstalled'], report.missing)
