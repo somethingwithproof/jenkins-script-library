@@ -23,8 +23,11 @@ org.jenkins-ci.plugins:docker-commons:477.v289085a_b_6896
 org.jenkins-ci.plugins:docker-workflow:653.v2f2c08eff0ec
 org.jenkins-ci.plugins:durable-task:686.v80ff80875b_82
 org.jenkins-ci.plugins:ec2:2068.vd80935072db_b_
+io.jenkins.plugins:eddsa-api:0.3.0.1-29.v67e9a_1c969b_b_
 org.jenkins-ci.plugins:git:5.11.0
 org.jenkins-ci.plugins:git-client:6.7.1
+org.jenkins-ci.plugins:google-compute-engine:4.833.v2f71f6b_b_1809
+org.jenkins-ci.plugins:google-oauth-plugin:1.346.v712b_a_e0d1e60
 io.jenkins.plugins:gson-api:2.15.0-212.v085f60a_8093b_
 org.jenkins-ci.modules:instance-identity:203.v15e81a_1b_7a_38
 io.jenkins.plugins:ionicons-api:94.vcc3065403257
@@ -36,6 +39,7 @@ io.jenkins.plugins:jakarta-xml-bind-api:4.0.9-19.v2b_a_5b_44d9a_1c
 io.jenkins.plugins:javax-activation-api:1.2.0-8
 io.jenkins.plugins:jaxb:2.3.9-143.v5979df3304e6
 io.jenkins.plugins:joda-time-api:2.15.1-211.ve499f52b_da_33
+org.jenkins-ci.plugins:jsch:0.2.16-95.v3eecb_55fa_b_78
 io.jenkins.plugins:json-api:20260814-226.v20f9685d642c
 org.csanchez.jenkins.plugins:kubernetes:4560.vc25b_83890c34
 org.jenkins-ci.plugins:kubernetes-client-api:7.3.1-256.v788a_0b_787114
@@ -46,6 +50,7 @@ io.jenkins.plugins.mina-sshd-api:mina-sshd-api-common:2.20.1-199.v8ce76b_c93542
 io.jenkins.plugins.mina-sshd-api:mina-sshd-api-core:2.20.1-199.v8ce76b_c93542
 io.jenkins.plugins.mina-sshd-api:mina-sshd-api-scp:2.20.1-199.v8ce76b_c93542
 org.jenkins-ci.plugins:node-iterator-api:72.vc90e81737df1
+org.jenkins-ci.plugins:oauth-credentials:0.668.vb_431feb_d8a_4e
 io.jenkins.plugins:okhttp-api:5.5.0-242.v1482d48d3ea_3
 io.jenkins.plugins:pipeline-groovy-lib:822.vc95f70dea_db_7
 org.jenkins-ci.plugins:pipeline-input-step:568.v0c9db_2652741
@@ -61,6 +66,7 @@ io.jenkins.plugins:snakeyaml-api:2.7-152.vc672728cf536
 org.jenkins-ci.plugins:ssh-credentials:372.va_250881b_08cd
 org.jenkins-ci.plugins:structs:362.va_b_695ef4fdf9
 org.jenkins-ci.plugins:timestamper:1.30
+org.jenkins-ci.plugins:trilead-api:2.284.v1974ea_324382
 org.jenkins-ci.plugins:variant:70.va_d9f17f859e0
 io.jenkins.plugins:woodstox-core-api:7.3.0-16.v017f30ed004c
 org.jenkins-ci.plugins.workflow:workflow-api:1429.v7a_1b_efb_a_f7c5

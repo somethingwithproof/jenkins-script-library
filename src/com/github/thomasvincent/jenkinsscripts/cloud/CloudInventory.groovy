@@ -10,12 +10,14 @@ import jenkins.model.Jenkins
 /** Local plugin metadata only. Provider plugins are optional on a controller. */
 class CloudInventory {
     private static final Map CLOUD_TYPES = [
+        'com.google.jenkins.plugins.computeengine.ComputeEngineCloud': 'GCP',
         'hudson.plugins.ec2.EC2Cloud': 'AWS',
         'com.microsoft.azure.vmagent.AzureVMCloud': 'Azure',
         'org.csanchez.jenkins.plugins.kubernetes.KubernetesCloud': 'Kubernetes',
         'com.oracle.cloud.baremetal.jenkins.BaremetalCloud': 'Oracle'
     ]
     private static final Map NODE_TYPES = [
+        'com.google.jenkins.plugins.computeengine.ComputeEngineInstance': 'GCP',
         'hudson.plugins.ec2.EC2AbstractSlave': 'AWS',
         'com.microsoft.azure.vmagent.AzureVMAgent': 'Azure',
         'org.csanchez.jenkins.plugins.kubernetes.KubernetesSlave': 'Kubernetes',
@@ -38,7 +40,7 @@ class CloudInventory {
         if (!id) return null
         Cloud cloud
         try {
-            cloud = node.getCloud()
+            cloud = id == 'GCP' ? Jenkins.get().getCloud(node.cloudName) : node.getCloud()
         } catch (ClassCastException staleOwner) {
             // A different plugin may have replaced the cloud at this name.
             return null
@@ -53,7 +55,14 @@ class CloudInventory {
         def clouds = []
         for (Cloud cloud : controller.clouds) {
             String id = provider(cloud, CLOUD_TYPES)
-            if (id) clouds.add([provider: id, cloudName: cloud.name])
+            if (!id) continue
+            Map entry = [provider: id, cloudName: cloud.name]
+            if (id == 'GCP') {
+                entry.templates = (cloud.configurations ?: []).collect { config ->
+                    [namePrefix: config.namePrefix, description: config.description, labels: config.labelString]
+                }
+            }
+            clouds.add(entry)
         }
         def agents = []
         for (Node node : controller.nodes) {

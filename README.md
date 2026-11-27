@@ -300,7 +300,8 @@ ociManager.provisionNewInstance("my-oci-template")
 A trusted Pipeline can call `cloudInventory()` to list configured clouds and their
 agents. Each agent has a provider, the configured cloud name, its Jenkins node ID,
 and its online state. Static agents and agents whose configured cloud is gone
-are omitted. Multiple configurations of the same provider remain distinct.
+are omitted. Multiple configurations of the same provider remain distinct. Controllers with the optional
+Google Compute Engine plugin also report GCE agents and configured instance templates.
 
 `optimizeCloudCosts.optimize(dryRun: true)` returns planned actions and estimated
 savings. An apply request reports a status for each action. The bundled cost
