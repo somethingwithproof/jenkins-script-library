@@ -44,6 +44,9 @@ jobs:
     - name: Lint with CodeNarc
       run: ./gradlew codenarcMain --no-daemon
 
+    - name: Verify release archives and JAR
+      run: ./gradlew verifyRelease -PreleaseTag=v0.0.0-ci
+
     - name: Run unit tests
       run: ./gradlew test --no-daemon
 
