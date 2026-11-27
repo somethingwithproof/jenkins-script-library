@@ -4,7 +4,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2024 Thomas Vincent
+ * Copyright (c) 2024-2026 Thomas Vincent
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -27,21 +27,20 @@
 
 package com.github.thomasvincent.jenkinsscripts.helm
 
-import hudson.model.Node
-import hudson.model.TaskListener
-import hudson.tools.InstallSourceProperty
-import hudson.tools.HelmInstallation
-import hudson.tools.ZipExtractionInstaller
-import jenkins.model.Jenkins
+import com.cloudbees.groovy.cps.NonCPS
 import com.github.thomasvincent.jenkinsscripts.util.PipelineUtils
 
 import java.io.Serializable
-import java.io.IOException
+import java.util.logging.Level
+import java.util.logging.Logger
+import java.util.regex.Pattern
 
 /**
- * Helm tool installer for Jenkins pipelines.
+ * Build-scoped Helm CLI helper for Jenkins pipelines.
  *
- * Manages Helm installation, OS/architecture detection, and PATH configuration.
+ * Installs a requested Helm binary into an agent-local temporary directory and
+ * executes validated, shell-escaped Helm lint and upgrade/install commands
+ * without relying on controller-side plugin descriptors.
  *
  * @author Thomas Vincent
  * @since 1.0
@@ -49,29 +48,37 @@ import java.io.IOException
 class HelmHelper implements Serializable {
 
     private static final long serialVersionUID = 1L
+    private static final String DEFAULT_VERSION = '3.17.0'
+    private static final Pattern VERSION_PATTERN = Pattern.compile(/^v?[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.]+)?$/)
+    private static final Pattern RELEASE_PATTERN = Pattern.compile(/^[a-z0-9]([-a-z0-9]{0,51}[a-z0-9])?$/)
+    private static final Pattern NAMESPACE_PATTERN = Pattern.compile(/^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$/)
+    private static final Pattern TIMEOUT_PATTERN = Pattern.compile(/^[0-9]+(ns|us|ms|s|m|h)$/)
 
-    /** Reference to the pipeline script context (Serializable in Jenkins CPS) */
+    private transient Logger log
+
+    /** Reference to the pipeline script context (Serializable in Jenkins CPS). */
     private final def pipeline
 
-    /** Lazily re-initialized utility for common pipeline operations */
+    /** Lazily re-initialized utility for platform detection. */
     private transient PipelineUtils utils
 
-    /**
-     * Creates a new Helm installer with pipeline context.
-     *
-     * ```groovy
-     * def helm = new HelmHelper(this)
-     * ```
-     */
     HelmHelper(def pipeline) {
         this.pipeline = pipeline
-        this.utils = new PipelineUtils(pipeline)
+        this.utils = pipeline != null ? new PipelineUtils(pipeline) : null
+    }
+
+    @NonCPS
+    private Logger getLog() {
+        if (log == null) {
+            log = Logger.getLogger(HelmHelper.class.name)
+        }
+        return log
     }
 
     private PipelineUtils getUtils() {
         if (utils == null) {
             if (pipeline == null) {
-                throw new IllegalStateException("Pipeline script context is not initialized")
+                throw new IllegalStateException('Pipeline script context is not initialized')
             }
             utils = new PipelineUtils(pipeline)
         }
@@ -79,154 +86,238 @@ class HelmHelper implements Serializable {
     }
 
     /**
-     * Installs and activates a Helm version in the PATH.
+     * Installs and activates a Helm version on the current build agent.
      *
-     * Automatically detects OS/architecture and downloads if needed.
-     *
-     * ```groovy
-     * helm.use('3.10.0')  // Install and use Helm 3.10.0
-     * helm.use()          // Default to version 2.12.3
-     *
-     * // Use in a pipeline
-     * node {
-     *     stage('Setup') {
-     *         def helm = new HelmHelper(this)
-     *         helm.use('3.11.2')
-     *     }
-     *     stage('Deploy') {
-     *         sh 'helm upgrade --install my-release ./chart'
-     *     }
-     * }
-     * ```
+     * @param version Semantic version (for example, '3.17.0' or 'v3.17.0')
+     * @return Agent directory containing the installed helm executable
      */
-    void use(String version = '2.12.3') {
+    String use(String version = DEFAULT_VERSION) {
         String normalizedVersion = normalizeVersion(version)
         PipelineUtils pipelineUtils = getUtils()
         String os = pipelineUtils.currentOS()
         String arch = normalizeArchitecture(pipelineUtils.currentArchitecture())
         String extension = determineFileExtension()
-        String helmInstallPath = buildInstallPath(normalizedVersion)
+        String downloadUrl = buildDownloadUrl(normalizedVersion, os, arch, extension)
+        String baseTmp = pipeline.pwd(tmp: true)
+        String binDir = "${baseTmp}/helm/${normalizedVersion}/${os}-${arch}"
 
-        def installer = createInstaller(normalizedVersion, os, arch, extension, helmInstallPath)
-        def helmTool = createToolInstallation(normalizedVersion, helmInstallPath, installer)
+        try {
+            if (pipeline.isUnix()) {
+                String installScript = [
+                    'set -eu',
+                    "BIN_DIR=${shellQuote(binDir)}",
+                    'if [ ! -x "$BIN_DIR/helm" ]; then',
+                    '  mkdir -p "$BIN_DIR"',
+                    "  ARCHIVE=\"\$BIN_DIR/helm.${extension}\"",
+                    "  curl -fsSL ${shellQuote(downloadUrl)} -o \"\$ARCHIVE\"",
+                    '  tar -xzf "$ARCHIVE" -C "$BIN_DIR" --strip-components=1',
+                    '  rm -f "$ARCHIVE"',
+                    '  chmod +x "$BIN_DIR/helm"',
+                    'fi'
+                ].join('\n')
+                pipeline.sh(script: installScript)
+                String currentPath = pipeline.env?.PATH ?: ''
+                pipeline.env.PATH = currentPath ? "${binDir}:${currentPath}" : binDir
+            } else {
+                String psScript = [
+                    '$ErrorActionPreference = "Stop"',
+                    "\$binDir = '${binDir.replace("'", "''")}'",
+                    'if (-not (Test-Path (Join-Path $binDir "helm.exe"))) {',
+                    '  New-Item -ItemType Directory -Force -Path $binDir | Out-Null',
+                    '  $archive = Join-Path $binDir "helm.zip"',
+                    "  Invoke-WebRequest -Uri '${downloadUrl}' -OutFile \$archive",
+                    '  Expand-Archive -Path $archive -DestinationPath $binDir -Force',
+                    '  Remove-Item -Path $archive -Force',
+                    '}'
+                ].join('\n')
+                pipeline.powershell(script: psScript)
+                String currentPath = pipeline.env?.PATH ?: ''
+                pipeline.env.PATH = currentPath ? "${binDir};${currentPath}" : binDir
+            }
 
-        configureEnvironment(helmTool, normalizedVersion)
+            pipeline.echo "Using Helm ${normalizedVersion} installed at ${binDir}"
+            return binDir
+        } catch (Exception e) {
+            getLog().log(Level.WARNING, "Failed to install Helm ${normalizedVersion}", e)
+            pipeline.error("Failed to set up Helm ${normalizedVersion}: ${e.message}")
+            throw e
+        }
     }
 
     /**
-     * Ensures version string starts with 'v' for Helm URLs.
-     *
-     * ```groovy
-     * normalizeVersion('3.10.0')  // Returns 'v3.10.0'
-     * normalizeVersion('v3.10.0') // Returns 'v3.10.0' (unchanged)
-     * ```
+     * Lints a Helm chart using shell-escaped arguments.
      */
-    private String normalizeVersion(String version) {
-        return version.startsWith("v") ? version : "v$version"
+    Map<String, Object> lint(Map args = [:]) {
+        String chart = (args.chart ?: '').toString().trim()
+        if (!chart) {
+            throw new IllegalArgumentException('chart parameter is required')
+        }
+        String command = buildLintCommand(args)
+        try {
+            pipeline.sh(script: command)
+        } catch (Exception e) {
+            getLog().log(Level.WARNING, "Helm lint failed for chart ${chart}", e)
+            throw e
+        }
+        return [
+            chart  : chart,
+            command: command,
+            status : 'linted'
+        ] as Map<String, Object>
     }
 
     /**
-     * Converts architecture strings to Helm's format.
-     *
-     * Uses Groovy's replaceAll method to transform architecture identifiers.
-     *
-     * ```groovy
-     * normalizeArchitecture('i386')   // Returns '386'
-     * normalizeArchitecture('amd64')  // Returns 'amd64' (unchanged)
-     * ```
+     * Runs `helm upgrade --install` with validated parameters and safe shell quoting.
      */
-    private String normalizeArchitecture(String architecture) {
-        return architecture.replaceAll("i", "")
+    Map<String, Object> deploy(Map args = [:]) {
+        String release = (args.release ?: '').toString().trim()
+        String chart = (args.chart ?: '').toString().trim()
+        String namespace = (args.namespace ?: 'default').toString().trim()
+        boolean atomic = args.atomic != false
+        boolean wait = args.wait != false
+        boolean createNamespace = args.createNamespace == true
+        boolean dryRun = args.dryRun == true
+
+        String command = buildDeployCommand(args)
+        try {
+            pipeline.sh(script: command)
+        } catch (Exception e) {
+            getLog().log(Level.WARNING, "Helm deploy failed for release ${release}", e)
+            throw e
+        }
+
+        return [
+            release        : release,
+            chart          : chart,
+            namespace      : namespace,
+            atomic         : atomic,
+            wait           : wait,
+            createNamespace: createNamespace,
+            dryRun         : dryRun,
+            command        : command,
+            status         : dryRun ? 'dry-run' : 'deployed'
+        ] as Map<String, Object>
     }
 
-    /**
-     * Returns the correct package extension based on OS.
-     *
-     * Uses Groovy's ternary operator for concise platform checking.
-     *
-     * ```groovy
-     * determineFileExtension() // Returns 'tar.gz' on Unix, 'zip' on Windows
-     * ```
-     */
-    private String determineFileExtension() {
+    @NonCPS
+    String buildLintCommand(Map args = [:]) {
+        String chart = (args.chart ?: '').toString().trim()
+        if (!chart) {
+            throw new IllegalArgumentException('chart parameter is required')
+        }
+        String helmBin = (args.helmBin ?: 'helm').toString().trim()
+        List<String> parts = [shellQuote(helmBin), 'lint', shellQuote(chart)]
+        List valuesFiles = (args.valuesFiles instanceof List) ? (args.valuesFiles as List) : []
+        for (Object file : valuesFiles) {
+            String path = file?.toString()?.trim()
+            if (path) {
+                parts.add('-f')
+                parts.add(shellQuote(path))
+            }
+        }
+        return parts.join(' ')
+    }
+
+    @NonCPS
+    String buildDeployCommand(Map args = [:]) {
+        String release = (args.release ?: '').toString().trim()
+        String chart = (args.chart ?: '').toString().trim()
+        String namespace = (args.namespace ?: 'default').toString().trim()
+        String timeout = (args.timeout ?: '5m').toString().trim()
+        String helmBin = (args.helmBin ?: 'helm').toString().trim()
+
+        if (!release || !RELEASE_PATTERN.matcher(release).matches()) {
+            throw new IllegalArgumentException("Invalid Helm release name: '${release}'")
+        }
+        if (!chart) {
+            throw new IllegalArgumentException('chart parameter is required')
+        }
+        if (!NAMESPACE_PATTERN.matcher(namespace).matches()) {
+            throw new IllegalArgumentException("Invalid Kubernetes namespace: '${namespace}'")
+        }
+        if (!TIMEOUT_PATTERN.matcher(timeout).matches()) {
+            throw new IllegalArgumentException("Invalid Helm timeout: '${timeout}'")
+        }
+
+        boolean atomic = args.atomic != false
+        boolean wait = args.wait != false
+        boolean createNamespace = args.createNamespace == true
+        boolean dryRun = args.dryRun == true
+
+        List<String> parts = [
+            shellQuote(helmBin),
+            'upgrade',
+            '--install',
+            shellQuote(release),
+            shellQuote(chart),
+            '--namespace',
+            shellQuote(namespace),
+            '--timeout',
+            shellQuote(timeout)
+        ]
+
+        if (createNamespace) {
+            parts.add('--create-namespace')
+        }
+        if (atomic) {
+            parts.add('--atomic')
+        }
+        if (wait) {
+            parts.add('--wait')
+        }
+        if (dryRun) {
+            parts.add('--dry-run')
+        }
+
+        List valuesFiles = (args.valuesFiles instanceof List) ? (args.valuesFiles as List) : []
+        for (Object file : valuesFiles) {
+            String path = file?.toString()?.trim()
+            if (path) {
+                parts.add('-f')
+                parts.add(shellQuote(path))
+            }
+        }
+
+        if (args.setValues instanceof Map) {
+            (args.setValues as Map).each { Object k, Object v ->
+                String key = k?.toString()?.trim()
+                if (key) {
+                    parts.add('--set')
+                    parts.add(shellQuote("${key}=${v == null ? '' : v.toString()}"))
+                }
+            }
+        }
+
+        return parts.join(' ')
+    }
+
+    @NonCPS
+    String normalizeVersion(String version) {
+        String candidate = (version ?: '').trim()
+        if (!VERSION_PATTERN.matcher(candidate).matches()) {
+            throw new IllegalArgumentException("Invalid Helm version: '${version}'")
+        }
+        return candidate.startsWith('v') ? candidate : "v${candidate}"
+    }
+
+    @NonCPS
+    String normalizeArchitecture(String architecture) {
+        return (architecture ?: 'amd64').replaceAll('i', '')
+    }
+
+    @NonCPS
+    String determineFileExtension() {
         return pipeline.isUnix() ? 'tar.gz' : 'zip'
     }
 
-    /**
-     * Constructs Helm's installation path in Jenkins tools dir.
-     *
-     * Uses GString interpolation for path construction.
-     *
-     * ```groovy
-     * buildInstallPath('v3.10.0') // Returns '/jenkins/tools/helm/v3.10.0'
-     * ```
-     */
-    private String buildInstallPath(String version) {
-        return "${Jenkins.instance.rootPath}/tools/helm/$version"
+    @NonCPS
+    String buildDownloadUrl(String version, String os, String arch, String extension) {
+        String normalizedVersion = normalizeVersion(version)
+        return "https://get.helm.sh/helm-${normalizedVersion}-${os}-${arch}.${extension}"
     }
 
-    /**
-     * Creates Helm download and extraction installer.
-     *
-     * Uses Groovy list syntax to create installer configuration.
-     *
-     * ```groovy
-     * def installer = createInstaller(
-     *     'v3.10.0', 'darwin', 'amd64', 'tar.gz', '/jenkins/tools/helm/v3.10.0'
-     * )
-     * // Creates installer for https://get.helm.sh/helm-v3.10.0-darwin-amd64.tar.gz
-     * ```
-     */
-    private List<ZipExtractionInstaller> createInstaller(
-            String version, String os, String arch, String extension, String installPath) {
-        return [
-            new ZipExtractionInstaller(
-                null,
-                "https://get.helm.sh/helm-$version-$os-$arch.$extension",
-                "$installPath/$os-$arch"
-            )
-        ]
-    }
-
-    /**
-     * Registers Helm with Jenkins' tool system.
-     *
-     * Configures tool metadata for installation tracking.
-     *
-     * ```groovy
-     * def helmTool = createToolInstallation(
-     *     'v3.10.0',
-     *     '/jenkins/tools/helm/v3.10.0',
-     *     installersList
-     * )
-     * ```
-     */
-    private HelmInstallation createToolInstallation(
-            String version, String installPath, List<ZipExtractionInstaller> installers) {
-        return new HelmInstallation(
-                "helm-$version", installPath, [new InstallSourceProperty(installers)])
-    }
-
-    /**
-     * Adds Helm to PATH and activates it for the pipeline.
-     *
-     * Uses try/catch for robust error handling and clear error messages.
-     *
-     * ```groovy
-     * configureEnvironment(helmTool, 'v3.10.0')
-     * // Updates PATH and prints "Using Helm v3.10.0 installed at /path/to/helm"
-     * ```
-     */
-    private void configureEnvironment(HelmInstallation helmTool, String version) {
-        try {
-            Node currentNode = pipeline.getContext(Node.class)
-            TaskListener listener = pipeline.getContext(TaskListener.class)
-
-            String helmHome = helmTool.forNode(currentNode, listener).home
-            pipeline.env.PATH = "$helmHome:${pipeline.env.PATH}"
-            pipeline.echo "Using Helm $version installed at $helmHome"
-        } catch (IOException | InterruptedException e) {
-            pipeline.error("Failed to set up Helm $version: ${e.message}")
-        }
+    @NonCPS
+    static String shellQuote(String value) {
+        return "'" + (value ?: '').replace("'", "'\"'\"'") + "'"
     }
 }

@@ -53,8 +53,8 @@ class GroovyCompatibilityVerifierSpec extends Specification {
 
     def "scripts compile and preserve expected security/performance fixes"() {
         given:
-        String scanSrc = new File("src/main/groovy/com/github/thomasvincent/jenkinsscripts/scripts/SecurityVulnerabilityScan.groovy").getText("UTF-8")
-        String perfSrc = new File("src/main/groovy/com/github/thomasvincent/jenkinsscripts/scripts/AnalyzePipelinePerformance.groovy").getText("UTF-8")
+        String scanSrc = new File("src/com/github/thomasvincent/jenkinsscripts/scripts/SecurityVulnerabilityScan.groovy").getText("UTF-8")
+        String perfSrc = new File("src/com/github/thomasvincent/jenkinsscripts/scripts/AnalyzePipelinePerformance.groovy").getText("UTF-8")
 
         expect:
         scanSrc.contains('import java.lang.management.ManagementFactory')

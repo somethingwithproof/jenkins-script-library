@@ -27,7 +27,7 @@ public class PipelineLibraryTest {
 
     @Test public void loadLibraryValidatePipelinesAndResumeBuild() throws Throwable {
         File repo = temporary.newFolder("library");
-        for (String dir : new String[] {"src/com", "src/hudson", "vars", "resources"}) {
+        for (String dir : new String[] {"src/com", "vars", "resources"}) {
             new FilePath(new File(dir).getAbsoluteFile()).copyRecursiveTo(new FilePath(new File(repo, dir)));
         }
         git(repo, "init", "--quiet", "-b", "main");

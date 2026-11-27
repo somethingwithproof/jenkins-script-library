@@ -12,8 +12,8 @@ from pathlib import Path
 def verify(project, version):
     stem = f"{project}-{version}"
     listing = subprocess.check_output([
-        "git", "ls-files", "-z", "--", "src/com", "src/hudson", "vars", "resources",
-        "examples/*.jenkinsfile", "templates/*.jenkinsfile", "README.md", "LICENSE",
+        "git", "ls-files", "-z", "--", "src/com", "vars", "resources", "admin-scripts",
+        "examples", "templates/*.jenkinsfile", "README.md", "LICENSE",
     ])
     expected = {f"{stem}/{name}": Path(name).read_bytes()
                 for name in listing.decode().split("\0") if name}
