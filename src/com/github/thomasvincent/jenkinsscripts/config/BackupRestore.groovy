@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 package com.github.thomasvincent.jenkinsscripts.config
 
+import com.cloudbees.groovy.cps.NonCPS
+
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -19,6 +21,7 @@ class BackupRestore {
     private static final Object RESTORE_LOCK = new Object()
     private static final String ORIGINAL_SUFFIX = '.pre-restore'
 
+    @NonCPS
     static Map restore(Path controllerHome, Path archive, Collection<String> names, boolean preview) {
         Path home = controllerHome.toRealPath()
         if (Files.isSymbolicLink(archive)) {
@@ -26,7 +29,7 @@ class BackupRestore {
         }
         if (Files.isDirectory(archive, NOFOLLOW_LINKS)) {
             Map<Path, Boolean> entries = [:]
-            Files.walk(archive).withCloseable { paths ->
+            BackupFiles.withStream(Files.walk(archive)) { paths ->
                 paths.forEach { source ->
                     if (source == archive) {
                         return
@@ -71,6 +74,7 @@ class BackupRestore {
         }
     }
 
+    @NonCPS
     private static Path relative(String name) {
         String portable = name.replace('\\', '/')
         if (!portable || portable.startsWith('/') || portable ==~ /^[A-Za-z]:.*/ ||
@@ -80,6 +84,7 @@ class BackupRestore {
         return Paths.get(portable)
     }
 
+    @NonCPS
     private static void checkTarget(Path home, Path path, boolean directory) {
         Path target = home.resolve(path)
         Path cursor = home
@@ -97,6 +102,7 @@ class BackupRestore {
         }
     }
 
+    @NonCPS
     private static Map apply(Path home, Map<Path, Boolean> entries, Collection<String> names,
                              boolean preview, Closure stage) {
         def requested = names.collect { name -> relative(name) }
@@ -123,6 +129,7 @@ class BackupRestore {
         }
     }
 
+    @NonCPS
     private static Map writeSelection(Path home, Map<Path, Boolean> entries, Collection<Path> selected,
                                       Map report, Closure stage) {
         Path staging = Files.createTempDirectory('jenkins-restore-')
@@ -163,10 +170,11 @@ class BackupRestore {
             rollBack(home, recovery, changed, directories, failure)
             throw failure
         } finally {
-            Files.walk(staging).withCloseable { paths -> paths.sorted(Comparator.reverseOrder()).forEach { path -> Files.delete(path) } }
+            BackupFiles.withStream(Files.walk(staging)) { paths -> paths.sorted(Comparator.reverseOrder()).forEach { path -> Files.delete(path) } }
         }
     }
 
+    @NonCPS
     private static void createDirectories(Path directory, List<Path> created) {
         List<Path> missing = []
         Path cursor = directory
@@ -180,6 +188,7 @@ class BackupRestore {
         }
     }
 
+    @NonCPS
     private static void replaceFile(Path staged, Path target, Path original) {
         Path next = Files.createTempFile(target.parent, '.jenkins-restore-', '.tmp')
         try {
@@ -194,6 +203,7 @@ class BackupRestore {
         }
     }
 
+    @NonCPS
     private static void rollBack(Path home, Path recovery, List<Path> changed, List<Path> directories,
                                  Exception failure) {
         changed.reverseEach { path ->

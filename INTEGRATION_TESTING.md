@@ -2,7 +2,15 @@
 
 ## Overview
 
-The CI controller acceptance suite runs on JDK 21 using the Gradle wrapper and Jenkins Test Harness. The Docker Compose environment below is available separately for local integration work.
+The CI controller acceptance suite runs on JDK 21 using the Gradle wrapper and Jenkins Test Harness. A separate Jenkins process loads the library from a temporary Git repository.
+A Pipeline on a separate agent creates and archives ZIP and directory backups,
+then retains its inventory result across a controller restart. The test also runs
+the Jenkins Declarative model validator against `Jenkinsfile`,
+`templates/basic-pipeline.jenkinsfile`, and `examples/advanced-pipeline.jenkinsfile`.
+It validates their structure without running build, release, or deployment stages.
+The test controller's plugin versions are pinned in `config/controller-test-plugins.txt`.
+
+The Docker Compose environment below is available separately for local integration work.
 
 ## Architecture
 

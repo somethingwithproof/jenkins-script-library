@@ -27,6 +27,8 @@
 
 package com.github.thomasvincent.jenkinsscripts.config
 
+import com.cloudbees.groovy.cps.NonCPS
+
 import jenkins.model.Jenkins
 import java.nio.file.Files
 import java.nio.file.Paths
@@ -87,6 +89,7 @@ class JenkinsConfigBackup {
      * backup.withConfigFiles(['config.xml', 'jobs/', 'users/'])
      * ```
      */
+    @NonCPS
     JenkinsConfigBackup withConfigFiles(List<String> configFiles) {
         this.configFiles = configFiles
         return this
@@ -99,6 +102,7 @@ class JenkinsConfigBackup {
      * backup.withCompression(false) // Store as uncompressed files
      * ```
      */
+    @NonCPS
     JenkinsConfigBackup withCompression(boolean compress) {
         this.compress = compress
         return this
@@ -114,32 +118,48 @@ class JenkinsConfigBackup {
      * println "Backup created at: ${backupPath}"
      * ```
      */
+    @NonCPS
     String createBackup(String backupDir) throws IOException, SecurityException {
-        // Check permissions
+        return writeBackup(Paths.get(backupDir), null)
+    }
+
+    @NonCPS
+    private String writeBackup(Path parent, String requestedName) {
         if (!jenkins.hasPermission(Jenkins.ADMINISTER)) {
             throw new SecurityException("Administrative privileges required to backup Jenkins configuration")
         }
-
-        // Ensure the backup directory exists
-        Files.createDirectories(Paths.get(backupDir))
-
-        // Create a timestamped directory for this backup
+        parent = parent.toAbsolutePath().normalize()
+        Files.createDirectories(parent)
+        parent = parent.toRealPath()
+        // A backup inside a selected configuration tree could recursively include itself.
+        for (String item : configFiles) {
+            Path source = jenkins.rootDir.toPath().resolve(item)
+            if (Files.isDirectory(source) && parent.startsWith(source.toRealPath())) {
+                throw new IOException("Backup destination is inside selected directory: ${item}")
+            }
+        }
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
-        String backupName = "jenkins_backup_${timestamp}"
-        Path backupPath = Paths.get(backupDir, backupName)
-
-        if (compress) {
-            return createCompressedBackup(backupPath)
-        } else {
-            return createUncompressedBackup(backupPath)
+        String name = requestedName ?: "jenkins_backup_${timestamp}_${UUID.randomUUID()}${compress ? '.zip' : ''}"
+        Path target = parent.resolve(name)
+        Path staging = Files.createTempDirectory(parent, '.jenkins-backup-')
+        try {
+            Path output = compress ? Files.createTempFile(staging, 'backup-', '.zip') :
+                Files.createTempDirectory(staging, 'backup-')
+            String completed = compress ? createCompressedBackup(output) : createUncompressedBackup(output)
+            // Publish only a complete backup. An existing destination belongs to the caller.
+            Files.move(Paths.get(completed), target)
+            return target.toString()
+        } finally {
+            hudson.Util.deleteRecursive(staging.toFile())
         }
     }
 
     /**
      * Performs a backup with explicit inclusion flags to a destination path or directory.
      */
+    @NonCPS
     String performBackup(String destination, boolean includeJobs = true, boolean includePlugins = true,
-                         boolean includeNodes = true, boolean compressBackup = true) throws IOException, SecurityException {
+                         boolean includeNodes = true, boolean compressBackup = true, boolean destinationIsDirectory = false) throws IOException, SecurityException {
         List<String> selectedFiles = [
             "config.xml",
             "credentials.xml",
@@ -162,14 +182,18 @@ class JenkinsConfigBackup {
         this.configFiles = selectedFiles
         this.compress = compressBackup
 
-        Path destPath = Paths.get(destination)
-        String backupDir = destPath.parent ? destPath.parent.toString() : destination
-        return createBackup(backupDir)
+        Path destPath = Paths.get(destination).toAbsolutePath().normalize()
+        if (destinationIsDirectory || destination.endsWith(File.separator) ||
+                (compressBackup && Files.isDirectory(destPath))) {
+            return createBackup(destPath.toString())
+        }
+        return writeBackup(destPath.parent, destPath.fileName.toString())
     }
 
     /**
      * Restores Jenkins configuration from a backup ZIP file or directory.
      */
+    @NonCPS
     boolean restoreBackup(String backupFilePath) throws IOException, SecurityException {
         jenkins.checkPermission(Jenkins.ADMINISTER)
         if (!Files.exists(Paths.get(backupFilePath))) return false
@@ -177,6 +201,7 @@ class JenkinsConfigBackup {
         return true
     }
 
+    @NonCPS
     Map restore(String archivePath, Map options = [:]) {
         jenkins.checkPermission(Jenkins.ADMINISTER)
         BackupRestore.restore(jenkins.rootDir.toPath(), Paths.get(archivePath),
@@ -186,6 +211,7 @@ class JenkinsConfigBackup {
     /**
      * Checks whether a path under jobs/ points to build logs, artifacts, or workspaces that should be excluded.
      */
+    @NonCPS
     private static boolean shouldExcludePath(String configFile, Path sourceRoot, Path candidate) {
         if (!configFile.startsWith("jobs")) {
             return false
@@ -209,6 +235,7 @@ class JenkinsConfigBackup {
     /**
      * Creates an uncompressed backup.
      */
+    @NonCPS
     private String createUncompressedBackup(Path backupPath) throws IOException {
         Files.createDirectories(backupPath)
 
@@ -226,7 +253,7 @@ class JenkinsConfigBackup {
 
             if (Files.isDirectory(source)) {
                 Files.createDirectories(destination)
-                Files.walk(source).withCloseable { stream ->
+                BackupFiles.withStream(Files.walk(source)) { stream ->
                     stream.forEach { Path sourcePath ->
                         if (shouldExcludePath(configFile, source, sourcePath)) {
                             return
@@ -257,8 +284,9 @@ class JenkinsConfigBackup {
     /**
      * Creates a compressed backup as a ZIP file.
      */
+    @NonCPS
     private String createCompressedBackup(Path backupPath) throws IOException {
-        String zipFilePath = backupPath.toString() + ".zip"
+        String zipFilePath = backupPath.toString()
         String jenkinsHome = jenkins.rootDir.absolutePath
         Path jenkinsHomePath = Paths.get(jenkinsHome)
         int filesCopied = 0
@@ -272,21 +300,19 @@ class JenkinsConfigBackup {
                 }
 
                 if (Files.isDirectory(source)) {
-                    Files.walk(source).withCloseable { stream ->
+                    BackupFiles.withStream(Files.walk(source)) { stream ->
                         stream.forEach { Path sourcePath ->
                             if (!Files.isDirectory(sourcePath) && !shouldExcludePath(configFile, source, sourcePath)) {
                                 Path relativePath = jenkinsHomePath.relativize(sourcePath)
-                                if (addFileToZip(zipOut, sourcePath, relativePath.toString())) {
-                                    filesCopied++
-                                }
+                                addFileToZip(zipOut, sourcePath, relativePath.toString())
+                                filesCopied++
                             }
                         }
                     }
                 } else {
                     Path relativePath = jenkinsHomePath.relativize(source)
-                    if (addFileToZip(zipOut, source, relativePath.toString())) {
-                        filesCopied++
-                    }
+                    addFileToZip(zipOut, source, relativePath.toString())
+                    filesCopied++
                 }
             }
         }
@@ -295,24 +321,13 @@ class JenkinsConfigBackup {
         return zipFilePath
     }
 
-    private boolean addFileToZip(ZipOutputStream zipOut, Path sourcePath, String entryName) {
-        boolean entryOpened = false
+    @NonCPS
+    private void addFileToZip(ZipOutputStream zipOut, Path sourcePath, String entryName) {
+        zipOut.putNextEntry(new ZipEntry(entryName))
         try {
-            zipOut.putNextEntry(new ZipEntry(entryName))
-            entryOpened = true
             Files.copy(sourcePath, zipOut)
-            return true
-        } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "Failed to add file to zip: ${sourcePath}", e)
-            return false
         } finally {
-            if (entryOpened) {
-                try {
-                    zipOut.closeEntry()
-                } catch (IOException closeEx) {
-                    LOGGER.log(Level.WARNING, "Failed to close zip entry: ${entryName}", closeEx)
-                }
-            }
+            zipOut.closeEntry()
         }
     }
 
@@ -328,6 +343,7 @@ class JenkinsConfigBackup {
      * }
      * ```
      */
+    @NonCPS
     List<Map<String, Object>> listAvailableBackups(String backupDir) {
         List<Map<String, Object>> backups = []
         Path backupPath = Paths.get(backupDir)
@@ -336,7 +352,7 @@ class JenkinsConfigBackup {
             return backups
         }
 
-        Files.list(backupPath).withCloseable { stream ->
+        BackupFiles.withStream(Files.list(backupPath)) { stream ->
             stream.forEach { Path path ->
                 String fileName = path.fileName.toString()
 
@@ -345,7 +361,7 @@ class JenkinsConfigBackup {
 
                     long size
                     if (Files.isDirectory(path)) {
-                        size = Files.walk(path).withCloseable { walkStream ->
+                        size = BackupFiles.withStream(Files.walk(path)) { walkStream ->
                             walkStream.filter({ Path p -> !Files.isDirectory(p) })
                                     .mapToLong({ Path p -> Files.size(p) })
                                     .sum()
@@ -380,6 +396,7 @@ class JenkinsConfigBackup {
      * println "${deleted} old backups were removed"
      * ```
      */
+    @NonCPS
     int purgeOldBackups(String backupDir, int keepCount) {
         List<Map<String, Object>> backups = listAvailableBackups(backupDir)
 
@@ -393,7 +410,7 @@ class JenkinsConfigBackup {
                 Path path = Paths.get(backup.path as String)
 
                 if (Files.isDirectory(path)) {
-                    Files.walk(path).withCloseable { walkStream ->
+                    BackupFiles.withStream(Files.walk(path)) { walkStream ->
                         walkStream.sorted(Comparator.reverseOrder())
                                 .forEach({ Path p -> Files.delete(p) })
                     }

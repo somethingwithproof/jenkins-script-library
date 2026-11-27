@@ -8,6 +8,12 @@
  */
 
 import com.github.thomasvincent.jenkinsscripts.config.JenkinsConfigBackup
+import hudson.FilePath
+import hudson.Launcher
+import hudson.model.Run
+import hudson.model.TaskListener
+import hudson.tasks.ArtifactArchiver
+import java.nio.file.Files
 import jenkins.model.Jenkins
 import com.cloudbees.groovy.cps.NonCPS
 
@@ -16,7 +22,7 @@ import com.cloudbees.groovy.cps.NonCPS
  *
  * Usage in Pipeline:
  * ```groovy
- * // Backup to workspace
+ * // Backup to the controller backup directory
  * def backupFile = backupJenkinsConfig()
  *
  * // Backup to specific location
@@ -39,33 +45,17 @@ def call(Map args = [:]) {
     boolean compress = args.compress != false
     boolean archive = args.archive == true
 
-    // Determine destination
-    String destination = args.destination as String
-    if (!destination) {
-        String timestamp = new Date().format('yyyy-MM-dd_HH-mm-ss')
-        String filename = compress ? "jenkins-backup-${timestamp}.zip" : "jenkins-backup-${timestamp}"
-        destination = "${env.WORKSPACE}/${filename}"
+    if (args.destination && args.destinationDir) {
+        error 'Specify either destination or destinationDir'
     }
-
-    echo "[backupJenkinsConfig] Starting Jenkins configuration backup"
-    echo "[backupJenkinsConfig] Options: includeJobs=${includeJobs}, includePlugins=${includePlugins}, " +
-         "includeNodes=${includeNodes}, compress=${compress}"
-
-    Map backupResult = performBackupNonCps(destination, includeJobs, includePlugins, includeNodes, compress)
-    String backupPath = backupResult.path as String
-
-    if (backupPath) {
-        echo "[backupJenkinsConfig] Backup completed successfully: ${backupPath}"
-
-        if (archive && backupResult.exists && backupResult.fileName) {
-            archiveArtifacts artifacts: backupResult.fileName as String, fingerprint: true
-            echo "[backupJenkinsConfig] Backup archived as build artifact"
-        }
-
-        return backupPath
-    } else {
-        error "Backup failed - check logs for details"
+    String path = performBackupNonCps((args.destinationDir ?: args.destination) as String,
+        includeJobs, includePlugins, includeNodes, compress, args.destinationDir != null)
+    if (archive) {
+        TaskListener listener = getContext(TaskListener)
+        archiveBackup(currentBuild.rawBuild, listener, path)
     }
+    echo "[backupJenkinsConfig] Created ${path}"
+    return path
 }
 
 /**
@@ -85,20 +75,34 @@ def restore(Map args = [:]) {
 }
 
 @NonCPS
-private Map performBackupNonCps(String destination, boolean includeJobs, boolean includePlugins,
-                                boolean includeNodes, boolean compress) {
+private String performBackupNonCps(String destination, boolean includeJobs, boolean includePlugins,
+                                   boolean includeNodes, boolean compress, boolean destinationIsDirectory) {
     def jenkins = Jenkins.get()
-    def backup = new JenkinsConfigBackup(jenkins)
-    String backupPath = backup.performBackup(destination, includeJobs, includePlugins, includeNodes, compress)
-    if (!backupPath) {
-        return [path: null, exists: false, fileName: null]
+    String path = destination ?: new File(jenkins.rootDir, 'backups').path
+    return new JenkinsConfigBackup(jenkins).performBackup(path, includeJobs, includePlugins,
+        includeNodes, compress, destination == null || destinationIsDirectory)
+}
+
+@NonCPS
+private void archiveBackup(Run run, TaskListener listener, String path) {
+    // Archive directly from private controller staging, including when the build runs on an agent.
+    File source = new File(path)
+    FilePath staging = new FilePath(Files.createTempDirectory('jenkins-backup-artifact-').toFile())
+    try {
+        FilePath target = staging.child(source.name)
+        if (source.isDirectory()) {
+            new FilePath(source).copyRecursiveTo(target)
+        } else {
+            new FilePath(source).copyTo(target)
+        }
+        def archiver = new ArtifactArchiver('**')
+        archiver.setFingerprint(true)
+        archiver.setDefaultExcludes(false)
+        archiver.setFollowSymlinks(false)
+        archiver.perform(run, staging, new Launcher.LocalLauncher(listener), listener)
+    } finally {
+        staging.deleteRecursive()
     }
-    File backupFile = new File(backupPath)
-    return [
-        path: backupPath,
-        exists: backupFile.exists(),
-        fileName: backupFile.name
-    ]
 }
 
 @NonCPS

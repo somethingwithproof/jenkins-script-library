@@ -47,7 +47,7 @@ jobs:
     - name: Run unit tests
       run: ./gradlew test --no-daemon
 
-    - name: Exercise controller operations
+    - name: Validate Declarative Pipelines and test controller restart
       run: ./gradlew integrationTest --no-daemon
 
     - name: Check for Hardcoded Credentials

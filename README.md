@@ -326,6 +326,10 @@ Originals of changed files are saved under a private recovery directory in
 `JENKINS_HOME`. Reviewing and reloading the restored configuration is a separate
 administrator action. Archive and restore paths refer to the controller filesystem.
 
+For Pipeline backups, `destination` selects the exact output and `destinationDir`
+selects the parent for generated names. The default is `JENKINS_HOME/backups`.
+See [backup options and artifact access](vars/README.md#controller-administration).
+
 ## Development
 
 ### Building the Project

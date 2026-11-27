@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 package com.github.thomasvincent.jenkinsscripts.config
 
+import com.cloudbees.groovy.cps.NonCPS
+
 import jenkins.model.Jenkins
 
 /** Read-only inventory and comparison with a Jenkins plugins.txt manifest. */
@@ -9,6 +11,7 @@ class PluginInventory {
 
     private static final String ANY_VERSION = 'latest'
 
+    @NonCPS
     static Map inspect(Jenkins controller, String manifest = null) {
         controller.checkPermission(Jenkins.SYSTEM_READ)
         def installed = controller.pluginManager.plugins.collect { plugin ->
