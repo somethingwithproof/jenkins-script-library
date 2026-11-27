@@ -129,6 +129,67 @@ class JenkinsConfigBackupSpec extends Specification {
         Files.readString(home.resolve("config.xml")) == "<hudson/>"
     }
 
+    def "explicit ZIP names are preserved and a retry leaves an existing backup intact"() {
+        given:
+        Path home = createJenkinsHome()
+        Jenkins jenkins = Mock(Jenkins) {
+            hasPermission(Jenkins.ADMINISTER) >> true
+            getRootDir() >> home.toFile()
+        }
+        def backup = new JenkinsConfigBackup(jenkins)
+        Path archive = tempDir.resolve('nested').resolve('operator.zip')
+
+        when:
+        String created = backup.performBackup(archive.toString(), false, false, false)
+        byte[] original = Files.readAllBytes(archive)
+        backup.performBackup(archive.toString(), false, false, false)
+
+        then:
+        thrown(java.nio.file.FileAlreadyExistsException)
+        Path.of(created).toRealPath() == archive.toRealPath()
+        Files.readAllBytes(archive) == original
+        archive.parent.toFile().list().toList() == ['operator.zip']
+    }
+
+    def "an uncompressed destination is exact and cannot be reused accidentally"() {
+        given:
+        Path home = createJenkinsHome()
+        Jenkins jenkins = Mock(Jenkins) {
+            hasPermission(Jenkins.ADMINISTER) >> true
+            getRootDir() >> home.toFile()
+        }
+        def backup = new JenkinsConfigBackup(jenkins)
+        Path tree = tempDir.resolve('first-tree')
+        backup.performBackup(tree.toString(), false, false, false, false)
+        def entries = tree.toFile().list().sort()
+
+        when:
+        backup.performBackup(tree.toString(), false, false, false, false)
+
+        then:
+        thrown(java.nio.file.FileAlreadyExistsException)
+        tree.toFile().list().sort() == entries
+    }
+
+    def "a new destination directory receives distinct complete backups on repeated calls"() {
+        given:
+        Path home = createJenkinsHome()
+        Jenkins jenkins = Mock(Jenkins) {
+            hasPermission(Jenkins.ADMINISTER) >> true
+            getRootDir() >> home.toFile()
+        }
+        def backup = new JenkinsConfigBackup(jenkins)
+        Path directory = tempDir.resolve('new-parent')
+
+        when:
+        Path first = Path.of(backup.performBackup(directory.toString(), false, false, false, false, true))
+        Path second = Path.of(backup.performBackup(directory.toString(), false, false, false, false, true))
+
+        then:
+        first != second
+        [first, second].every { it.parent == directory.toRealPath() && Files.exists(it.resolve('config.xml')) }
+    }
+
     def "restoreBackup rejects Zip-Slip traversal entries"() {
         given:
         Path home = createJenkinsHome()

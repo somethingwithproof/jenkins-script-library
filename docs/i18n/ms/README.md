@@ -75,7 +75,7 @@ Pustaka ini boleh digunakan melalui dua cara:
 
 2. **Sebagai skrip individu untuk dijalankan secara terus dalam Jenkins**:
 
-   Skrip dalam `src/main/groovy/com/github/thomasvincent/jenkinsscripts/scripts/` boleh dilaksanakan secara terus dalam Jenkins Script Console atau melalui Jenkins CLI.
+   Skrip dalam `src/com/github/thomasvincent/jenkinsscripts/scripts/` boleh dilaksanakan secara terus dalam Jenkins Script Console atau melalui Jenkins CLI.
 
 ## Penggunaan
 
@@ -107,7 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### Migrasi Tugas
 
-Migrasi ke pengawal jauh tidak tersedia. Walaupun URL sasaran diberikan, skrip tetap menggunakan pengawal Jenkins semasa.
+Migrasi ke pengawal jauh tidak tersedia.
 
 ##### Pembuatan Templat Tugas
 
@@ -238,10 +238,6 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 Pustaka ini juga menyediakan API berprogram untuk digunakan dalam skrip Groovy anda sendiri:
 
-JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
-
-`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
-
 #### Pengurusan Tugas
 
 ```groovy
@@ -331,12 +327,12 @@ doManager.provisionNewDroplet("my-do-template")
 
 #### Persekitaran Pengujian Docker
 
-[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+[`java24`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
 
-[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:21-jdk`
 
 ```sh
-docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java24
 docker compose -f docker-compose.test.yml run --rm java21
 ```
 

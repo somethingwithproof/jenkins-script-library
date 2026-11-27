@@ -75,7 +75,7 @@ Azo ampiasaina amin'ny fomba roa ity tranomboky ity:
 
 2. **Amin'ny maha soratra tsirairay alefa mivantana ao amin'ny Jenkins**:
 
-   Ny soratra ao amin'ny `src/main/groovy/com/github/thomasvincent/jenkinsscripts/scripts/` dia azo alefa mivantana ao amin'ny Jenkins Script Console na amin'ny alalan'ny Jenkins CLI.
+   Ny soratra ao amin'ny `src/com/github/thomasvincent/jenkinsscripts/scripts/` dia azo alefa mivantana ao amin'ny Jenkins Script Console na amin'ny alalan'ny Jenkins CLI.
 
 ## Fampiasana
 
@@ -107,7 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### Famindrana asa
 
-Tsy azo afindra amin’ny mpandrindra lavitra ny asa. Na dia omena URL kendrena aza dia ny mpandrindra Jenkins ankehitriny ihany no ampiasain’ilay script.
+Tsy azo afindra amin’ny mpandrindra lavitra ny asa.
 
 ##### Fanaovana modely asa
 
@@ -238,10 +238,6 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 Manome API ara-pandaharana ihany koa ity tranomboky ity mba hampiasaina ao amin'ny soratra Groovy anao manokana:
 
-JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
-
-`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
-
 #### Fitantanana asa
 
 ```groovy
@@ -331,12 +327,12 @@ doManager.provisionNewDroplet("my-do-template")
 
 #### Tontolo fitsapana Docker
 
-[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+[`java24`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
 
-[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:21-jdk`
 
 ```sh
-docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java24
 docker compose -f docker-compose.test.yml run --rm java21
 ```
 

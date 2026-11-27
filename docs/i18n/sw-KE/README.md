@@ -75,7 +75,7 @@ Maktaba hii inaweza kutumika kwa njia mbili:
 
 2. **Kama hati za binafsi za kuendesha moja kwa moja katika Jenkins**:
 
-   Hati zilizo katika `src/main/groovy/com/github/thomasvincent/jenkinsscripts/scripts/` zinaweza kuendeshwa moja kwa moja kwenye Jenkins Script Console au kupitia Jenkins CLI.
+   Hati zilizo katika `src/com/github/thomasvincent/jenkinsscripts/scripts/` zinaweza kuendeshwa moja kwa moja kwenye Jenkins Script Console au kupitia Jenkins CLI.
 
 ## Matumizi
 
@@ -107,7 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### Uhamishaji wa Kazi
 
-Uhamishaji kwenda kwenye kidhibiti cha mbali haupatikani. Hata ukitaja URL lengwa, hati hutumia kidhibiti cha sasa cha Jenkins.
+Uhamishaji kwenda kwenye kidhibiti cha mbali haupatikani.
 
 ##### Uundaji wa Violezo vya Kazi
 
@@ -238,10 +238,6 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 Maktaba pia hutoa API ya kiprogramu kwa matumizi katika hati zako za Groovy:
 
-JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
-
-`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
-
 #### Usimamizi wa Kazi
 
 ```groovy
@@ -331,12 +327,12 @@ doManager.provisionNewDroplet("my-do-template")
 
 #### Mazingira ya Majaribio ya Docker
 
-[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+[`java24`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
 
-[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:21-jdk`
 
 ```sh
-docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java24
 docker compose -f docker-compose.test.yml run --rm java21
 ```
 

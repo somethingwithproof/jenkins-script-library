@@ -2,7 +2,15 @@
 
 ## Overview
 
-This Jenkins Script Library uses a comprehensive Docker-based integration testing framework that provides end-to-end testing of all scripts in a real Jenkins environment.
+The CI controller acceptance suite runs on JDK 21 using the Gradle wrapper and Jenkins Test Harness. A separate Jenkins process loads the library from a temporary Git repository.
+A Pipeline on a separate agent creates and archives ZIP and directory backups,
+then retains its inventory result across a controller restart. The test also runs
+the Jenkins Declarative model validator against `Jenkinsfile`,
+`templates/basic-pipeline.jenkinsfile`, and `examples/advanced-pipeline.jenkinsfile`.
+It validates their structure without running build, release, or deployment stages.
+The test controller's plugin versions are pinned in `config/controller-test-plugins.txt`.
+
+The Docker Compose environment below is available separately for local integration work.
 
 ## Architecture
 
@@ -24,21 +32,17 @@ This Jenkins Script Library uses a comprehensive Docker-based integration testin
 ## Quick Start
 
 ### Prerequisites
-- Docker and Docker Compose
-- Java 17+
-- Gradle 8.14+
+- JDK 21 and the checked-in Gradle wrapper for controller tests
+- Docker with Compose for the container environment
 
 ### Running Tests
 
 ```bash
-# Run all integration tests in Docker
-./gradlew dockerIntegrationTest
+# Run the controller suite on disposable Jenkins instances
+./gradlew integrationTest
 
-# Run specific test class
-./gradlew integrationTest --tests JobManagementE2ETest
-
-# Run tests against existing Jenkins
-./gradlew integrationTest -PjenkinsUrl=http://localhost:8080 -PjenkinsUser=admin -PjenkinsPassword=admin
+# Run the restore acceptance test
+./gradlew integrationTest --tests '*ControllerOperationsTest.inspectAndRecoverControllerConfiguration'
 
 # Start environment and keep it running for development
 docker-compose -f docker-compose.integration.yml up -d
@@ -119,23 +123,23 @@ All integration tests should extend `BaseIntegrationTest`:
 
 ```groovy
 class MyNewE2ETest extends BaseIntegrationTest {
-    
+
     @Test
     void testMyFeature() {
         // Given: Setup test data
         createJob("test-job", jobXml)
-        
+
         // When: Execute script
         String result = executeGroovyScript("""
             @Library('jenkins-script-library') _
-            
+
             import com.github.thomasvincent.jenkinsscripts.MyClass
             new MyClass().doSomething()
         """)
-        
+
         // Then: Verify results
         assertTrue("Should succeed", result.contains("SUCCESS"))
-        
+
         // Cleanup handled automatically
     }
 }
@@ -165,52 +169,27 @@ class MyNewE2ETest extends BaseIntegrationTest {
 
 #### PostgreSQL
 - URL: `jdbc:postgresql://localhost:5432/jenkins`
-- User: `jenkins`
-- Password: `jenkins`
+- The Compose service defines the local database credentials in `POSTGRES_USER` and `POSTGRES_PASSWORD`.
 
 ## CI/CD Integration
 
 ### GitHub Actions
-```yaml
-name: Integration Tests
 
-on: [push, pull_request]
-
-jobs:
-  integration-test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      
-      - name: Set up JDK 17
-        uses: actions/setup-java@v3
-        with:
-          java-version: '17'
-          
-      - name: Run integration tests
-        run: ./gradlew dockerIntegrationTest
-        
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: test-results
-          path: build/reports/tests/
-```
+The repository CI workflow runs the controller suite on pull requests. See [ci.yml](.github/workflows/ci.yml).
 
 ### Jenkins Pipeline
 ```groovy
 pipeline {
     agent any
-    
+
     stages {
         stage('Integration Test') {
             steps {
-                sh './gradlew dockerIntegrationTest'
+                sh './gradlew integrationTest'
             }
         }
     }
-    
+
     post {
         always {
             junit 'build/test-results/integrationTest/*.xml'
@@ -239,9 +218,7 @@ docker-compose -f docker-compose.integration.yml logs -f
 ```
 
 ### Access Jenkins UI
-When tests are running, Jenkins is available at http://localhost:8080
-- Username: `admin`
-- Password: `admin`
+For the Docker environment, check the Jenkins port mapping and initialization settings in `docker-compose.integration.yml`. The Gradle controller suite allocates a temporary port.
 
 ### Debug Mode
 ```bash
@@ -289,7 +266,7 @@ protected void assertJobExists(String jobName) {
     String result = executeGroovyScript(
         "Jenkins.get().getItem('${jobName}') != null"
     )
-    assertTrue("Job ${jobName} should exist", 
+    assertTrue("Job ${jobName} should exist",
         Boolean.parseBoolean(result.trim()))
 }
 ```

@@ -75,7 +75,7 @@ jenkins-script-library/
 
 2. **براہِ راست Jenkins میں چلانے کے لیے انفرادی اسکرپٹس کے طور پر**:
 
-   `src/main/groovy/com/github/thomasvincent/jenkinsscripts/scripts/` میں موجود اسکرپٹس کو براہِ راست Jenkins Script Console یا Jenkins CLI کے ذریعے چلایا جا سکتا ہے۔
+   `src/com/github/thomasvincent/jenkinsscripts/scripts/` میں موجود اسکرپٹس کو براہِ راست Jenkins Script Console یا Jenkins CLI کے ذریعے چلایا جا سکتا ہے۔
 
 ## استعمال
 
@@ -107,7 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### جاب مائیگریشن
 
-ریموٹ کنٹرولر پر منتقلی دستیاب نہیں ہے۔ ہدف کا URL دینے پر بھی اسکرپٹ موجودہ Jenkins کنٹرولر استعمال کرتی ہے۔
+ریموٹ کنٹرولر پر منتقلی دستیاب نہیں ہے۔
 
 ##### جاب ٹیمپلیٹنگ
 
@@ -238,10 +238,6 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 یہ لائبریری آپ کی اپنی Groovy اسکرپٹس میں استعمال کے لیے ایک پروگرامیٹک API بھی فراہم کرتی ہے:
 
-JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
-
-`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
-
 #### جاب مینجمنٹ
 
 ```groovy
@@ -331,12 +327,12 @@ doManager.provisionNewDroplet("my-do-template")
 
 #### Docker ٹیسٹنگ ماحول
 
-[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+[`java24`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
 
-[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:21-jdk`
 
 ```sh
-docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java24
 docker compose -f docker-compose.test.yml run --rm java21
 ```
 

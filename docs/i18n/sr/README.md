@@ -73,11 +73,9 @@ jenkins-script-library/
    }
    ```
 
-   > **Напомена**: Објављени Gradle артефакт тренутно компајлира само пакете `util` и `pipeline` (`build.gradle`). Класе из `jobs`, `cloud` и `scripts` користите директно из `src/main/groovy/`.
-
 2. **Као појединачне скрипте за директно извршавање у Jenkins-у**:
 
-   Скрипте у `src/main/groovy/com/github/thomasvincent/jenkinsscripts/scripts/` могу се извршавати директно у Jenkins Script Console или путем Jenkins CLI алата.
+   Скрипте у `src/com/github/thomasvincent/jenkinsscripts/scripts/` могу се извршавати директно у Jenkins Script Console или путем Jenkins CLI алата.
 
 ## Коришћење
 
@@ -109,7 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### Миграција послова
 
-Удаљена миграција није доступна. Чак и када наведете циљни URL, скрипта користи тренутни Jenkins контролер.
+Удаљена миграција није доступна.
 
 ##### Креирање послова из шаблона
 
@@ -240,10 +238,6 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 Библиотека такође пружа програмски API за коришћење у вашим Groovy скриптама:
 
-JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
-
-`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
-
 #### Управљање пословима
 
 ```groovy
@@ -333,14 +327,14 @@ doManager.provisionNewDroplet("my-do-template")
 
 #### Docker окружење за тестирање
 
-Оба Compose сервиса покрећу Gradle тестове на Јави 24.
+Оба Compose сервиса покрећу Gradle тестове на Јави 21 и 24.
 
-[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+[`java24`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
 
-[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:21-jdk`
 
 ```sh
-docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java24
 docker compose -f docker-compose.test.yml run --rm java21
 ```
 

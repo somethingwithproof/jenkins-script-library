@@ -1,0 +1,189 @@
+// SPDX-FileCopyrightText: 2025-2026 Thomas Vincent <thomasvincent@gmail.com>
+// SPDX-License-Identifier: MIT
+
+/*
+ * MIT License
+ *
+ * Copyright (c) 2023-2025 Thomas Vincent
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+package com.github.thomasvincent.jenkinsscripts.util
+
+import java.io.Serializable
+import java.io.IOException
+
+/**
+ * Pipeline utilities for Jenkins scripts.
+ *
+ * Provides helper methods for determining platform characteristics
+ * and environment details for Jenkins pipelines.
+ *
+ * @author Thomas Vincent
+ * @since 1.0
+ */
+class PipelineUtils implements Serializable {
+
+    private static final long serialVersionUID = 1L
+
+    // Architecture constants to avoid duplication
+    private static final String ARCH_AMD64 = "amd64"
+    private static final String ARCH_ARM64 = "arm64"
+    private static final String ARCH_386 = "386"
+    private static final String OS_LINUX = "linux"
+
+    /** Reference to the pipeline script context (Serializable in Jenkins CPS) */
+    private final def pipeline
+
+    /**
+     * Initializes a new PipelineUtils instance.
+     *
+     * Takes a reference to the pipeline script context for command execution.
+     *
+     * ```groovy
+     * def utils = new PipelineUtils(this)
+     * def os = utils.currentOS()  // Detect OS platform
+     * ```
+     */
+    PipelineUtils(def pipeline) {
+        this.pipeline = pipeline
+    }
+
+    private def requirePipeline() {
+        if (pipeline == null) {
+            throw new IllegalStateException("Pipeline script context is not initialized")
+        }
+        return pipeline
+    }
+
+    /**
+     * Determines the current operating system.
+     *
+     * Uses pipeline commands to detect OS platform type.
+     *
+     * ```groovy
+     * def utils = new PipelineUtils(this)
+     * utils.currentOS()  // 'linux', 'darwin', or 'windows'
+     * ```
+     */
+    String currentOS() {
+        def script = requirePipeline()
+        if (script.isUnix()) {
+            try {
+                def osName = script.sh(script: 'uname', returnStdout: true).trim().toLowerCase()
+                return osName == 'darwin' ? 'darwin' : OS_LINUX
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt()
+                throw e
+            } catch (IOException e) {
+                return OS_LINUX // Default to Linux if we can't determine
+            }
+        } else {
+            return 'windows'
+        }
+    }
+
+    /**
+     * Determines the current system architecture.
+     *
+     * Detects processor architecture and normalizes to standard identifiers.
+     *
+     * ```groovy
+     * def utils = new PipelineUtils(this)
+     * utils.currentArchitecture()  // 'amd64', 'arm64', etc.
+     * ```
+     */
+    String currentArchitecture() {
+        def script = requirePipeline()
+        try {
+            if (script.isUnix()) {
+                def arch = script.sh(script: 'uname -m', returnStdout: true).trim()
+                return mapArchitecture(arch)
+            } else {
+                def arch = script.powershell(
+                        script: '(Get-WmiObject Win32_Processor).Architecture',
+                        returnStdout: true).trim()
+                return mapWindowsArchitecture(arch)
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt()
+            throw e
+        } catch (IOException e) {
+            return ARCH_AMD64 // Default to amd64 if we can't determine
+        }
+    }
+
+    /**
+     * Maps UNIX architecture names to standardized identifiers.
+     *
+     * Converts Unix uname architecture values to consistent naming scheme.
+     *
+     * ```groovy
+     * def utils = new PipelineUtils(this)
+     * utils.mapArchitecture("x86_64")   // "amd64"
+     * utils.mapArchitecture("aarch64")  // "arm64"
+     * ```
+     */
+    String mapArchitecture(String arch) {
+        switch (arch) {
+            case 'x86_64':
+            case 'x64':
+                return ARCH_AMD64
+            case 'aarch64':
+                return ARCH_ARM64
+            case ~/^armv.*/:
+                return 'arm'
+            case ~/^i[3456]86$/:
+                return ARCH_386
+            default:
+                return arch
+        }
+    }
+
+    /**
+     * Maps Windows architecture codes to standardized identifiers.
+     *
+     * Converts Windows architecture numeric codes to consistent naming scheme.
+     *
+     * ```groovy
+     * def utils = new PipelineUtils(this)
+     * utils.mapWindowsArchitecture("0")   // "i386"
+     * utils.mapWindowsArchitecture("9")   // "amd64"
+     * utils.mapWindowsArchitecture("12")  // "arm64"
+     * ```
+     */
+    String mapWindowsArchitecture(String arch) {
+        switch (arch) {
+            case '0':
+                return 'i386'
+            case '9':
+                return ARCH_AMD64
+            case '12':
+                return ARCH_ARM64
+            case 'AMD64':
+            case 'EM64T':
+                return ARCH_AMD64
+            case 'x86':
+                return ARCH_386
+            default:
+                return ARCH_AMD64
+        }
+    }
+}

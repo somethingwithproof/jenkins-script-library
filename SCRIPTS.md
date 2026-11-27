@@ -4,10 +4,10 @@ This document provides a comprehensive guide to all scripts available in the Jen
 
 ## Script Usage
 
-All scripts are located in the `src/main/groovy/com/github/thomasvincent/jenkinsscripts/scripts` directory. To use a script in Jenkins:
+All scripts are located in the `src/com/github/thomasvincent/jenkinsscripts/scripts` directory. To use a script in Jenkins:
 
 1. Navigate to "Manage Jenkins" > "Script Console"
-2. Copy the script content 
+2. Copy the script content
 3. Modify parameters as needed
 4. Execute the script
 
@@ -97,21 +97,19 @@ def auditor = new AuditJobConfigurations()
 auditor.auditJobs(".*", ["security", "performance"])
 ```
 
+### AuditPlugins
+
+In a trusted Pipeline, `auditPlugins()` lists installed plugins. Pass the text of
+an expected manifest to compare versions. The controller-side script accepts
+`--expected /path/to/plugins.txt --format json`. Reading a manifest from the
+controller filesystem requires administrator permission.
+
 ### BackupJenkinsConfig
 
-Creates a backup of Jenkins configuration files.
-
-**Parameters:**
-- `backupDir` - Directory to store backups
-- `includeJobs` - Whether to include job configurations (true/false)
-
-**Example:**
-```groovy
-import com.github.thomasvincent.jenkinsscripts.scripts.BackupJenkinsConfig
-
-def backup = new BackupJenkinsConfig()
-backup.createBackup("/var/backups/jenkins", true)
-```
+Use `--destination DIR` to create a backup. To inspect a backup before changing
+files, use `--restore ARCHIVE --list-contents` or `--restore ARCHIVE --files
+config.xml --dry-run`. Apply a selection by omitting the preview flag. Changed
+originals are preserved in the recovery directory printed by the command.
 
 ### CleanBuildHistory
 
@@ -335,20 +333,9 @@ manager.manage("scale", "build-agent", 5)
 
 ### MigrateJobs
 
-Migrates Jenkins jobs between Jenkins instances or folders.
-
-**Parameters:**
-- `jobPattern` - Pattern to match job names (regex supported)
-- `targetLocation` - Target location to migrate jobs to
-- `migrationType` - Type of migration ("copy", "move")
-
-**Example:**
-```groovy
-import com.github.thomasvincent.jenkinsscripts.scripts.MigrateJobs
-
-def migrator = new MigrateJobs()
-migrator.migrate(".*-project", "NewFolder", "copy")
-```
+The remote migration command stops before changing jobs. Callers that already
+hold two distinct in-process Jenkins controller objects can use the
+`com.github.thomasvincent.jenkinsscripts.jobs.JobMigrator` API.
 
 ### OptimizeAgentResources
 

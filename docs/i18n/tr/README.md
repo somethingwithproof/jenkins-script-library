@@ -75,7 +75,7 @@ Bu kütüphane iki şekilde kullanılabilir:
 
 2. **Doğrudan Jenkins içinde çalıştırılacak bağımsız betikler olarak**:
 
-   `src/main/groovy/com/github/thomasvincent/jenkinsscripts/scripts/` dizinindeki betikler doğrudan Jenkins Script Console üzerinden veya Jenkins CLI aracılığıyla çalıştırılabilir.
+   `src/com/github/thomasvincent/jenkinsscripts/scripts/` dizinindeki betikler doğrudan Jenkins Script Console üzerinden veya Jenkins CLI aracılığıyla çalıştırılabilir.
 
 ## Kullanım
 
@@ -107,7 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### İş Taşıma
 
-Uzak bir denetleyiciye geçiş yapılamaz. Bir hedef URL girilse bile betik geçerli Jenkins denetleyicisini kullanır.
+Uzak bir denetleyiciye geçiş yapılamaz.
 
 ##### İş Şablonlama
 
@@ -238,10 +238,6 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 Kütüphane ayrıca kendi Groovy betiklerinizde kullanmanız için programatik bir API sunar:
 
-JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
-
-`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
-
 #### İş Yönetimi
 
 ```groovy
@@ -331,12 +327,12 @@ doManager.provisionNewDroplet("my-do-template")
 
 #### Docker Test Ortamı
 
-[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+[`java24`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
 
-[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:21-jdk`
 
 ```sh
-docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java24
 docker compose -f docker-compose.test.yml run --rm java21
 ```
 

@@ -62,7 +62,7 @@ jenkins-script-library/
 
 ## Installation
 
-This library can be used in two ways:
+Load the shared library from this repository in Jenkins, or use its Gradle artifact. Jenkins loads pipeline steps from `vars/` and packaged classes from `src/com/`. Both use the same source tree.
 
 1. **As a dependency in your Gradle/Maven project**:
 
@@ -73,11 +73,9 @@ This library can be used in two ways:
    }
    ```
 
-   > **Note**: The published Gradle artifact currently compiles only the `util` and `pipeline` packages (`build.gradle`). Use `jobs`, `cloud`, and `scripts` directly from `src/main/groovy/`.
-
 2. **As individual scripts to run directly in Jenkins**:
 
-   The scripts in `src/main/groovy/com/github/thomasvincent/jenkinsscripts/scripts/` can be executed directly in Jenkins Script Console or through the Jenkins CLI.
+   The scripts in `src/com/github/thomasvincent/jenkinsscripts/scripts/` can be executed directly in Jenkins Script Console or through the Jenkins CLI.
 
 ## Usage
 
@@ -109,7 +107,8 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### Job Migration
 
-Remote migration is unavailable. Even with a target URL, the script uses the current Jenkins controller.
+The command-line migration entry point stops before changing jobs. The in-process
+`JobMigrator` API requires two distinct Jenkins controller objects.
 
 ##### Job Templating
 
@@ -227,7 +226,7 @@ groovy SecurityVulnerabilityScan.groovy --critical-only
 
 ```bash
 # Backup Jenkins configuration
-groovy BackupJenkinsConfig.groovy --output jenkins-backup.tar.gz
+groovy BackupJenkinsConfig.groovy --destination /var/backups/jenkins
 
 # Optimize agent resources
 groovy OptimizeAgentResources.groovy --reclaim-idle
@@ -239,10 +238,6 @@ groovy OptimizeJobScheduling.groovy --balance-load
 ### Programmatic API
 
 The library also provides a programmatic API for use in your own Groovy scripts:
-
-JAR → [`util`](src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
-
-`src/main/groovy` → [`jobs`](src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
 
 #### Job Management
 
@@ -305,6 +300,36 @@ def doNodes = doManager.getDigitalOceanNodes()
 doManager.provisionNewDroplet("my-do-template")
 ```
 
+### Controller operations from a trusted Pipeline
+
+```groovy
+def inventory = auditPlugins(expected: readFile('config/plugins.txt'))
+if (inventory.drift) {
+    error "Plugin drift: missing=${inventory.missing}, extra=${inventory.extra}, mismatched=${inventory.mismatched}"
+}
+
+def entries = backupJenkinsConfig.restore(
+    backupFile: '/var/backups/jenkins/snapshot.zip', files: ['jobs/team/'], dryRun: true
+)
+echo "Selected ${entries.size()} entries"
+```
+
+`auditPlugins()` returns a read-only inventory. The expected manifest accepts plugin
+IDs, `id:latest` and `id:version`. The controller-side `AuditPlugins.groovy` script
+accepts `--expected` and `--format json` for automation. A comparison with drift
+fails the command after printing the report.
+
+Use `BackupJenkinsConfig.groovy --restore ARCHIVE --list-contents` to inspect a
+backup and `--files config.xml,jobs/team/ --dry-run` to preview a selection.
+Omit the preview flags to apply it. ZIPs and directory backups are supported.
+Originals of changed files are saved under a private recovery directory in
+`JENKINS_HOME`. Reviewing and reloading the restored configuration is a separate
+administrator action. Archive and restore paths refer to the controller filesystem.
+
+For Pipeline backups, `destination` selects the exact output and `destinationDir`
+selects the parent for generated names. The default is `JENKINS_HOME/backups`.
+See [backup options and artifact access](vars/README.md#controller-administration).
+
 ## Development
 
 ### Building the Project
@@ -318,6 +343,9 @@ doManager.provisionNewDroplet("my-do-template")
 ```bash
 # Run unit tests
 ./gradlew test
+
+# Run controller operations against a temporary Jenkins home
+./gradlew integrationTest
 
 # Run all configured checks
 ./gradlew check
@@ -333,14 +361,14 @@ doManager.provisionNewDroplet("my-do-template")
 
 #### Docker Testing Environment
 
-Both Compose services run the Gradle test suite on Java 24.
+The Compose services run the Gradle test suite on Java 21 and Java 24.
 
-[`java17`](Dockerfile.test) → `eclipse-temurin:24-jdk`
+[`java24`](Dockerfile.test) → `eclipse-temurin:24-jdk`
 
-[`java21`](Dockerfile.java21) → `eclipse-temurin:24-jdk`
+[`java21`](Dockerfile.java21) → `eclipse-temurin:21-jdk`
 
 ```sh
-docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java24
 docker compose -f docker-compose.test.yml run --rm java21
 ```
 

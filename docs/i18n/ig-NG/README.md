@@ -75,7 +75,7 @@ Enwere ike iji ọba akwụkwọ koodu a n'ụzọ abụọ:
 
 2. **Dị ka skriptị dị iche iche a ga-agba ozugbo na Jenkins**:
 
-   Enwere ike ịgba skriptị ndị dị na `src/main/groovy/com/github/thomasvincent/jenkinsscripts/scripts/` ozugbo na Jenkins Script Console ma ọ bụ site na Jenkins CLI.
+   Enwere ike ịgba skriptị ndị dị na `src/com/github/thomasvincent/jenkinsscripts/scripts/` ozugbo na Jenkins Script Console ma ọ bụ site na Jenkins CLI.
 
 ## Ojiji
 
@@ -107,7 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### Mbufe Job
 
-Enweghị ike ibugharị ọrụ gaa na Jenkins controller dị anya. Ọ bụrụgodị na i tinye URL ebe a na-aga, script ahụ ga-eji controller Jenkins nke ugbu a.
+Enweghị ike ibugharị ọrụ gaa na Jenkins controller dị anya.
 
 ##### Ndebiri Job
 
@@ -238,10 +238,6 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 Ọba akwụkwọ koodu a na-enyekwa API mmemme maka ojiji na skriptị Groovy nke gị:
 
-JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
-
-`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
-
 #### Njikwa Job
 
 ```groovy
@@ -331,12 +327,12 @@ doManager.provisionNewDroplet("my-do-template")
 
 #### Gburugburu Nnwale Docker
 
-[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+[`java24`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
 
-[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:21-jdk`
 
 ```sh
-docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java24
 docker compose -f docker-compose.test.yml run --rm java21
 ```
 

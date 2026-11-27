@@ -75,7 +75,7 @@ Iri soko ry'ibikoresho rishobora gukoreshwa mu buryo bubiri:
 
 2. **Nka script zihariye zo gukoresha mu buryo butaziguye muri Jenkins**:
 
-   Script ziri muri `src/main/groovy/com/github/thomasvincent/jenkinsscripts/scripts/` zishobora gukoreshwa mu buryo butaziguye muri Jenkins Script Console cyangwa binyuze muri Jenkins CLI.
+   Script ziri muri `src/com/github/thomasvincent/jenkinsscripts/scripts/` zishobora gukoreshwa mu buryo butaziguye muri Jenkins Script Console cyangwa binyuze muri Jenkins CLI.
 
 ## Uko bikoreshwa
 
@@ -107,7 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### Kwimura imirimo
 
-Kwimurira imirimo ku yindi kontorola ntibishoboka. Nubwo watanga URL y’aho ushaka kuyimurira, iyi script ikoresha kontorola ya Jenkins urimo.
+Kwimurira imirimo ku yindi kontorola ntibishoboka.
 
 ##### Gukora inyandikorugero z'imirimo
 
@@ -238,10 +238,6 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 Iri soko ry'ibikoresho ritanga kandi API yo muri porogaramu yo gukoresha muri script zawe za Groovy:
 
-JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
-
-`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
-
 #### Gucunga imirimo
 
 ```groovy
@@ -331,12 +327,12 @@ doManager.provisionNewDroplet("my-do-template")
 
 #### Urubuga rw'igerageza rwa Docker
 
-[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+[`java24`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
 
-[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:21-jdk`
 
 ```sh
-docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java24
 docker compose -f docker-compose.test.yml run --rm java21
 ```
 

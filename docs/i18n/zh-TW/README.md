@@ -75,7 +75,7 @@ jenkins-script-library/
 
 2. **作為獨立腳本直接在 Jenkins 中執行**：
 
-   位於 `src/main/groovy/com/github/thomasvincent/jenkinsscripts/scripts/` 的腳本可直接在 Jenkins Script Console 或透過 Jenkins CLI 執行。
+   位於 `src/com/github/thomasvincent/jenkinsscripts/scripts/` 的腳本可直接在 Jenkins Script Console 或透過 Jenkins CLI 執行。
 
 ## 使用方式
 
@@ -107,7 +107,7 @@ groovy EnableJobs.groovy my-jenkins-job
 
 ##### 作業遷移
 
-目前無法遷移至遠端控制器。即使指定目標 URL，指令碼仍會使用目前的 Jenkins 控制器。
+目前無法遷移至遠端控制器。
 
 ##### 作業範本化
 
@@ -238,10 +238,6 @@ groovy OptimizeJobScheduling.groovy --balance-load
 
 本程式庫亦提供程式化 API，供您在自己的 Groovy 腳本中使用：
 
-JAR → [`util`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/util), [`pipeline`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/pipeline)
-
-`src/main/groovy` → [`jobs`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/jobs), [`cloud`](../../../src/main/groovy/com/github/thomasvincent/jenkinsscripts/cloud)
-
 #### 作業管理
 
 ```groovy
@@ -331,12 +327,12 @@ doManager.provisionNewDroplet("my-do-template")
 
 #### Docker 測試環境
 
-[`java17`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
+[`java24`](../../../Dockerfile.test) → `eclipse-temurin:24-jdk`
 
-[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:24-jdk`
+[`java21`](../../../Dockerfile.java21) → `eclipse-temurin:21-jdk`
 
 ```sh
-docker compose -f docker-compose.test.yml run --rm java17
+docker compose -f docker-compose.test.yml run --rm java24
 docker compose -f docker-compose.test.yml run --rm java21
 ```
 
