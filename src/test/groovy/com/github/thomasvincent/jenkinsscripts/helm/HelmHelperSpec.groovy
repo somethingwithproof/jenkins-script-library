@@ -116,8 +116,11 @@ class HelmHelperSpec extends Specification {
         pipeline.psCommands.size() == 1
         pipeline.psCommands[0].contains('https://get.helm.sh/helm-v3.17.0-windows-amd64.zip')
         pipeline.psCommands[0].contains('[System.Guid]::NewGuid()')
-        pipeline.psCommands[0].contains('Get-ChildItem -Path $stageDir -Filter "helm.exe" -Recurse')
-        pipeline.psCommands[0].contains('Move-Item -Path $extractedExe.FullName -Destination $helmExe -Force')
+        pipeline.psCommands[0].contains('Test-Path -LiteralPath $helmExe')
+        pipeline.psCommands[0].contains('Expand-Archive -LiteralPath $archive')
+        pipeline.psCommands[0].contains('Get-ChildItem -LiteralPath $stageDir -Filter "helm.exe" -Recurse')
+        pipeline.psCommands[0].contains('Move-Item -LiteralPath $extractedExe.FullName -Destination $helmExe -Force')
+        pipeline.psCommands[0].contains('Remove-Item -LiteralPath $stageDir')
     }
 
     def "use preserves the original exception without wrapping via pipeline.error"() {
@@ -153,31 +156,34 @@ class HelmHelperSpec extends Specification {
         Map unixLint = unixHelper.lint(
             chart: './charts/demo',
             valuesFiles: ['values.yaml'],
-            setValues: [imageTag: "rel'42"]
+            setValues: [imageTag: "rel'42", allowedHosts: 'api.example.com,admin.example.com']
         )
         Map winLint = winHelper.lint(
             chart: './charts/demo',
             valuesFiles: ['values.yaml'],
-            setValues: [imageTag: "rel'42"]
+            setValues: [imageTag: "rel'42", allowedHosts: 'api.example.com,admin.example.com']
         )
         Map winDeploy = winHelper.deploy(
             release: 'demo-app',
             chart: './charts/demo',
-            setValues: [imageTag: "rel'42"]
+            setValues: [imageTag: "rel'42", allowedHosts: 'api.example.com,admin.example.com']
         )
 
         then:
         unixPipeline.shCommands.size() == 1
         unixLint.command.contains("-f 'values.yaml'")
         unixLint.command.contains("--set 'imageTag=rel'\"'\"'42'")
+        unixLint.command.contains("--set 'allowedHosts=api.example.com\\,admin.example.com'")
 
         winPipeline.shCommands.isEmpty()
         winPipeline.psCommands.size() == 2
         winLint.command.startsWith("& 'helm' 'lint' './charts/demo'")
         winLint.command.contains("'-f' 'values.yaml'")
         winLint.command.contains("'--set' 'imageTag=rel''42'")
+        winLint.command.contains("'--set' 'allowedHosts=api.example.com\\,admin.example.com'")
         winDeploy.command.startsWith("& 'helm' 'upgrade' '--install' 'demo-app' './charts/demo'")
         winDeploy.command.contains("'--set' 'imageTag=rel''42'")
+        winDeploy.command.contains("'--set' 'allowedHosts=api.example.com\\,admin.example.com'")
     }
 
     def "buildDeployCommand applies defaults and preserves explicit false flags"() {

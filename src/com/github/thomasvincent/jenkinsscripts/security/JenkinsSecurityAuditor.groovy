@@ -529,7 +529,7 @@ class JenkinsSecurityAuditor {
             </head>
             <body>
                 <h1>Jenkins Security Audit Report</h1>
-                <p>Generated on ${new Date().format("yyyy-MM-dd HH:mm:ss")}</p>
+                <p>Generated on ${new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date())}</p>
 
                 <div class="summary">
                     <h2>Summary</h2>
@@ -595,12 +595,24 @@ class JenkinsSecurityAuditor {
      */
     private void appendFindingHtml(StringBuilder builder, SecurityFinding finding, String severityClass) {
         builder.append("""
-            <div class="finding ${severityClass}">
-                <div class="finding-title">${finding.title}</div>
-                <div class="finding-meta">Category: ${finding.category}</div>
-                <div class="finding-desc">${finding.description}</div>
+            <div class="finding ${escapeHtml(severityClass)}">
+                <div class="finding-title">${escapeHtml(finding.title)}</div>
+                <div class="finding-meta">Category: ${escapeHtml(finding.category?.name())}</div>
+                <div class="finding-desc">${escapeHtml(finding.description)}</div>
             </div>
         """)
+    }
+
+    static String escapeHtml(String value) {
+        if (value == null) {
+            return ''
+        }
+        return value
+            .replace('&', '&amp;')
+            .replace('<', '&lt;')
+            .replace('>', '&gt;')
+            .replace('"', '&quot;')
+            .replace("'", '&#39;')
     }
 
     /**

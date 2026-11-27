@@ -141,13 +141,19 @@ private String generateHtmlReport(Map findings) {
 """)
 
     findings.each { category, categoryFindings ->
-        html.append("<h2>${category}</h2>")
+        html.append("<h2>${JenkinsSecurityAuditor.escapeHtml(category?.toString())}</h2>")
         categoryFindings.each { finding ->
-            def cssClass = finding.severity.toLowerCase()
+            String severity = finding.severity?.toString() ?: 'INFO'
+            String cssClass = JenkinsSecurityAuditor.escapeHtml(severity.toLowerCase())
+            String escapedSeverity = JenkinsSecurityAuditor.escapeHtml(severity)
+            String escapedDesc = JenkinsSecurityAuditor.escapeHtml(finding.description?.toString())
+            String escapedRec = finding.recommendation
+                ? "<br><em>Recommendation:</em> ${JenkinsSecurityAuditor.escapeHtml(finding.recommendation?.toString())}"
+                : ''
             html.append("""
     <div class="finding ${cssClass}">
-        <strong class="${cssClass}">${finding.severity}:</strong> ${finding.description}
-        ${finding.recommendation ? "<br><em>Recommendation:</em> ${finding.recommendation}" : ""}
+        <strong class="${cssClass}">${escapedSeverity}:</strong> ${escapedDesc}
+        ${escapedRec}
     </div>
 """)
         }
@@ -173,10 +179,11 @@ private void sendSecurityReport(Map findings, String recipient) {
 private String generateEmailBody(Map findings, String buildUrl) {
     def criticalCount = findings.values().flatten().count { it.severity == 'CRITICAL' }
     def warningCount = findings.values().flatten().count { it.severity in ['WARNING', 'HIGH'] }
+    String escapedBuildUrl = JenkinsSecurityAuditor.escapeHtml(buildUrl ?: '')
 
     return """
 <h2>Jenkins Security Audit Results</h2>
-<p>Build: ${buildUrl ?: ''}</p>
+<p>Build: ${escapedBuildUrl}</p>
 <p>Summary: ${criticalCount} critical issues, ${warningCount} warnings</p>
 <p>Please review the attached report for details.</p>
 """

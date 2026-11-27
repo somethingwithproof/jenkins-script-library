@@ -128,29 +128,29 @@ class HelmHelper implements Serializable {
                     '$ErrorActionPreference = "Stop"',
                     "\$binDir = ${powershellQuote(binDir)}",
                     '$helmExe = Join-Path $binDir "helm.exe"',
-                    'if (-not (Test-Path $helmExe)) {',
+                    'if (-not (Test-Path -LiteralPath $helmExe)) {',
                     '  New-Item -ItemType Directory -Force -Path $binDir | Out-Null',
                     '  $stageDir = Join-Path $binDir (".helm-install-" + [System.Guid]::NewGuid().ToString("N"))',
                     '  New-Item -ItemType Directory -Force -Path $stageDir | Out-Null',
                     '  try {',
                     '    $archive = Join-Path $stageDir "helm.zip"',
                     "    Invoke-WebRequest -Uri ${powershellQuote(downloadUrl)} -OutFile \$archive",
-                    '    Expand-Archive -Path $archive -DestinationPath $stageDir -Force',
-                    '    $extractedExe = Get-ChildItem -Path $stageDir -Filter "helm.exe" -Recurse | Select-Object -First 1',
+                    '    Expand-Archive -LiteralPath $archive -DestinationPath $stageDir -Force',
+                    '    $extractedExe = Get-ChildItem -LiteralPath $stageDir -Filter "helm.exe" -Recurse | Select-Object -First 1',
                     '    if (-not $extractedExe) {',
                     '      throw "Extracted Helm archive did not contain helm.exe"',
                     '    }',
-                    '    if (-not (Test-Path $helmExe)) {',
+                    '    if (-not (Test-Path -LiteralPath $helmExe)) {',
                     '      try {',
-                    '        Move-Item -Path $extractedExe.FullName -Destination $helmExe -Force',
+                    '        Move-Item -LiteralPath $extractedExe.FullName -Destination $helmExe -Force',
                     '      } catch {',
-                    '        if (-not (Test-Path $helmExe)) {',
+                    '        if (-not (Test-Path -LiteralPath $helmExe)) {',
                     '          throw',
                     '        }',
                     '      }',
                     '    }',
                     '  } finally {',
-                    '    Remove-Item -Path $stageDir -Recurse -Force -ErrorAction SilentlyContinue',
+                    '    Remove-Item -LiteralPath $stageDir -Recurse -Force -ErrorAction SilentlyContinue',
                     '  }',
                     '}'
                 ].join('\n')
@@ -330,7 +330,8 @@ class HelmHelper implements Serializable {
             (args.setValues as Map).each { Object k, Object v ->
                 String key = k?.toString()?.trim()
                 if (key) {
-                    String pair = "${key}=${v == null ? '' : v.toString()}"
+                    String escapedValue = escapeHelmSetValue(v == null ? '' : v.toString())
+                    String pair = "${key}=${escapedValue}"
                     parts.add(unix ? '--set' : powershellQuote('--set'))
                     parts.add(unix ? shellQuote(pair) : powershellQuote(pair))
                 }
@@ -371,5 +372,15 @@ class HelmHelper implements Serializable {
     @NonCPS
     static String powershellQuote(String value) {
         return "'" + (value ?: '').replace("'", "''") + "'"
+    }
+
+    @NonCPS
+    static String escapeHelmSetValue(String value) {
+        return (value ?: '')
+            .replace('\\', '\\\\')
+            .replace(',', '\\,')
+            .replace('=', '\\=')
+            .replace('{', '\\{')
+            .replace('}', '\\}')
     }
 }

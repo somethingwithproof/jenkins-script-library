@@ -790,7 +790,7 @@ class VarsPipelineUnitSpec extends Specification {
         }
 
         then:
-        1 * offlineAgent.connect(true)
+        1 * offlineAgent.connect(false)
         healResult.totalAttempts == 1
         healResult.failed == 1
         healResult.agentStatuses.size() == 1
@@ -821,7 +821,7 @@ class VarsPipelineUnitSpec extends Specification {
         recoveringAgent.isOnline() >> { !recoveringOffline }
         recoveringAgent.offlineCause >> null
         recoveringAgent.getMonitorData() >> [:]
-        recoveringAgent.connect(true) >> {
+        recoveringAgent.connect(false) >> {
             recoveringOffline = false
             return null
         }
@@ -845,7 +845,7 @@ class VarsPipelineUnitSpec extends Specification {
         }
 
         then: "stubborn agent reaches REPLACING and recovering agent reaches HEALTHY"
-        2 * stubbornAgent.connect(true)
+        2 * stubbornAgent.connect(false)
         replaceResult.totalAttempts == 3
         replaceResult.successful == 1
         replaceResult.failed == 1
@@ -865,12 +865,12 @@ class VarsPipelineUnitSpec extends Specification {
         }
 
         then:
-        1 * stubbornAgent.connect(true)
+        1 * stubbornAgent.connect(false)
         statsWithReconnect.totalAttempts == 1
         statsForcedReadOnly.totalAttempts == 0
     }
 
-    def "auditSecurity skips users removed from the security realm while counting valid admins"() {
+    def "auditSecurity skips users removed from the security realm while counting valid admins and escaping HTML"() {
         given:
         def step = unit.loadScript('vars/auditSecurity.groovy')
         Jenkins jenkins = Mockito.mock(Jenkins)
@@ -881,9 +881,10 @@ class VarsPipelineUnitSpec extends Specification {
         org.springframework.security.core.Authentication adminAuth =
             Mockito.mock(org.springframework.security.core.Authentication)
 
-        Mockito.when(removedUser.id).thenReturn('former-employee')
+        String maliciousId = '<img src=x onerror=alert(1)>'
+        Mockito.when(removedUser.id).thenReturn(maliciousId)
         Mockito.when(removedUser.impersonate2()).thenThrow(
-            new org.springframework.security.core.userdetails.UsernameNotFoundException('former-employee')
+            new org.springframework.security.core.userdetails.UsernameNotFoundException(maliciousId)
         )
         Mockito.when(validAdmin.id).thenReturn('active-admin')
         Mockito.when(validAdmin.impersonate2()).thenReturn(adminAuth)
@@ -903,21 +904,31 @@ class VarsPipelineUnitSpec extends Specification {
 
         when:
         Map result
+        String auditorHtml
         MockedStatic<Jenkins> mocked = Mockito.mockStatic(Jenkins)
         MockedStatic<hudson.model.User> mockedUsers = Mockito.mockStatic(hudson.model.User)
         try {
             mocked.when { Jenkins.get() }.thenReturn(jenkins)
             mockedUsers.when { hudson.model.User.getAll() }.thenReturn([removedUser, validAdmin])
-            result = step.call(archive: false, failOnCritical: false)
+            result = step.call(archive: true, failOnCritical: false)
+            def directAuditor = new com.github.thomasvincent.jenkinsscripts.security.JenkinsSecurityAuditor(jenkins)
+            directAuditor.runFullAudit()
+            auditorHtml = directAuditor.generateHtmlReport()
         } finally {
             mockedUsers.close()
             mocked.close()
         }
 
-        then: "audit succeeds, counts active-admin (no 'No Admin Users' finding), and records skipped user"
+        then: "audit succeeds, keeps raw text in findings map, and escapes HTML in both reports"
         List authFindings = (result.findings.AUTHORIZATION ?: []) as List
-        authFindings.any { it.title == 'Unresolved User Account: former-employee' && it.severity == 'INFO' }
+        authFindings.any { it.title == "Unresolved User Account: ${maliciousId}" && it.severity == 'INFO' }
         !authFindings.any { it.title == 'No Admin Users' }
+        String htmlReport = unit.writtenFiles['security-audit-report.html']
+        htmlReport != null
+        !htmlReport.contains(maliciousId)
+        htmlReport.contains('&lt;img src=x onerror=alert(1)&gt;')
+        !auditorHtml.contains(maliciousId)
+        auditorHtml.contains('&lt;img src=x onerror=alert(1)&gt;')
     }
 
     def "admin cleanup-jobs script rejects nonpositive BUILD_LIMIT, invalid DRY_RUN, and failed JobCleaner.clean()"() {

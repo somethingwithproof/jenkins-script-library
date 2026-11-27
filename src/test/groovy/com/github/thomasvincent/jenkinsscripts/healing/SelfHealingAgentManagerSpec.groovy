@@ -132,7 +132,7 @@ class SelfHealingAgentManagerSpec extends Specification {
         manager.performHealthCheck()
 
         then: "only one reconnect attempt is dispatched while delayed task is pending"
-        1 * agent.connect(true)
+        1 * agent.connect(false)
         manager.statistics.totalAttempts == 1
 
         when: "start and stop lifecycle runs"
@@ -167,7 +167,7 @@ class SelfHealingAgentManagerSpec extends Specification {
         manager.performHealthCheck()
 
         then:
-        1 * agent.connect(true)
+        1 * agent.connect(false)
         !manager.isRunning()
         manager.statistics.totalAttempts == 1
         manager.statistics.agents['single-pass-agent'].status == 'RECOVERING'
@@ -240,7 +240,7 @@ class SelfHealingAgentManagerSpec extends Specification {
         manager.performHealthCheck()
 
         then:
-        1 * agent.connect(true) >> pendingFuture
+        1 * agent.connect(false) >> pendingFuture
         0 * agent.disconnect(_)
         manager.hasPendingRecovery('pending-agent')
         manager.statistics.agents['pending-agent'].status == 'RECOVERING'
@@ -252,15 +252,16 @@ class SelfHealingAgentManagerSpec extends Specification {
         !pendingFuture.isCancelled()
     }
 
-    def "singlePass restart waits for disconnect future and skips reconnect on disconnect timeout"() {
+    def "singlePass restart uses non-UserCause disconnect and schedules deferred reconnect when disconnect times out"() {
         given:
         def jenkins = Mock(Jenkins)
         def agent = Mock(SlaveComputer)
-        def timedOutDisconnect = Mock(Future)
+        def slowDisconnect = new CompletableFuture<Void>()
+        OfflineCause recordedCause = null
         agent.name >> 'restart-agent'
         agent.isOffline() >> true
         agent.isOnline() >> false
-        agent.offlineCause >> null
+        agent.offlineCause >> { recordedCause }
         agent.node >> Mock(Slave)
         jenkins.toComputer() >> null
         jenkins.computers >> ([agent] as Computer[])
@@ -273,13 +274,24 @@ class SelfHealingAgentManagerSpec extends Specification {
             singlePass         : true
         ], jenkins)
 
-        when:
+        when: "disconnect takes longer than the bounded wait"
         manager.performHealthCheck()
 
-        then:
-        1 * agent.disconnect(_ as OfflineCause) >> timedOutDisconnect
-        1 * timedOutDisconnect.get(50L, TimeUnit.MILLISECONDS) >> { throw new TimeoutException('still closing') }
-        0 * agent.connect(true)
+        then: "disconnect used a non-UserCause and deferred reconnect is tracked without premature connect"
+        1 * agent.disconnect(_ as SelfHealingAgentManager.SelfHealingRestartCause) >> { OfflineCause c ->
+            recordedCause = c
+            return slowDisconnect
+        }
+        !(recordedCause instanceof OfflineCause.UserCause)
+        0 * agent.connect(_)
+        manager.hasPendingRecovery('restart-agent')
+
+        when: "disconnect finally completes"
+        slowDisconnect.complete(null)
+
+        then: "deferred reconnect executes and clears pending recovery"
+        1 * agent.connect(false)
+        !manager.hasPendingRecovery('restart-agent')
 
         cleanup:
         manager.stop()
