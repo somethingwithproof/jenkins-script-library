@@ -72,3 +72,75 @@ To preview a selective restore on the controller, call
 `backupJenkinsConfig.restore(backupFile: archive, files: ['config.xml'], dryRun: true)`.
 The preview returns the selected paths. Applying the restore requires Jenkins
 administrator permission and preserves copies of changed files.
+
+## Spot capacity
+
+`provisionSpot` requests one new interruptible VM or schedules one Pod on an
+interruptible pool. It runs on a Unix agent with Python 3.9 or later. Submission
+uses the corresponding authenticated cloud CLI on that agent. A preview validates
+the request locally and returns the provider, target and `planned` status. Pass
+`apply: true` to submit. A `submitted` result includes the resource identifier.
+Jenkins agent registration and readiness depend on the supplied image, launch
+template or Pod configuration.
+
+```groovy
+def request = [
+    provider: 'aws',
+    region: 'us-east-1',
+    requestId: "ci-nightly-linux-${env.BUILD_NUMBER}",
+    spec: [LaunchTemplate: [LaunchTemplateId: 'lt-0123456789abcdef0', Version: '3']]
+]
+def plan = provisionSpot(request)
+echo "Planned capacity request for ${plan.target}"
+def submitted = provisionSpot(request + [apply: true])
+echo "Submitted ${submitted.resourceId}"
+```
+
+| Provider | Required inputs | Interruption behavior |
+| --- | --- | --- |
+| `aws` | `region`, stable `requestId`, and EC2 RunInstances `spec` with `LaunchTemplate` or `ImageId` plus the normal launch settings | Requests one one-time Spot instance. The client token identifies retries. |
+| `azure` | `subscription`, `resourceGroup`, `name`, and an Azure Compute VM REST `spec` with location, hardware, storage, OS and network settings | Creates a Spot VM in Azure public cloud. The create-only precondition protects existing VMs. Eviction defaults to Deallocate. The spec may select Delete. |
+| `gcp` | `project`, `zone`, `name`, and `instanceTemplate` | Creates a named Spot VM with the STOP termination action and automatic restart disabled. |
+| `oracle` | Commercial OCI `region`, stable `requestId`, and native LaunchInstanceDetails `spec` with compartment, availability domain, shape, source and network settings | Requests a preemptible instance with a terminate action. The boot volume is preserved by default. |
+| `kubernetes` | `context`, `namespace`, `pool` and a named v1 Pod `spec` | Requires an existing interruptible pool. The Pod remains pending if matching capacity is unavailable. |
+
+Kubernetes accepts `eks` (managed node group), `aks`, `gke` and `oke`. The step
+adds the provider's required node selector and preserves existing selectors. AKS, GKE
+and OKE also receive a matching scheduling toleration. A Pod that fixes a node
+directly, changes the scheduler, or specifies a conflicting pool selector is rejected.
+
+Use a stable request ID or resource name for the same logical request. After an
+ambiguous provider response, check that target before retrying. Actual cloud
+charges depend on the resource lifecycle and the provider's bill. Existing agents
+are neither replaced nor terminated by this step.
+
+### Schedule a build on existing spot agents
+
+Call `withSpotAgent` outside an agent allocation. Its `label` option is a Jenkins
+label expression and defaults to `spot`. The step takes a snapshot of online,
+task-accepting agents matching that expression and queues work by their node names.
+A busy candidate can wait in the Jenkins queue. An enclosing Pipeline timeout
+can bound that wait and the build together.
+
+```groovy
+timeout(time: 30, unit: 'MINUTES') {
+    withSpotAgent(provider: 'aws', label: 'linux && spot') {
+        checkout scm
+        sh './gradlew test'
+    }
+}
+```
+
+The step checks capacity on the allocated Unix agent before invoking the body.
+It skips candidates whose capacity is regular or cannot be verified, and fails
+if it exhausts the candidate set. The body runs once and its return value, errors,
+and interruptions propagate to the caller. Handle retrying interrupted builds
+in the calling Pipeline, according to whether its workload can safely be repeated.
+
+| Provider | Agent verification requirements |
+| --- | --- |
+| `aws` | Python 3 and EC2 IMDSv2 access to the instance lifecycle field. |
+| `azure` | Python 3 and Azure Instance Metadata Service access to the VM priority field. |
+| `gcp` | Python 3 and Compute Engine metadata access to the VM preemptible scheduling flag. |
+| `oracle` | Python 3, OCI instance metadata, and an authenticated OCI CLI with permission to read the current instance. The instance OCID and region come from metadata. |
+| `kubernetes` | Python 3 and kubectl with permission to get the agent Pod and its worker Node. Set `pool` to `eks`, `aks`, `gke` or `oke`. Expose `POD_NAME`, `POD_NAMESPACE` and `POD_UID` from `metadata.name`, `metadata.namespace` and `metadata.uid` via the Downward API. The verifier checks that the Pod UID matches and reads the capacity label on its assigned worker. |

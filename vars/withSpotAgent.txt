@@ -1,0 +1,4 @@
+Run a Pipeline body on an existing verified interruptible agent. Set provider to
+aws, azure, gcp, oracle or kubernetes. Optionally supply a Jenkins label expression
+(default: spot). Kubernetes also requires pool eks, aks, gke or oke. The step
+returns the body's result and propagates build failures and interruptions.

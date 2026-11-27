@@ -36,6 +36,9 @@ void beforeRestart() {
         @Library('jenkins-script-library') _
         def report
         node {
+            def spot = provisionSpot(provider: 'aws', requestId: 'preview', region: 'us-east-1',
+                spec: [LaunchTemplate: [LaunchTemplateId: 'lt-fixture', Version: '1']])
+            assert spot == [provider: 'aws', target: 'us-east-1/preview', status: 'planned']
             assert cloudInventory().agents.isEmpty()
             assert optimizeCloudCosts.optimize(dryRun: false).counts.applied == 0
             report = auditPlugins(expected: 'absent-fixture:latest')
@@ -70,6 +73,7 @@ void afterRestart() {
     run.getAction(InputAction).getExecution('Resume').proceed(null)
     rule.assertBuildStatusSuccess(rule.waitForCompletion(run))
     rule.assertLogContains('Inventory survived restart', run)
-    new GroovyShell(rule.jenkins.pluginManager.uberClassLoader, binding)
-        .evaluate(new File(project, 'src/controller-test/fixtures/CloudOwnership.groovy'))
+    def shell = new GroovyShell(rule.jenkins.pluginManager.uberClassLoader, binding)
+    shell.evaluate(new File(project, 'src/controller-test/fixtures/SpotScheduling.groovy'))
+    shell.evaluate(new File(project, 'src/controller-test/fixtures/CloudOwnership.groovy'))
 }

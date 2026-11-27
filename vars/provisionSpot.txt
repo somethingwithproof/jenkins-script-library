@@ -1,0 +1,4 @@
+Provision one interruptible VM or schedule one Pod on an interruptible node pool.
+The default preview returns the provider, target and planned status. Pass apply: true
+to submit the request from the current Unix agent. Successful submissions include
+the provider resource identifier. See vars/README.md for provider inputs.
